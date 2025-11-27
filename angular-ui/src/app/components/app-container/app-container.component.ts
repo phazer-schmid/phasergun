@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { AppStatusOutput } from '@/interfaces/AppStatusOutput';
+import { AppStatusOutput } from '@fda-compliance/shared-types';
 import { OrchestratorService } from '../../services/orchestrator.service';
 import { InputFormComponent } from '../input-form/input-form.component';
 import { OutputDisplayComponent } from '../output-display/output-display.component';

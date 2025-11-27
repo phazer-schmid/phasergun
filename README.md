@@ -1,91 +1,68 @@
-# FDA 510(k) Compliance - Decoupled POC Application
+# FDA 510(k) Compliance System - Modular Architecture
 
-## Overview
-
-This is a proof-of-concept implementation of a decoupled, AI-powered regulatory compliance application. The architecture follows a modular design where each component is independently testable using mocks.
-
-## Architecture
-
-### Core Modules
-1. **UI Module** - Vue 3 + TypeScript + Tailwind CSS
-2. **Orchestration Module** - Coordinates the workflow
-3. **File System & Parsing Module** - Scans and extracts content (mocked)
-4. **Chunking Module** - Breaks documents into processable parts (mocked)
-5. **RAG & Knowledge Base Module** - Retrieves relevant context (mocked)
-6. **LLM Integration Module** - Generates AI responses (mocked)
-
-### Technology Stack
-- **Frontend**: Vue 3 (Composition API), TypeScript, Tailwind CSS
-- **Build Tool**: Vite
-- **Module System**: ES Modules with TypeScript interfaces
+This system provides a fully decoupled architecture for FDA 510(k) compliance analysis with clear separation of concerns.
 
 ## Project Structure
 
 ```
-poc-decoupled-app/
-├── src/
-│   ├── components/          # Vue components
-│   │   ├── AppContainer.vue
-│   │   ├── InputForm.vue
-│   │   └── OutputDisplay.vue
-│   ├── interfaces/          # TypeScript interfaces (contracts)
-│   │   ├── SourceFolderInput.ts
-│   │   ├── AppStatusOutput.ts
-│   │   ├── ParsedDocument.ts
-│   │   ├── ChunkedDocumentPart.ts
-│   │   ├── KnowledgeContext.ts
-│   │   └── LLMResponse.ts
-│   ├── services/           # Service implementations
-│   │   ├── Orchestrator.ts
-│   │   ├── FileParser.ts (mock)
-│   │   ├── Chunker.ts (mock)
-│   │   ├── RAGService.ts (mock)
-│   │   └── LLMService.ts (mock)
-│   ├── App.vue
-│   └── main.ts
-├── public/
-├── index.html
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-└── tailwind.config.js
+├── packages/              # Independent, testable modules
+│   ├── shared-types/      # Common TypeScript interfaces
+│   ├── file-parser/      # DHF document scanning
+│   ├── chunker/          # Document chunking
+│   ├── rag-service/      # Knowledge base & retrieval  
+│   ├── llm-service/      # AI model integration
+│   └── orchestrator/     # Workflow coordination
+└── angular-ui/           # User interface
 ```
 
-## Setup Instructions
-
-### Prerequisites
-- Node.js 18+ and npm
-
-### Installation
+## Quick Start
 
 ```bash
-# Navigate to project directory
-cd poc-decoupled-app
+# Install all dependencies and build packages
+npm run install-all
 
-# Install dependencies
-npm install
+# Test individual modules via CLI
+npm run test-file-parser
+npm run test-chunker
+npm run test-rag
+npm run test-llm
+npm run test-orchestrator
 
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
+# Start the Angular UI
+npm run start-ui
+# Opens at http://localhost:4200
 ```
 
-## Usage
+## Key Concepts
 
-1. Enter a folder path in the input field
-2. Click the "Analyze Folder" button
-3. View the processing status and results
+- **RAG (Retrieval-Augmented Generation)**: Your "thinking document" (primary context) is stored here along with regulatory guidelines
+- **Chunking**: Breaking large documents into smaller pieces for better AI processing
+- **Primary Context**: Your strategic thinking document that guides AI behavior
 
-## Current Status
+## Module Independence
 
-**POC Phase**: All non-UI modules are mocked. The full orchestration flow executes and returns a simple "hello world" style confirmation message demonstrating the complete module traversal.
+Each module:
+- Has its own package.json and can be installed independently
+- Has a CLI test script for standalone testing
+- Can be built and tested without other modules
+- Exposes clear TypeScript interfaces
 
-## Next Steps
+## End-to-End Flow
 
-1. Replace FileParser mock with real implementation
-2. Replace Chunker mock with real implementation
-3. Integrate real RAG service with vector database
-4. Connect to actual LLM providers (Claude/Gemini)
-5. Build comprehensive dashboard for phase-based analysis
+1. User submits folder path in Angular UI
+2. Orchestrator coordinates workflow:
+   - File Parser scans and extracts text
+   - Chunker breaks documents into pieces
+   - RAG Service retrieves relevant knowledge/context
+   - LLM Service generates compliance analysis
+3. Results displayed in UI with detailed report
+
+All modules currently use mocks for rapid development and testing.
+
+## Documentation
+
+See detailed documentation in project root:
+- Full architecture details
+- Module specifications
+- Development roadmap
+- API contracts

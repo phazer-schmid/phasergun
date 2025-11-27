@@ -1,0 +1,19 @@
+{
+  "name": "@fda-compliance/chunker",
+  "version": "0.1.0",
+  "description": "Document chunking module for RAG processing",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "node dist/cli.js",
+    "dev": "tsc && node dist/cli.js"
+  },
+  "dependencies": {
+    "@fda-compliance/shared-types": "file:../shared-types"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.0",
+    "@types/node": "^20.0.0"
+  }
+}

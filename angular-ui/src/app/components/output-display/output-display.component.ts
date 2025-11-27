@@ -1,6 +1,6 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { AppStatusOutput } from '@/interfaces/AppStatusOutput';
+import { AppStatusOutput } from '@fda-compliance/shared-types';
 
 @Component({
   selector: 'app-output-display',

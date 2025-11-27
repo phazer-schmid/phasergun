@@ -1,0 +1,17 @@
+{
+  "name": "@fda-compliance/shared-types",
+  "version": "0.1.0",
+  "description": "Shared TypeScript interfaces for FDA 510(k) compliance application",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"No tests yet\""
+  },
+  "keywords": ["fda", "510k", "compliance", "types"],
+  "author": "",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "typescript": "~5.9.0"
+  }
+}
