@@ -6,7 +6,7 @@ A completely decoupled, modular architecture with **6 independent packages** + *
 
 ## Module Structure
 
-### Independent Packages (`packages/`)
+### Core Business Logic (`src/`)
 ```
 shared-types/       ← TypeScript interfaces (foundation for all)
    └─ SourceFolderInput, AppStatusOutput, ParsedDocument, etc.
@@ -28,7 +28,7 @@ orchestrator/       ← Coordinates complete workflow
 ```
 
 ### UI (`angular-ui/`)
-Angular 18 standalone components with Tailwind CSS
+Angular 18 standalone components with Tailwind CSS - completely separate from core logic
 
 ## Key Architectural Decisions
 
@@ -267,7 +267,7 @@ Each mock can be replaced independently:
 ## Files Created
 
 ```
-packages/
+src/                    # Core logic (NOT nested under UI)
   shared-types/
     package.json, tsconfig.json
     src/index.ts + 6 interface files
@@ -292,7 +292,7 @@ packages/
     package.json, tsconfig.json
     src/index.ts, cli.ts
 
-angular-ui/
+angular-ui/             # UI (separate from core)
   package.json (updated with module dependencies)
   src/app/services/orchestrator.service.ts (updated)
   src/app/components/ (3 components updated)

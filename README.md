@@ -5,14 +5,14 @@ This system provides a fully decoupled architecture for FDA 510(k) compliance an
 ## Project Structure
 
 ```
-├── packages/              # Independent, testable modules
-│   ├── shared-types/      # Common TypeScript interfaces
+├── src/                  # Core business logic modules
+│   ├── shared-types/     # Common TypeScript interfaces
 │   ├── file-parser/      # DHF document scanning
 │   ├── chunker/          # Document chunking
 │   ├── rag-service/      # Knowledge base & retrieval  
 │   ├── llm-service/      # AI model integration
 │   └── orchestrator/     # Workflow coordination
-└── angular-ui/           # User interface
+└── angular-ui/           # User interface (completely separate)
 ```
 
 ## Quick Start

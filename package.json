@@ -4,17 +4,17 @@
   "private": true,
   "description": "FDA 510(k) Compliance Analysis System - Modular Architecture",
   "workspaces": [
-    "packages/*",
+    "src/*",
     "angular-ui"
   ],
   "scripts": {
     "install-all": "npm install && npm run build-packages",
     "build-packages": "npm run build --workspaces --if-present",
-    "test-file-parser": "cd packages/file-parser && npm run dev",
-    "test-chunker": "cd packages/chunker && npm run dev",
-    "test-rag": "cd packages/rag-service && npm run dev",
-    "test-llm": "cd packages/llm-service && npm run dev",
-    "test-orchestrator": "cd packages/orchestrator && npm run dev",
+    "test-file-parser": "cd src/file-parser && npm run dev",
+    "test-chunker": "cd src/chunker && npm run dev",
+    "test-rag": "cd src/rag-service && npm run dev",
+    "test-llm": "cd src/llm-service && npm run dev",
+    "test-orchestrator": "cd src/orchestrator && npm run dev",
     "test-all-modules": "npm run test-file-parser && npm run test-chunker && npm run test-rag && npm run test-llm && npm run test-orchestrator",
     "start-ui": "cd angular-ui && npm start"
   },
