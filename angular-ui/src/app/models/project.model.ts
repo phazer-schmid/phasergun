@@ -1,3 +1,20 @@
+export interface DateHistoryEntry {
+  changedAt: string;
+  changedBy?: string;
+  previousDates: {
+    phase1?: string;
+    phase2?: string;
+    phase3?: string;
+    phase4?: string;
+  };
+  newDates: {
+    phase1?: string;
+    phase2?: string;
+    phase3?: string;
+    phase4?: string;
+  };
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -22,4 +39,5 @@ export interface Project {
     phase3?: string;
     phase4?: string;
   };
+  dateHistory?: DateHistoryEntry[];
 }

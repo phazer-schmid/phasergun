@@ -1,0 +1,249 @@
+<div class="dashboard-container">
+  <!-- Sidebar -->
+  <aside class="dashboard-sidebar">
+    <!-- Logo/Branding -->
+    <div class="sidebar-header">
+      <div class="app-logo">
+        <div class="logo-icon">M</div>
+        <div class="logo-content">
+          <span class="logo-text">MedDev Pro</span>
+          <span class="logo-subtitle">Regulatory Control</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <!-- Entire Project -->
+        <div 
+          class="nav-item nav-item-active"
+          (click)="selectNavItem({ id: 'project', label: 'Entire Project', type: 'project', icon: '📁' })">
+          <span class="nav-icon">📁</span>
+          <span class="nav-label">Entire Project</span>
+        </div>
+
+        <!-- Phase Items -->
+        <div 
+          class="nav-item"
+          (click)="selectNavItem({ id: 'phase1', label: 'Phase 1: Planning', type: 'phase', phaseId: 1, icon: '1' })">
+          <span class="nav-icon-number">1</span>
+          <span class="nav-label">Phase 1: Planning</span>
+        </div>
+
+        <div 
+          class="nav-item"
+          (click)="selectNavItem({ id: 'phase2', label: 'Phase 2: Design', type: 'phase', phaseId: 2, icon: '2' })">
+          <span class="nav-icon-number">2</span>
+          <span class="nav-label">Phase 2: Design</span>
+        </div>
+
+        <div 
+          class="nav-item"
+          (click)="selectNavItem({ id: 'phase3', label: 'Phase 3: Development', type: 'phase', phaseId: 3, icon: '3' })">
+          <span class="nav-icon-number">3</span>
+          <span class="nav-label">Phase 3: Development</span>
+        </div>
+
+        <div 
+          class="nav-item"
+          (click)="selectNavItem({ id: 'phase4', label: 'Phase 4: Testing', type: 'phase', phaseId: 4, icon: '4' })">
+          <span class="nav-icon-number">4</span>
+          <span class="nav-label">Phase 4: Testing</span>
+        </div>
+
+        <!-- Regulatory Submission -->
+        <div class="nav-item">
+          <span class="nav-icon">✓</span>
+          <span class="nav-label">Regulatory Submission</span>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Sidebar Footer -->
+    <div class="sidebar-footer">
+      <div class="footer-text">© 2025 MedDev Pro</div>
+      <div class="footer-version">v1.0.0 - HIPAA Compliant</div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="dashboard-main">
+    <!-- Header -->
+    <div class="dashboard-header">
+      <h1 class="page-title">Entire Project</h1>
+    </div>
+
+    <!-- Stats Cards Row -->
+    <div class="stats-row">
+      <!-- Project Completeness Card -->
+      <div class="card stats-card">
+        <div class="stats-header">
+          <div class="stats-label">Project Completeness</div>
+          <div class="stats-value-large">57%</div>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill progress-gradient" style="width: 57%"></div>
+        </div>
+        <div class="stats-meta">24 of 42 documents submitted</div>
+      </div>
+
+      <!-- Document Quality Risk Card -->
+      <div class="card stats-card stats-card-risk">
+        <div class="stats-header">
+          <div class="stats-label-row">
+            <span class="stats-label">Document Quality Risk</span>
+            <span class="badge badge-medium">MEDIUM</span>
+          </div>
+        </div>
+        <div class="stats-value-row">
+          <span class="stats-value-large">68</span>
+          <span class="stats-suffix">/100 quality score</span>
+        </div>
+        <div class="stats-meta">3 issues detected in submitted documents</div>
+      </div>
+    </div>
+
+    <!-- Main Content Row -->
+    <div class="dashboard-grid">
+      <!-- Document Checklist -->
+      <div class="card checklist-card">
+        <div class="section-header">
+          <h2 class="section-title">Document Checklist</h2>
+          <span class="section-meta">4/6</span>
+        </div>
+
+        <div class="checklist-content">
+          <!-- Checklist Item 1 - Completed -->
+          <div class="checklist-item">
+            <input type="checkbox" checked disabled class="checkbox">
+            <div class="checklist-text">
+              <div class="checklist-label checklist-label-complete">Clinical Trial Protocol</div>
+              <div class="checklist-meta">
+                <span>Submitted 2025-01-10 • Reviewed by Dr. Smith</span>
+                <span class="badge badge-low">⚠ Low</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Checklist Item 2 - Completed -->
+          <div class="checklist-item">
+            <input type="checkbox" checked disabled class="checkbox">
+            <div class="checklist-text">
+              <div class="checklist-label checklist-label-complete">Risk Management File</div>
+              <div class="checklist-meta">Submitted 2025-01-08</div>
+            </div>
+          </div>
+
+          <!-- Checklist Item 3 -->
+          <div class="checklist-item">
+            <input type="checkbox" disabled class="checkbox">
+            <div class="checklist-text">
+              <div class="checklist-label">Design Controls</div>
+              <div class="checklist-meta">
+                <span class="badge badge-yellow">IN PROGRESS</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Checklist Item 4 -->
+          <div class="checklist-item">
+            <input type="checkbox" disabled class="checkbox">
+            <div class="checklist-text">
+              <div class="checklist-label">Validation Protocol</div>
+              <div class="checklist-meta">
+                <span class="badge badge-orange">MISSING</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Checklist Item 5 -->
+          <div class="checklist-item">
+            <input type="checkbox" disabled class="checkbox">
+            <div class="checklist-text">
+              <div class="checklist-label">Traceability Matrix</div>
+              <div class="checklist-meta">
+                <span class="badge badge-orange">MISSING</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Checklist Item 6 -->
+          <div class="checklist-item">
+            <input type="checkbox" disabled class="checkbox">
+            <div class="checklist-text">
+              <div class="checklist-label">Quality Management System</div>
+              <div class="checklist-meta">
+                <span class="badge badge-orange">MISSING</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI Analysis Panel -->
+      <div class="card analysis-card">
+        <div class="section-header">
+          <h2 class="section-title">AI Analysis & Narrative</h2>
+          <button 
+            class="btn-refresh"
+            [disabled]="isAnalyzing"
+            (click)="runAnalysis()">
+            <span *ngIf="!isAnalyzing">🔄 Refresh</span>
+            <span *ngIf="isAnalyzing">⏳ Analyzing...</span>
+          </button>
+        </div>
+
+        <div class="analysis-content">
+          <div *ngIf="!analysisResult" class="analysis-empty">
+            <p>No analysis available yet. Click "Refresh" to run an AI-powered analysis of your documentation.</p>
+          </div>
+
+          <div *ngIf="analysisResult?.status === 'processing'" class="analysis-loading">
+            <p>Analyzing your documentation with RAG-enhanced AI...</p>
+          </div>
+
+          <div *ngIf="analysisResult?.status === 'complete'" class="analysis-narrative">
+            <h3 class="narrative-title">Project Status & AI Recommendations</h3>
+            
+            <div class="narrative-text">
+              <p>Your medical device project is progressing well with 57% document completion rate. The quality score of 68/100 indicates moderate risk in submitted documents. Key areas requiring attention: Shelf Life Testing shows critical gaps, and Sterilization Validation documentation needs strengthening. Current trajectory suggests Phase 4 completion within 8 weeks if risk mitigation actions are implemented immediately.</p>
+            </div>
+
+            <!-- Show detailed report if available -->
+            <div *ngIf="analysisResult!.detailedReport" class="narrative-details">
+              {{ analysisResult!.detailedReport }}
+            </div>
+
+            <!-- Gaps Section (if available) -->
+            <div *ngIf="analysisResult!.gaps && analysisResult!.gaps.length > 0" class="analysis-section">
+              <h4 class="analysis-section-title">Identified Gaps</h4>
+              <div *ngFor="let gap of analysisResult!.gaps" class="analysis-item">
+                <span class="badge" [ngClass]="'badge-' + gap.severity">{{ gap.severity }}</span>
+                <div class="analysis-item-text">
+                  <strong>{{ gap.type }}:</strong> {{ gap.description }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Risks Section (if available) -->
+            <div *ngIf="analysisResult!.risks && analysisResult!.risks.length > 0" class="analysis-section">
+              <h4 class="analysis-section-title">Risk Factors</h4>
+              <div *ngFor="let risk of analysisResult!.risks" class="analysis-item">
+                <span class="badge" [ngClass]="'badge-' + risk.severity">{{ risk.severity }}</span>
+                <div class="analysis-item-text">
+                  <strong>{{ risk.category }}:</strong> {{ risk.description }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="analysisResult?.status === 'error'" class="analysis-error">
+            <p><strong>Error:</strong> {{ analysisResult!.message }}</p>
+            <p class="error-details">{{ analysisResult!.detailedReport }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>

@@ -170,6 +170,40 @@
               />
             </div>
           </div>
+
+          <!-- Date History -->
+          <div *ngIf="project?.dateHistory && project!.dateHistory!.length > 0" class="mt-4 pt-4 border-t border-gray-200">
+            <h4 class="text-xs font-medium text-gray-600 mb-2">Date Change History</h4>
+            <div class="space-y-2 max-h-48 overflow-y-auto">
+              <div *ngFor="let entry of project!.dateHistory" class="text-xs bg-gray-50 p-2 rounded border border-gray-200">
+                <div class="font-medium text-gray-700 mb-1">
+                  Changed on {{ entry.changedAt | date:'short' }}
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-gray-600">
+                  <div *ngIf="entry.previousDates.phase1 !== entry.newDates.phase1">
+                    <span class="font-medium">P1:</span> 
+                    <span class="line-through text-red-600">{{ entry.previousDates.phase1 | date:'shortDate' }}</span>
+                    → <span class="text-green-600">{{ entry.newDates.phase1 | date:'shortDate' }}</span>
+                  </div>
+                  <div *ngIf="entry.previousDates.phase2 !== entry.newDates.phase2">
+                    <span class="font-medium">P2:</span>
+                    <span class="line-through text-red-600">{{ entry.previousDates.phase2 | date:'shortDate' }}</span>
+                    → <span class="text-green-600">{{ entry.newDates.phase2 | date:'shortDate' }}</span>
+                  </div>
+                  <div *ngIf="entry.previousDates.phase3 !== entry.newDates.phase3">
+                    <span class="font-medium">P3:</span>
+                    <span class="line-through text-red-600">{{ entry.previousDates.phase3 | date:'shortDate' }}</span>
+                    → <span class="text-green-600">{{ entry.newDates.phase3 | date:'shortDate' }}</span>
+                  </div>
+                  <div *ngIf="entry.previousDates.phase4 !== entry.newDates.phase4">
+                    <span class="font-medium">P4:</span>
+                    <span class="line-through text-red-600">{{ entry.previousDates.phase4 | date:'shortDate' }}</span>
+                    → <span class="text-green-600">{{ entry.newDates.phase4 | date:'shortDate' }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Action Buttons -->
