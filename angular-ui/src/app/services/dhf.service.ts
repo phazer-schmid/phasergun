@@ -1,28 +1,26 @@
 import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { DHFFile, DHFDocument, PhaseDHFMapping } from '@fda-compliance/shared-types';
 
-// TODO: Uncomment when HttpClient is properly configured
-// import { HttpClient } from '@angular/common/http';
-// import { Observable, of } from 'rxjs';
-// import { catchError, map } from 'rxjs/operators';
-
-// interface ScanResponse {
-//   projectId: string;
-//   dhfFiles: DHFFile[];
-//   scanStatus: string;
-//   timestamp: string;
-//   stats: {
-//     totalDHFFiles: number;
-//     completedFiles: number;
-//     totalDocuments: number;
-//   };
-// }
+interface ScanResponse {
+  projectId: string;
+  dhfFiles: DHFFile[];
+  scanStatus: string;
+  timestamp: string;
+  stats: {
+    totalDHFFiles: number;
+    completedFiles: number;
+    totalDocuments: number;
+  };
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class DhfService {
-  // private apiUrl = 'http://localhost:3001/api';
+  private apiUrl = 'http://localhost:3001/api';
   // Mock DHF phase mapping based on the YAML file
   private dhfPhaseMapping: PhaseDHFMapping[] = [
     {
@@ -146,27 +144,8 @@ export class DhfService {
           documentReference: 'VR0284.A',
           submissionSection: 'Section 17 - Biocompatibility',
           required: true,
-          status: 'complete',
-          documents: [
-            {
-              name: 'ISO 10993-1 Biocompatibility Evaluation',
-              status: 'complete',
-              date: '2025-01-15',
-              reviewer: 'Dr. Johnson'
-            },
-            {
-              name: 'Cytotoxicity Test Results',
-              status: 'complete',
-              date: '2025-01-18',
-              reviewer: 'Lab Tech A'
-            },
-            {
-              name: 'Sensitization Study Report',
-              status: 'complete',
-              date: '2025-01-20',
-              reviewer: 'Dr. Smith'
-            }
-          ]
+          status: 'missing',
+          documents: []
         },
         {
           id: 'biocompatibility_protocol',
@@ -192,26 +171,8 @@ export class DhfService {
           documentReference: 'VR0287.A',
           submissionSection: 'Section 16 - Shelf Life',
           required: true,
-          status: 'in_progress',
-          documents: [
-            {
-              name: 'Accelerated Aging Protocol V1.2',
-              status: 'in_progress',
-              progress: 65
-            },
-            {
-              name: 'Package Integrity Testing - Interim Report',
-              status: 'in_progress',
-              progress: 45,
-              issues: [
-                {
-                  type: 'documentation',
-                  severity: 'medium',
-                  description: 'Missing test data for temperature extremes'
-                }
-              ]
-            }
-          ]
+          status: 'missing',
+          documents: []
         },
         {
           id: 'final_traceability_matrix',
@@ -286,9 +247,7 @@ export class DhfService {
     }
   ];
 
-  constructor() {}
-  // TODO: Uncomment when HttpClient is properly configured
-  // constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) {}
 
   /**
    * Get DHF files for a specific phase
@@ -319,33 +278,30 @@ export class DhfService {
 
   /**
    * Scan a project folder for DHF documents using the API
-   * 
-   * TODO: Uncomment and configure HttpClient to enable API integration
-   * 
-   * Steps to enable:
-   * 1. Ensure @angular/common is properly installed
-   * 2. Add provideHttpClient() to app providers
-   * 3. Uncomment the HttpClient imports and this method
-   * 4. Start the API server (see DHF_SCANNER_SETUP.md)
+   * Connects to the backend DHF scanner that uses Claude AI for classification
+   * @param projectId - The project identifier
+   * @param projectPath - Path to the project folder
+   * @param phaseId - Optional phase ID to scan only a specific phase (undefined = scan all phases)
    */
-  // scanProjectFolder(projectId: string, projectPath: string): Observable<ScanResponse> {
-  //   return this.http.post<ScanResponse>(
-  //     `${this.apiUrl}/projects/${projectId}/scan-dhf`,
-  //     { projectPath }
-  //   ).pipe(
-  //     catchError(error => {
-  //       console.error('Error scanning project:', error);
-  //       throw error;
-  //     })
-  //   );
-  // }
-
-  /**
-   * Currently using mock data
-   * Backend API is ready at http://localhost:3001/api/projects/:id/scan-dhf
-   * See DHF_SCANNER_SETUP.md for integration instructions
-   */
-  useMockData(): boolean {
-    return true; // Using mock data until HttpClient is configured
+  scanProjectFolder(projectId: string, projectPath: string, phaseId?: number): Observable<DHFFile[]> {
+    const scanScope = phaseId ? `Phase ${phaseId}` : 'entire project';
+    console.log(`[DHF Service] Scanning ${scanScope} for project ${projectId} at ${projectPath}`);
+    
+    return this.http.post<ScanResponse>(
+      `${this.apiUrl}/projects/${projectId}/scan-dhf`,
+      { 
+        projectPath,
+        phaseId  // Pass phase filter to backend
+      }
+    ).pipe(
+      map(response => {
+        console.log(`[DHF Service] Scan complete: ${response.stats.totalDocuments} documents found`);
+        return response.dhfFiles;
+      }),
+      catchError(error => {
+        console.error('[DHF Service] Error scanning project:', error);
+        throw error;
+      })
+    );
   }
 }

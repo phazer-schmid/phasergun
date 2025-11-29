@@ -37,6 +37,9 @@ export class ProjectDashboardComponent implements OnInit {
   currentView: 'project' | 'phase' = 'project';
   selectedPhaseId?: number;
   dhfFiles: DHFFile[] = [];
+  isScanning = false;
+  scanError: string | null = null;
+  currentViewTitle: string = 'Entire Project';
 
   constructor(
     private route: ActivatedRoute,
@@ -284,17 +287,108 @@ export class ProjectDashboardComponent implements OnInit {
     this.selectedPhaseId = phaseId;
     this.currentView = 'phase';
     this.dhfFiles = this.dhfService.getDhfFilesForPhase(phaseId);
+    
+    // Update title based on phase
+    const phaseNames: { [key: number]: string } = {
+      1: 'Phase 1: Planning',
+      2: 'Phase 2: Design',
+      3: 'Phase 3: Development',
+      4: 'Phase 4: Testing'
+    };
+    this.currentViewTitle = phaseNames[phaseId] || `Phase ${phaseId}`;
   }
 
   onEntireProjectClick(): void {
     this.currentView = 'project';
     this.selectedPhaseId = undefined;
     this.dhfFiles = this.dhfService.getAllDhfFiles();
+    this.currentViewTitle = 'Entire Project';
   }
 
   loadDhfFiles(): void {
     // Load all DHF files for entire project by default
     this.dhfFiles = this.dhfService.getAllDhfFiles();
+  }
+
+  /**
+   * Scan project folder for real DHF documents using AI classification
+   */
+  async scanDhfDocuments(): Promise<void> {
+    if (!this.project || this.isScanning) return;
+
+    // Validate project has a folder path
+    if (!this.project.folderPath) {
+      this.scanError = 'Project folder path not configured';
+      return;
+    }
+
+    // If scanning entire project, show confirmation
+    if (this.currentView === 'project') {
+      const confirmed = confirm(
+        'Scan Entire Project?\n\n' +
+        'This will scan all phase folders and may take several minutes depending on the number of documents.\n\n' +
+        'Click OK to proceed or Cancel to abort.'
+      );
+      
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    this.isScanning = true;
+    this.scanError = null;
+    
+    const scanScope = this.currentView === 'project' 
+      ? 'entire project' 
+      : `Phase ${this.selectedPhaseId}`;
+    console.log(`[Dashboard] Starting DHF scan for ${scanScope}`);
+
+    try {
+      // Determine which phase to scan (undefined = all phases)
+      const phaseToScan = this.currentView === 'phase' ? this.selectedPhaseId : undefined;
+      
+      // Call the API to scan and classify documents
+      this.dhfService.scanProjectFolder(
+        this.project.id, 
+        this.project.folderPath,
+        phaseToScan
+      ).subscribe({
+          next: (scannedFiles) => {
+            console.log(`[Dashboard] Scan complete, received ${scannedFiles.length} DHF file categories`);
+            
+            // Update the display with scanned files
+            if (this.currentView === 'phase' && this.selectedPhaseId) {
+              // Filter to show only the selected phase
+              const phaseFiles = scannedFiles.filter(f => {
+                return this.isFileInPhase(f.id, this.selectedPhaseId!);
+              });
+              this.dhfFiles = phaseFiles;
+            } else {
+              // Show all files for entire project view
+              this.dhfFiles = scannedFiles;
+            }
+            
+            this.isScanning = false;
+          },
+          error: (error) => {
+            console.error('[Dashboard] Scan failed:', error);
+            this.scanError = error.error?.message || 'Failed to scan project. Check console for details.';
+            this.isScanning = false;
+          }
+        });
+    } catch (error) {
+      console.error('[Dashboard] Scan error:', error);
+      this.scanError = 'An unexpected error occurred during scanning';
+      this.isScanning = false;
+    }
+  }
+
+  /**
+   * Helper to determine if a DHF file belongs to a specific phase
+   */
+  private isFileInPhase(fileId: string, phaseId: number): boolean {
+    const phase = this.dhfService.getDhfFilesForPhase(phaseId);
+    return phase.some(f => f.id === fileId);
   }
 
   getCompletedCount(): number {

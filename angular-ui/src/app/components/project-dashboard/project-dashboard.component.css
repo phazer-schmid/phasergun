@@ -197,11 +197,30 @@
   background: rgba(74, 59, 140, 0.06);
 }
 
+.header-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-lg);
+}
+
 .page-title {
   font-size: var(--font-size-3xl);
   font-weight: var(--font-weight-bold);
   color: var(--text-dark);
   margin: 0;
+}
+
+.header-title-row .btn-refresh {
+  padding: 10px 18px;
+  background: var(--primary-purple);
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+.header-title-row .btn-refresh:hover:not(:disabled) {
+  background: #5A4A99;
 }
 
 /* Stats Row */

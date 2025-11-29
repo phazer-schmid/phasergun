@@ -100,7 +100,16 @@
         <button class="btn-text" (click)="backToProjects()">← Back to Projects</button>
         <button class="btn-text" (click)="editProject()">✎ Edit Project</button>
       </div>
-      <h1 class="page-title">Entire Project</h1>
+      <div class="header-title-row">
+        <h1 class="page-title">{{ currentViewTitle }}</h1>
+        <button 
+          class="btn-refresh"
+          [disabled]="isScanning"
+          (click)="scanDhfDocuments()">
+          <span *ngIf="!isScanning">🔄 Scan Documents</span>
+          <span *ngIf="isScanning">⏳ Scanning...</span>
+        </button>
+      </div>
     </div>
 
     <!-- Stats Cards Row -->
@@ -193,22 +202,20 @@
       <div class="card analysis-card">
         <div class="section-header">
           <h2 class="section-title">AI Analysis & Narrative</h2>
-          <button 
-            class="btn-refresh"
-            [disabled]="isAnalyzing"
-            (click)="runAnalysis()">
-            <span *ngIf="!isAnalyzing">🔄 Refresh</span>
-            <span *ngIf="isAnalyzing">⏳ Analyzing...</span>
-          </button>
         </div>
 
         <div class="analysis-content">
-          <div *ngIf="!analysisResult" class="analysis-empty">
-            <p>No analysis available yet. Click "Refresh" to run an AI-powered analysis of your documentation.</p>
+          <div *ngIf="scanError" class="analysis-error">
+            <p><strong>Scan Error:</strong> {{ scanError }}</p>
           </div>
 
-          <div *ngIf="analysisResult?.status === 'processing'" class="analysis-loading">
-            <p>Analyzing your documentation with RAG-enhanced AI...</p>
+          <div *ngIf="!analysisResult && !isScanning && !scanError" class="analysis-empty">
+            <p>No documents scanned yet. Click "Scan Documents" to analyze your project folder using AI-powered classification.</p>
+          </div>
+
+          <div *ngIf="isScanning" class="analysis-loading">
+            <p>🤖 Scanning project folder and classifying documents using Claude AI...</p>
+            <p class="scan-details">This may take a minute depending on the number of documents.</p>
           </div>
 
           <div *ngIf="analysisResult?.status === 'complete'" class="analysis-narrative">

@@ -1,9 +1,9 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import Anthropic from '@anthropic-ai/sdk';
-import { DHFFile, DHFDocument, PhaseDHFMapping } from '@fda-compliance/shared-types';
-import * as pdfParse from 'pdf-parse';
 import * as mammoth from 'mammoth';
+import pdfParse from 'pdf-parse';
+import { DHFFile, DHFDocument, PhaseDHFMapping } from '@fda-compliance/shared-types';
 
 /**
  * Scanned Document Interface
@@ -58,13 +58,23 @@ export class DHFScanner {
 
   /**
    * Scan project folder for DHF documents
+   * @param projectPath - Path to the project folder
+   * @param phaseFilter - Optional phase ID to scan only a specific phase
    */
-  async scanProjectFolder(projectPath: string): Promise<DHFFile[]> {
-    console.log(`[DHFScanner] Scanning project folder: ${projectPath}`);
+  async scanProjectFolder(projectPath: string, phaseFilter?: number): Promise<DHFFile[]> {
+    const scanScope = phaseFilter ? `Phase ${phaseFilter}` : 'all phases';
+    console.log(`[DHFScanner] Scanning project folder: ${projectPath} (${scanScope})`);
     
     // Step 1: Find all phase folders
-    const phaseFolders = await this.findPhaseFolders(projectPath);
-    console.log(`[DHFScanner] Found ${phaseFolders.length} phase folders`);
+    let phaseFolders = await this.findPhaseFolders(projectPath);
+    
+    // Filter by specific phase if requested
+    if (phaseFilter !== undefined) {
+      phaseFolders = phaseFolders.filter(folder => folder.phase === phaseFilter);
+      console.log(`[DHFScanner] Filtered to Phase ${phaseFilter}: ${phaseFolders.length} folder(s) found`);
+    } else {
+      console.log(`[DHFScanner] Found ${phaseFolders.length} phase folders`);
+    }
     
     // Step 2: Scan documents from all phase folders
     const allDocuments: ScannedDocument[] = [];

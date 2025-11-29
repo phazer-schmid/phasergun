@@ -5,7 +5,7 @@ import * as path from 'path';
 import * as yaml from 'js-yaml';
 import { config } from 'dotenv';
 import { DHFScanner } from '@fda-compliance/dhf-scanner';
-import { DHFFile, PhaseDHFMapping } from '@fda-compliance/shared-types';
+import { PhaseDHFMapping } from '@fda-compliance/shared-types';
 
 // Load environment variables
 config();
@@ -25,11 +25,20 @@ let dhfMapping: PhaseDHFMapping[] = [];
  */
 async function loadDHFMapping(): Promise<void> {
   try {
-    const yamlPath = path.join(__dirname, '../../../rag-service/knowledge-base/context/dhf-phase-mapping.yaml');
+    const yamlPath = path.join(__dirname, '../../rag-service/knowledge-base/context/dhf-phase-mapping.yaml');
     const fileContents = await fs.readFile(yamlPath, 'utf8');
     const data = yaml.load(fileContents) as any;
     
-    dhfMapping = data.phases.map((phase: any) => ({
+    // Parse the YAML structure
+    const phaseMapping = data.dhf_phase_mapping;
+    const phases = [
+      { id: 1, ...phaseMapping.phase_1 },
+      { id: 2, ...phaseMapping.phase_2 },
+      { id: 3, ...phaseMapping.phase_3 },
+      { id: 4, ...phaseMapping.phase_4 }
+    ];
+    
+    dhfMapping = phases.map((phase: any) => ({
       phaseId: phase.id,
       phaseName: phase.name,
       dhfFiles: phase.dhf_files.map((dhfFile: any) => ({
@@ -53,7 +62,7 @@ async function loadDHFMapping(): Promise<void> {
 /**
  * Health check endpoint
  */
-app.get('/api/health', (req: Request, res: Response) => {
+app.get('/api/health', (_req: Request, res: Response) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
@@ -67,9 +76,10 @@ app.get('/api/health', (req: Request, res: Response) => {
  */
 app.post('/api/projects/:projectId/scan-dhf', async (req: Request, res: Response) => {
   const { projectId } = req.params;
-  const { projectPath } = req.body;
+  const { projectPath, phaseId } = req.body;
 
-  console.log(`[API] Received scan request for project ${projectId}`);
+  const scanScope = phaseId ? `Phase ${phaseId}` : 'entire project';
+  console.log(`[API] Received scan request for ${scanScope} in project ${projectId}`);
   console.log(`[API] Project path: ${projectPath}`);
 
   if (!projectPath) {
@@ -102,9 +112,9 @@ app.post('/api/projects/:projectId/scan-dhf', async (req: Request, res: Response
     // Load DHF mapping
     await scanner.loadDHFMapping(dhfMapping);
 
-    // Scan project folder
+    // Scan project folder (with optional phase filter)
     console.log(`[API] Starting scan of ${projectPath}...`);
-    const dhfFiles = await scanner.scanProjectFolder(projectPath);
+    const dhfFiles = await scanner.scanProjectFolder(projectPath, phaseId);
 
     console.log(`[API] Scan complete. Found ${dhfFiles.length} DHF files`);
 
@@ -116,8 +126,8 @@ app.post('/api/projects/:projectId/scan-dhf', async (req: Request, res: Response
       timestamp: new Date().toISOString(),
       stats: {
         totalDHFFiles: dhfFiles.length,
-        completedFiles: dhfFiles.filter(f => f.status === 'complete').length,
-        totalDocuments: dhfFiles.reduce((sum, f) => sum + (f.documents?.length || 0), 0)
+        completedFiles: dhfFiles.filter((f: any) => f.status === 'complete').length,
+        totalDocuments: dhfFiles.reduce((sum: number, f: any) => sum + (f.documents?.length || 0), 0)
       }
     });
   } catch (error) {
@@ -135,7 +145,7 @@ app.post('/api/projects/:projectId/scan-dhf', async (req: Request, res: Response
  * GET /api/dhf-mapping
  * Get the current DHF phase mapping
  */
-app.get('/api/dhf-mapping', (req: Request, res: Response) => {
+app.get('/api/dhf-mapping', (_req: Request, res: Response) => {
   res.json({
     phases: dhfMapping,
     totalFiles: dhfMapping.reduce((sum, p) => sum + p.dhfFiles.length, 0)
