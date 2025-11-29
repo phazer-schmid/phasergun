@@ -423,22 +423,25 @@
   gap: 6px;
 }
 
+.dhf-file-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
 .dhf-file-name {
+  flex: 1;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   color: var(--text-dark);
   white-space: pre-line; /* Allows \n in names */
 }
 
-.dhf-file-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--font-size-xs);
-}
-
 .dhf-reference {
+  font-size: var(--font-size-xs);
   color: var(--text-gray);
+  line-height: 1.5;
 }
 
 /* DHF Documents (nested under DHF files) */

@@ -304,4 +304,8 @@ export class ProjectDashboardComponent implements OnInit {
   hasIssues(document: DHFDocument): boolean {
     return !!(document.issues && document.issues.length > 0);
   }
+
+  formatDocumentReference(reference: string): string {
+    return reference.replace(/\//g, '<br/>');
+  }
 }

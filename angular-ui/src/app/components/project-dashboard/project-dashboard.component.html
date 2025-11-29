@@ -154,18 +154,19 @@
                 class="checkbox">
               
               <div class="dhf-file-info">
-                <div class="dhf-file-name" [innerHTML]="dhfFile.name"></div>
-                
-                <!-- Status Badge -->
-                <div class="dhf-file-meta">
-                  <span class="dhf-reference">{{ dhfFile.documentReference }}</span>
+                <div class="dhf-file-title-row">
+                  <div class="dhf-file-name" [innerHTML]="dhfFile.name"></div>
+                  <!-- Status Badge - Right aligned -->
                   <span 
                     *ngIf="dhfFile.status === 'missing'" 
-                    class="badge badge-orange">MISSING</span>
+                    class="badge badge-orange">NOT STARTED</span>
                   <span 
                     *ngIf="dhfFile.status === 'in_progress'" 
                     class="badge badge-yellow">IN PROGRESS</span>
                 </div>
+                
+                <!-- Document Reference below -->
+                <div class="dhf-reference" [innerHTML]="formatDocumentReference(dhfFile.documentReference)"></div>
               </div>
             </div>
 
