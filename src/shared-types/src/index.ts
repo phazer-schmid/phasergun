@@ -6,3 +6,4 @@ export * from './ChunkedDocumentPart';
 export * from './KnowledgeContext';
 export * from './LLMResponse';
 export * from './AnalysisContext';
+export * from './DHFFile';

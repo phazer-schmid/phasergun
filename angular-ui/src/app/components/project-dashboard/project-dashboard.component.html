@@ -17,8 +17,9 @@
       <div class="nav-section">
         <!-- Entire Project -->
         <div 
-          class="nav-item nav-item-active"
-          (click)="selectNavItem({ id: 'project', label: 'Entire Project', type: 'project', icon: '📁' })">
+          class="nav-item"
+          [class.nav-item-active]="currentView === 'project'"
+          (click)="onEntireProjectClick()">
           <span class="nav-icon">📁</span>
           <span class="nav-label">Entire Project</span>
         </div>
@@ -27,7 +28,8 @@
         <div class="nav-item-container">
           <div 
             class="nav-item"
-            (click)="selectNavItem({ id: 'phase1', label: 'Phase 1: Planning', type: 'phase', phaseId: 1, icon: '1' })">
+            [class.nav-item-active]="selectedPhaseId === 1"
+            (click)="onPhaseClick(1)">
             <span class="nav-icon-number">1</span>
             <span class="nav-label">Phase 1: Planning</span>
           </div>
@@ -39,7 +41,8 @@
         <div class="nav-item-container">
           <div 
             class="nav-item"
-            (click)="selectNavItem({ id: 'phase2', label: 'Phase 2: Design', type: 'phase', phaseId: 2, icon: '2' })">
+            [class.nav-item-active]="selectedPhaseId === 2"
+            (click)="onPhaseClick(2)">
             <span class="nav-icon-number">2</span>
             <span class="nav-label">Phase 2: Design</span>
           </div>
@@ -51,7 +54,8 @@
         <div class="nav-item-container">
           <div 
             class="nav-item"
-            (click)="selectNavItem({ id: 'phase3', label: 'Phase 3: Development', type: 'phase', phaseId: 3, icon: '3' })">
+            [class.nav-item-active]="selectedPhaseId === 3"
+            (click)="onPhaseClick(3)">
             <span class="nav-icon-number">3</span>
             <span class="nav-label">Phase 3: Development</span>
           </div>
@@ -63,7 +67,8 @@
         <div class="nav-item-container">
           <div 
             class="nav-item"
-            (click)="selectNavItem({ id: 'phase4', label: 'Phase 4: Testing', type: 'phase', phaseId: 4, icon: '4' })">
+            [class.nav-item-active]="selectedPhaseId === 4"
+            (click)="onPhaseClick(4)">
             <span class="nav-icon-number">4</span>
             <span class="nav-label">Phase 4: Testing</span>
           </div>
@@ -130,75 +135,53 @@
 
     <!-- Main Content Row -->
     <div class="dashboard-grid">
-      <!-- Document Checklist -->
+      <!-- DHF Document Checklist -->
       <div class="card checklist-card">
         <div class="section-header">
-          <h2 class="section-title">Document Checklist</h2>
-          <span class="section-meta">4/6</span>
+          <h2 class="section-title">DHF Document Checklist</h2>
+          <span class="section-meta">{{ getCompletedCount() }}/{{ dhfFiles.length }}</span>
         </div>
 
         <div class="checklist-content">
-          <!-- Checklist Item 1 - Completed -->
-          <div class="checklist-item">
-            <input type="checkbox" checked disabled class="checkbox">
-            <div class="checklist-text">
-              <div class="checklist-label checklist-label-complete">Clinical Trial Protocol</div>
-              <div class="checklist-meta">
-                <span>Submitted 2025-01-10 • Reviewed by Dr. Smith</span>
-                <span class="badge badge-low">⚠ Low</span>
+          <!-- DHF File Item -->
+          <div *ngFor="let dhfFile of dhfFiles" class="dhf-file-item">
+            <!-- DHF File Header -->
+            <div class="dhf-file-header">
+              <input 
+                type="checkbox" 
+                [checked]="dhfFile.status === 'complete'" 
+                disabled 
+                class="checkbox">
+              
+              <div class="dhf-file-info">
+                <div class="dhf-file-name" [innerHTML]="dhfFile.name"></div>
+                
+                <!-- Status Badge -->
+                <div class="dhf-file-meta">
+                  <span class="dhf-reference">{{ dhfFile.documentReference }}</span>
+                  <span 
+                    *ngIf="dhfFile.status === 'missing'" 
+                    class="badge badge-orange">MISSING</span>
+                  <span 
+                    *ngIf="dhfFile.status === 'in_progress'" 
+                    class="badge badge-yellow">IN PROGRESS</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Checklist Item 2 - Completed -->
-          <div class="checklist-item">
-            <input type="checkbox" checked disabled class="checkbox">
-            <div class="checklist-text">
-              <div class="checklist-label checklist-label-complete">Risk Management File</div>
-              <div class="checklist-meta">Submitted 2025-01-08</div>
-            </div>
-          </div>
-
-          <!-- Checklist Item 3 -->
-          <div class="checklist-item">
-            <input type="checkbox" disabled class="checkbox">
-            <div class="checklist-text">
-              <div class="checklist-label">Design Controls</div>
-              <div class="checklist-meta">
-                <span class="badge badge-yellow">IN PROGRESS</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Checklist Item 4 -->
-          <div class="checklist-item">
-            <input type="checkbox" disabled class="checkbox">
-            <div class="checklist-text">
-              <div class="checklist-label">Validation Protocol</div>
-              <div class="checklist-meta">
-                <span class="badge badge-orange">MISSING</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Checklist Item 5 -->
-          <div class="checklist-item">
-            <input type="checkbox" disabled class="checkbox">
-            <div class="checklist-text">
-              <div class="checklist-label">Traceability Matrix</div>
-              <div class="checklist-meta">
-                <span class="badge badge-orange">MISSING</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Checklist Item 6 -->
-          <div class="checklist-item">
-            <input type="checkbox" disabled class="checkbox">
-            <div class="checklist-text">
-              <div class="checklist-label">Quality Management System</div>
-              <div class="checklist-meta">
-                <span class="badge badge-orange">MISSING</span>
+            <!-- Documents under DHF File -->
+            <div *ngIf="dhfFile.documents && dhfFile.documents.length > 0" 
+                 class="dhf-documents">
+              <div *ngFor="let doc of dhfFile.documents" class="dhf-document-item">
+                <span class="document-bullet">•</span>
+                <div class="document-info">
+                  <span class="document-name">{{ doc.name }}</span>
+                  <span *ngIf="hasIssues(doc)" class="issue-icon" 
+                        title="Issues detected">⚠️</span>
+                  <span *ngIf="doc.date" class="document-meta">
+                    {{ doc.date }} • {{ doc.reviewer }}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

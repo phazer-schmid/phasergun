@@ -40,4 +40,15 @@ export interface Project {
     phase4?: string;
   };
   dateHistory?: DateHistoryEntry[];
+  dhfFiles?: {
+    [dhfId: string]: {
+      status: 'complete' | 'in_progress' | 'missing';
+      documents: Array<{
+        name: string;
+        status: string;
+        date?: string;
+        reviewer?: string;
+      }>;
+    };
+  };
 }

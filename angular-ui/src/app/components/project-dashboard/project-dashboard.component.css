@@ -399,6 +399,92 @@
   gap: 8px;
 }
 
+/* DHF File Item */
+.dhf-file-item {
+  border-bottom: 1px solid var(--border-light);
+  padding: var(--spacing-md) 0;
+}
+
+.dhf-file-item:last-child {
+  border-bottom: none;
+}
+
+.dhf-file-header {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: flex-start;
+  margin-bottom: var(--spacing-sm);
+}
+
+.dhf-file-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dhf-file-name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-dark);
+  white-space: pre-line; /* Allows \n in names */
+}
+
+.dhf-file-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-xs);
+}
+
+.dhf-reference {
+  color: var(--text-gray);
+}
+
+/* DHF Documents (nested under DHF files) */
+.dhf-documents {
+  margin-left: 32px;
+  padding-left: var(--spacing-md);
+  border-left: 2px solid var(--border-light);
+  margin-top: var(--spacing-sm);
+}
+
+.dhf-document-item {
+  display: flex;
+  gap: var(--spacing-xs);
+  align-items: flex-start;
+  padding: 6px 0;
+  font-size: var(--font-size-sm);
+}
+
+.document-bullet {
+  color: var(--text-gray);
+  flex-shrink: 0;
+}
+
+.document-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.document-name {
+  color: var(--text-dark);
+  font-weight: var(--font-weight-medium);
+}
+
+.document-meta {
+  color: var(--text-gray);
+  font-size: var(--font-size-xs);
+}
+
+.issue-icon {
+  color: var(--orange-alert);
+  font-size: 16px;
+  cursor: help;
+}
+
 /* Analysis Panel */
 .analysis-card {
   padding: var(--spacing-xl);

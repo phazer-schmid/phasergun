@@ -4,7 +4,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { ProjectService } from '../../services/project.service';
 import { OrchestratorService } from '../../services/orchestrator.service';
 import { Project } from '../../models/project.model';
-import { AppStatusOutput, AnalysisContext, SourceFolderInput } from '@fda-compliance/shared-types';
+import { AppStatusOutput, AnalysisContext, SourceFolderInput, DHFFile, DHFDocument } from '@fda-compliance/shared-types';
+import { DhfService } from '../../services/dhf.service';
 
 interface NavItem {
   id: string;
@@ -31,12 +32,18 @@ export class ProjectDashboardComponent implements OnInit {
   isAnalyzing = false;
   
   navItems: NavItem[] = [];
+  
+  // DHF-related properties
+  currentView: 'project' | 'phase' = 'project';
+  selectedPhaseId?: number;
+  dhfFiles: DHFFile[] = [];
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private projectService: ProjectService,
-    private orchestrator: OrchestratorService
+    private orchestrator: OrchestratorService,
+    private dhfService: DhfService
   ) {}
 
   ngOnInit(): void {
@@ -46,6 +53,7 @@ export class ProjectDashboardComponent implements OnInit {
       if (this.project) {
         this.buildNavigation();
         this.loadPreviousAnalysis();
+        this.loadDhfFiles();
       }
     }
   }
@@ -269,5 +277,31 @@ export class ProjectDashboardComponent implements OnInit {
               this.project?.targetDates?.phase2 || 
               this.project?.targetDates?.phase3 || 
               this.project?.targetDates?.phase4);
+  }
+
+  // DHF-related methods
+  onPhaseClick(phaseId: number): void {
+    this.selectedPhaseId = phaseId;
+    this.currentView = 'phase';
+    this.dhfFiles = this.dhfService.getDhfFilesForPhase(phaseId);
+  }
+
+  onEntireProjectClick(): void {
+    this.currentView = 'project';
+    this.selectedPhaseId = undefined;
+    this.dhfFiles = this.dhfService.getAllDhfFiles();
+  }
+
+  loadDhfFiles(): void {
+    // Load all DHF files for entire project by default
+    this.dhfFiles = this.dhfService.getAllDhfFiles();
+  }
+
+  getCompletedCount(): number {
+    return this.dhfFiles.filter(f => f.status === 'complete').length;
+  }
+
+  hasIssues(document: DHFDocument): boolean {
+    return !!(document.issues && document.issues.length > 0);
   }
 }
