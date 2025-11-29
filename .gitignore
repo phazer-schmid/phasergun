@@ -23,6 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
+**/.env
+
 # Misc
 .DS_Store
 architecture

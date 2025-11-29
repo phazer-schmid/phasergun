@@ -1,10 +1,28 @@
 import { Injectable } from '@angular/core';
 import { DHFFile, DHFDocument, PhaseDHFMapping } from '@fda-compliance/shared-types';
 
+// TODO: Uncomment when HttpClient is properly configured
+// import { HttpClient } from '@angular/common/http';
+// import { Observable, of } from 'rxjs';
+// import { catchError, map } from 'rxjs/operators';
+
+// interface ScanResponse {
+//   projectId: string;
+//   dhfFiles: DHFFile[];
+//   scanStatus: string;
+//   timestamp: string;
+//   stats: {
+//     totalDHFFiles: number;
+//     completedFiles: number;
+//     totalDocuments: number;
+//   };
+// }
+
 @Injectable({
   providedIn: 'root'
 })
 export class DhfService {
+  // private apiUrl = 'http://localhost:3001/api';
   // Mock DHF phase mapping based on the YAML file
   private dhfPhaseMapping: PhaseDHFMapping[] = [
     {
@@ -269,6 +287,8 @@ export class DhfService {
   ];
 
   constructor() {}
+  // TODO: Uncomment when HttpClient is properly configured
+  // constructor(private http: HttpClient) {}
 
   /**
    * Get DHF files for a specific phase
@@ -295,5 +315,37 @@ export class DhfService {
   getPhaseName(phaseId: number): string {
     const phase = this.dhfPhaseMapping.find(p => p.phaseId === phaseId);
     return phase ? phase.phaseName : '';
+  }
+
+  /**
+   * Scan a project folder for DHF documents using the API
+   * 
+   * TODO: Uncomment and configure HttpClient to enable API integration
+   * 
+   * Steps to enable:
+   * 1. Ensure @angular/common is properly installed
+   * 2. Add provideHttpClient() to app providers
+   * 3. Uncomment the HttpClient imports and this method
+   * 4. Start the API server (see DHF_SCANNER_SETUP.md)
+   */
+  // scanProjectFolder(projectId: string, projectPath: string): Observable<ScanResponse> {
+  //   return this.http.post<ScanResponse>(
+  //     `${this.apiUrl}/projects/${projectId}/scan-dhf`,
+  //     { projectPath }
+  //   ).pipe(
+  //     catchError(error => {
+  //       console.error('Error scanning project:', error);
+  //       throw error;
+  //     })
+  //   );
+  // }
+
+  /**
+   * Currently using mock data
+   * Backend API is ready at http://localhost:3001/api/projects/:id/scan-dhf
+   * See DHF_SCANNER_SETUP.md for integration instructions
+   */
+  useMockData(): boolean {
+    return true; // Using mock data until HttpClient is configured
   }
 }
