@@ -33,10 +33,43 @@ export class ProjectFormComponent {
   constructor(
     private projectService: ProjectService,
     private router: Router
-  ) {}
+  ) {
+    // Prefill the local path on component initialization
+    this.prefillLocalPath();
+  }
+
+  private prefillLocalPath(): void {
+    // Get user's home directory from the browser's current user
+    // For macOS, construct the Google Drive path
+    const homeDir = this.getHomeDirectory();
+    if (homeDir && this.selectedSource === 'local') {
+      this.folderPath = `${homeDir}/Library/CloudStorage/GoogleDrive-[YOUR EMAIL]@pulsebridgemt.com/Shared drives/PulseBridge Shared/eLum PDP Files/PGPShuteDHF`;
+    }
+  }
+
+  private getHomeDirectory(): string {
+    // Try to determine home directory from current path or use a placeholder
+    // In a browser environment, we'll use a placeholder that the user can update
+    try {
+      // Check if we can detect the username from common macOS paths
+      const userMatch = window.location.pathname.match(/\/Users\/([^\/]+)/);
+      if (userMatch && userMatch[1]) {
+        return `/Users/${userMatch[1]}`;
+      }
+    } catch (e) {
+      // Fallback to placeholder
+    }
+    return '/Users/[YOUR HOME FOLDER]';
+  }
 
   onSourceChange(): void {
-    this.folderPath = '';
+    if (this.selectedSource === 'local') {
+      // Prefill local path when switching to local filesystem
+      this.prefillLocalPath();
+    } else {
+      // Clear path when switching to Google Drive
+      this.folderPath = '';
+    }
   }
 
   openGoogleDrivePicker(): void {
