@@ -5,3 +5,4 @@ export * from './ParsedDocument';
 export * from './ChunkedDocumentPart';
 export * from './KnowledgeContext';
 export * from './LLMResponse';
+export * from './AnalysisContext';

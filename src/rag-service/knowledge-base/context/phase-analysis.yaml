@@ -1,0 +1,576 @@
+# PHASE-SPECIFIC ANALYSIS CONTEXTS
+# Analysis behavior changes based on which phase is being evaluated
+
+phases:
+  phase_1:
+    id: 1
+    name: "Concept"
+    objective: "Evaluate business potential and technical feasibility"
+    
+    phase_context:
+      maturity_level: "Exploratory - documents may be incomplete drafts"
+      primary_focus:
+        - "User needs identification"
+        - "Concept validation"
+        - "Business case establishment"
+        - "Early risk identification"
+      
+      document_expectations:
+        - "Draft documents acceptable"
+        - "Multiple concepts may exist"
+        - "Incomplete specifications expected"
+        - "Preliminary data acceptable with caveats"
+    
+    required_documents:
+      mandatory:
+        - name: "Project Charter"
+          purpose: "Defines project scope, objectives, stakeholders"
+        - name: "Regulatory Plan (Initial Strategy)"
+          purpose: "Outlines regulatory pathway, predicate strategy"
+        - name: "Risk Management Plan (RMP)"
+          purpose: "Defines risk management approach and criteria"
+        - name: "510(k) Predicate Device Summary"
+          purpose: "Identifies candidate predicate devices"
+          human_review: "Must confirm legal marketing status"
+        - name: "Voice of Customer Plan (VOCP)"
+          purpose: "Strategy for capturing user needs"
+        - name: "Specification Conformance Matrix (SCM) - Draft User Needs"
+          purpose: "Preliminary user requirements"
+        - name: "Design Test Method Documents - Draft"
+          purpose: "Initial test strategy planning"
+    
+    completion_criteria:
+      exit_requirements:
+        - "At least one candidate concept demonstrates good fit"
+        - "Business case established with supporting data"
+        - "Technical, project, and product risks identified"
+        - "Mitigation plans outlined for key risks"
+        - "Planning for Feasibility Phase complete"
+      
+      mandatory_deliverables:
+        status: "All Phase 1 documents approved or advanced to next revision"
+    
+    analysis_focus:
+      what_to_extract:
+        - "Pre-population of administrative data (company info, contacts)"
+        - "Early regulatory pathway validation"
+        - "Predicate landscape assessment"
+        - "Initial user needs identification"
+        - "Concept-level risk assessment"
+      
+      what_to_validate:
+        - "User needs include prioritization (High/Medium/Low)"
+        - "CTQ (Critical to Quality) requirements identified"
+        - "Predicate device is appropriate for intended use"
+        - "Regulatory strategy aligns with device classification"
+      
+      what_to_flag:
+        - "User needs without CTQ identification"
+        - "Predicate device selection lacking justification"
+        - "Ambiguous or untestable requirements"
+        - "Missing risk identification for known hazards"
+    
+    risk_assessment:
+      phase_specific_risks:
+        - risk: "Inadequate VOC (Voice of Customer) data"
+          impact: "Poor user needs definition"
+        - risk: "Concept selection without supporting data"
+          impact: "Wrong design direction"
+        - risk: "Missing or inappropriate predicate identification"
+          impact: "SE pathway invalidated"
+        - risk: "Unclear regulatory strategy"
+          impact: "Wrong submission type or approach"
+      
+      gap_indicators:
+        - "Concept selected but no comparison matrix"
+        - "User needs list without customer validation"
+        - "Predicate device from different device classification"
+    
+    quality_metrics:
+      user_needs_quality:
+        - "Uniquely identified (UN-001, UN-002, etc.)"
+        - "Unambiguous language (no 'approximately', 'adequate')"
+        - "Prioritized (High/Medium/Low)"
+        - "CTQ requirements clearly marked"
+        - "Traceable to VOC source"
+      
+      concept_quality:
+        - "Selection criteria defined"
+        - "Multiple concepts evaluated"
+        - "Decision matrix with weighted criteria"
+        - "Feasibility assessment documented"
+    
+    narrative_summary:
+      phase_overview:
+        - "Number of concepts evaluated"
+        - "Selected concept and rationale"
+        - "User needs identified (total count, CTQ count)"
+        - "Predicate device(s) selected"
+        - "Key risks identified"
+      
+      readiness_for_phase_2:
+        - "Concept viability confirmed: Yes/No"
+        - "Business case approved: Yes/No"
+        - "Regulatory pathway clear: Yes/No"
+        - "Critical gaps blocking Phase 2 entry"
+
+  phase_2:
+    id: 2
+    name: "Feasibility"
+    objective: "Optimize design to be safe, manufacturable, cost-effective, and reliable"
+    
+    phase_context:
+      maturity_level: "Design optimization - expect iterative changes"
+      primary_focus:
+        - "Translation of user needs to technical specifications"
+        - "Design for manufacturability"
+        - "Risk management execution"
+        - "Test method development and validation"
+      
+      document_expectations:
+        - "Numeric Rev required for controlled documents"
+        - "Approved status for SCM, RMW, PFMECA"
+        - "Protocols developed but not yet executed"
+        - "Design may have multiple iterations"
+    
+    required_documents:
+      mandatory:
+        - name: "SCM – User Needs & Technical Specifications (Design Inputs) - Approved"
+          purpose: "Complete requirements definition with traceability"
+          critical: true
+        - name: "Design Test Method Documents - Approved"
+          purpose: "Validated test methods for V&V"
+        - name: "Biocompatibility Test Protocol"
+          purpose: "Plan for ISO 10993 evaluation"
+        - name: "Sterilization Validation Protocol"
+          purpose: "Plan for sterility assurance"
+        - name: "Clinical Study Protocol (if applicable)"
+          purpose: "Human use evaluation plan"
+        - name: "Design Drawings (Numeric Rev)"
+          purpose: "Detailed design outputs"
+        - name: "Labels & IFU - Draft"
+          purpose: "Initial labeling development"
+        - name: "Design Characterization Matrix (DCM)"
+          purpose: "Links design parameters to testing"
+        - name: "Process Characterization Plan"
+          purpose: "Manufacturing process definition"
+        - name: "Risk Management Workbook (RMW) – PHA, UFMECA, DFMECA - Approved"
+          purpose: "Comprehensive risk analysis"
+          critical: true
+        - name: "PFMECA - Approved"
+          purpose: "Process failure modes analysis"
+          critical: true
+        - name: "Supplier Development Plan"
+          purpose: "Critical supplier qualification strategy"
+        - name: "Design Master Verification/Validation Matrix (DMVM)"
+          purpose: "V&V planning and traceability"
+    
+    completion_criteria:
+      exit_requirements:
+        - "Design freeze decision made"
+        - "Pre-DVT completed successfully"
+        - "Technical specifications validated and approved"
+        - "All CTQ requirements identified and traceable"
+        - "Manufacturing processes designed with process flows"
+        - "Risk controls identified for all significant hazards"
+      
+      mandatory_deliverables:
+        status: "All Phase 2 documents at Numeric Rev minimum, critical docs approved"
+    
+    analysis_focus:
+      what_to_extract:
+        - "Detailed requirements from SCM (User Needs → Technical Specs)"
+        - "Draft biocompatibility sections from protocols"
+        - "Draft sterilization sections from protocols"
+        - "CTQ requirements and acceptance criteria"
+        - "Risk inputs from RMW (hazards, controls, design requirements)"
+      
+      what_to_validate:
+        - "Every user need maps to ≥1 technical specification"
+        - "Every technical spec has test method assigned"
+        - "CTQ requirements include quantitative acceptance criteria"
+        - "Risk controls traceable to design requirements"
+        - "All cited standards are FDA-recognized"
+      
+      what_to_flag:
+        - "User needs without technical specs (traceability gap)"
+        - "Technical specs without test methods"
+        - "Ambiguous specifications (no measurable criteria)"
+        - "High-severity risks without identified controls"
+        - "Non-FDA-recognized standards cited"
+    
+    risk_assessment:
+      phase_specific_risks:
+        - risk: "Design freeze without Pre-DVT success"
+          impact: "High likelihood of DVT failures in Phase 3"
+        - risk: "Technical specs don't trace to user needs"
+          impact: "Traceability gap, regulatory deficiency"
+        - risk: "CTQ requirements not identified"
+          impact: "Missing critical performance parameters"
+        - risk: "Tolerance analysis incomplete"
+          impact: "Manufacturing variability not controlled"
+        - risk: "Supplier capability not assessed"
+          impact: "Supply chain risk"
+      
+      gap_indicators:
+        - "SCM shows user needs without corresponding technical specs"
+        - "Test methods not validated (accuracy, precision, linearity)"
+        - "Risk controls identified but not translated to design requirements"
+        - "Manufacturing process not characterized"
+    
+    quality_metrics:
+      requirements_quality:
+        characteristics:
+          - "Uniquely identified"
+          - "Unambiguous (no vague terms)"
+          - "Verifiable (testable with measurable criteria)"
+          - "Complete (whole idea expressed)"
+          - "Consistent (no contradictions)"
+          - "Traceable (forward/backward linkage)"
+          - "Prioritized (High/Medium/Low)"
+      
+      test_method_quality:
+        - "Validated per ISO/IEC 17025 or equivalent"
+        - "Accuracy, precision, linearity established"
+        - "Gauge R&R < 10% for critical measurements"
+        - "Test limits defined with statistical rationale"
+      
+      risk_management_quality:
+        - "All reasonably foreseeable hazards identified"
+        - "Severity and occurrence ratings justified"
+        - "Risk controls specified (elimination > mitigation > information)"
+        - "Residual risk acceptability criteria defined"
+    
+    narrative_summary:
+      phase_overview:
+        - "Total user needs and technical specs count"
+        - "CTQ requirements identified"
+        - "Design freeze status"
+        - "Pre-DVT results summary"
+        - "High-severity risks and mitigation status"
+      
+      readiness_for_phase_3:
+        - "Design frozen: Yes/No"
+        - "Pre-DVT successful: Yes/No"
+        - "All specs traceable: Yes/No"
+        - "Risk analysis complete: Yes/No"
+        - "Critical gaps blocking Phase 3 entry"
+
+  phase_3:
+    id: 3
+    name: "Development"
+    objective: "Verify design and validate manufacturing processes"
+    
+    phase_context:
+      maturity_level: "Objective evidence generation - testing in progress"
+      primary_focus:
+        - "Design verification (design outputs meet inputs)"
+        - "Design validation (product meets user needs)"
+        - "Process characterization and optimization"
+        - "Labeling finalization with risk mitigations"
+      
+      document_expectations:
+        - "Test reports with actual results required"
+        - "Pass/fail results documented"
+        - "Residual risks identified post-testing"
+        - "Numeric Rev for DMR, Alpha Rev for labels/IFU"
+    
+    required_documents:
+      mandatory:
+        - name: "Labels & Information for Use (IFU) - Approved (English)"
+          purpose: "Final labeling incorporating all risk warnings"
+          critical: true
+        - name: "Design Verification Test (DVT) Report"
+          purpose: "Objective evidence design meets specifications"
+          critical: true
+        - name: "Design Validation (DVAL) Test Reports"
+          purpose: "Objective evidence product meets user needs"
+          critical: true
+        - name: "Biocompatibility Test Report"
+          purpose: "ISO 10993 evaluation results"
+        - name: "Sterilization Validation Report"
+          purpose: "SAL 10^-6 achievement demonstrated"
+        - name: "Accelerated Aging (Interim Time Point) Report"
+          purpose: "Package integrity and shelf life projection"
+        - name: "Packaging Validation Report"
+          purpose: "Package design adequacy"
+        - name: "Device Master Records (DMR) (Numeric Rev)"
+          purpose: "Complete manufacturing instructions"
+        - name: "Process Characterization Report"
+          purpose: "Process parameters optimized"
+        - name: "Process Master Validation Matrix (PMVM) - Approved"
+          purpose: "Process validation planning"
+        - name: "Equipment/Process Qualification Protocols/Reports"
+          purpose: "IQ/OQ/PQ documentation"
+        - name: "Design Change Assessment (DCA)"
+          purpose: "Impact analysis for any post-DVT changes"
+    
+    completion_criteria:
+      exit_requirements:
+        - "DVT demonstrates all specs met (100% pass or deviations dispositioned)"
+        - "DVAL demonstrates all user needs satisfied"
+        - "All V&V testing complete with acceptable results"
+        - "Residual risks documented in labeling"
+        - "Process validation initiated (protocols approved)"
+        - "Equipment qualified (IQ/OQ/PQ complete)"
+      
+      mandatory_deliverables:
+        status: "All test reports complete, labeling approved, DMR at Numeric Rev"
+    
+    analysis_focus:
+      what_to_extract:
+        - "DVT/DVAL test results and conclusions"
+        - "510(k) technical evidence sections (15, 17, 20, 21)"
+        - "Biocompatibility conclusions for Section 17"
+        - "Sterilization validation summary for Section 18"
+        - "Residual risks from RMW for labeling cross-check"
+      
+      what_to_validate:
+        - "All specification limits tested and met"
+        - "Test methods match those defined in DTM"
+        - "Sample sizes statistically valid"
+        - "Residual risks appear in labeling (Section 14)"
+        - "Equivalency to production units demonstrated"
+      
+      what_to_flag:
+        - "Test results contradict specifications (Design Compliance Gap)"
+        - "Residual risk in RMW not in labeling (Critical Gap)"
+        - "Test failures without disposition/CAPA"
+        - "Design changes after DVT without DCA"
+        - "Non-validated test methods used"
+    
+    risk_assessment:
+      phase_specific_risks:
+        - risk: "V&V failures not dispositioned"
+          impact: "Incomplete objective evidence, submission blocked"
+        - risk: "Test methods not validated"
+          impact: "Invalid test results, regulatory deficiency"
+        - risk: "Residual risks not in labeling"
+          impact: "Critical RTA failure"
+        - risk: "Design changes after DVT not assessed"
+          impact: "Unknown impact on validated design"
+        - risk: "Equivalency to production units not demonstrated"
+          impact: "V&V results not applicable to marketed device"
+      
+      gap_indicators:
+        - "DVT report shows failures with 'TBD' disposition"
+        - "RMW residual risks not found in IFU warnings/precautions"
+        - "Test performed at room temp but spec says 'operating temperature range'"
+        - "Design change initiated but no DCA document"
+    
+    quality_metrics:
+      verification_quality:
+        - "Statistically significant sample sizes (n ≥ 30 for critical parameters)"
+        - "Testing at specification limits (not just nominal)"
+        - "Test methods validated (accuracy, precision, linearity)"
+        - "Objective evidence for 100% of requirements"
+        - "Pass/fail criteria pre-defined"
+      
+      validation_quality:
+        - "Performed on production-equivalent units"
+        - "Actual or simulated use environment"
+        - "All intended uses covered"
+        - "User needs satisfaction demonstrated"
+        - "Acceptance criteria met"
+      
+      labeling_quality:
+        - "All residual risks from RMW included"
+        - "Warnings specific and actionable"
+        - "Indications for use accurate"
+        - "Contraindications complete"
+        - "Instructions clear and unambiguous"
+    
+    narrative_summary:
+      phase_overview:
+        - "DVT pass rate (% specs met)"
+        - "DVAL results summary"
+        - "Biocompatibility conclusions"
+        - "Sterilization SAL achieved"
+        - "Residual risks count and severity"
+      
+      readiness_for_phase_4:
+        - "All V&V complete: Yes/No"
+        - "Labeling approved: Yes/No"
+        - "All residual risks in labeling: Yes/No"
+        - "Process ready for validation: Yes/No"
+        - "Critical gaps blocking Phase 4 entry"
+
+  phase_4:
+    id: 4
+    name: "Qualification"
+    objective: "Ensure product, processes, and infrastructure ready for launch"
+    
+    phase_context:
+      maturity_level: "Final submission assembly - production readiness"
+      primary_focus:
+        - "Process validation (PPQ)"
+        - "Final submission package synthesis"
+        - "RTA checklist compliance"
+        - "Manufacturing transfer preparation"
+      
+      document_expectations:
+        - "Alpha Rev required for final submission"
+        - "All testing complete with approved reports"
+        - "Human use decision made"
+        - "Regulatory approval pathway confirmed"
+    
+    required_documents:
+      mandatory:
+        - name: "Device Master Records (DMR) (Alpha Rev) - Updated"
+          purpose: "Released manufacturing instructions"
+          critical: true
+        - name: "Bioburden & LAL Bacterial Endotoxin Report"
+          purpose: "Pre-sterilization and endotoxin levels"
+        - name: "Product Performance Qualification (PPQ) Report"
+          purpose: "Process validation completion"
+          critical: true
+        - name: "Accelerated Aging Study (Final Time Point) Report"
+          purpose: "Final shelf life validation"
+        - name: "Supplier Development Report"
+          purpose: "Critical supplier qualification complete"
+        - name: "Clinical Evaluation Report (for CE/international)"
+          purpose: "Clinical data summary"
+        - name: "Clinical Study Protocol/Report (if required)"
+          purpose: "Human use data"
+        - name: "PPT Protocol/Report (if required)"
+          purpose: "Post-market surveillance plan"
+        - name: "Risk Management Report - Approved"
+          purpose: "Final risk acceptability decision"
+          critical: true
+        - name: "Risk Management File Index (RMFI)"
+          purpose: "Complete risk documentation index"
+        - name: "Regulatory Submission(s) & Technical File(s)"
+          purpose: "Complete 510(k) package"
+          critical: true
+        - name: "Truthful and Accuracy Statement"
+          purpose: "Signed declaration"
+          critical: true
+        - name: "Design Change Assessment - Updated"
+          purpose: "All changes tracked and assessed"
+        - name: "Marketing Communications (MARCOMM)"
+          purpose: "Launch materials compliant with claims"
+        - name: "Field/Physician Training Materials & Records"
+          purpose: "User training readiness"
+    
+    completion_criteria:
+      exit_requirements:
+        - "PPQ successful (all lots pass acceptance criteria)"
+        - "All regulatory approvals obtained (510(k) clearance)"
+        - "Human use readiness confirmed (if applicable)"
+        - "Manufacturing transfer requirements met"
+        - "All RTA checklist items = Pass"
+      
+      mandatory_deliverables:
+        status: "All documents at Alpha Rev, submission package complete"
+    
+    analysis_focus:
+      what_to_extract:
+        - "Final synthesis of all 510(k) sections using Alpha Rev documents"
+        - "PPQ results and process capability metrics"
+        - "Final risk profile from RMR"
+        - "Cover letter (Section 3) content"
+        - "510(k) Summary (Section 6) content"
+        - "Substantial Equivalence discussion (Section 13)"
+      
+      what_to_validate:
+        - "All source documents at Alpha Rev (no Numeric or Draft)"
+        - "RTA checklist 100% Pass"
+        - "No conflicting data across documents"
+        - "All human review checkpoints cleared"
+        - "Truthful and Accuracy Statement signed"
+      
+      what_to_flag:
+        - "Alpha Rev required but Numeric found (Version Conflict)"
+        - "PPQ failure (blocks submission)"
+        - "RTA item = Fail or Missing (blocks submission)"
+        - "Conflicting Alpha Rev data (blocks synthesis)"
+        - "Human use without safety confirmation"
+    
+    risk_assessment:
+      phase_specific_risks:
+        - risk: "PPQ failures"
+          impact: "Process not validated, cannot launch"
+        - risk: "Missing regulatory approvals"
+          impact: "Cannot market device"
+        - risk: "RTA checklist items incomplete"
+          impact: "Submission will be Refused to Accept"
+        - risk: "Human use without comprehensive safety review"
+          impact: "Patient safety risk, regulatory non-compliance"
+        - risk: "Version conflicts in source documents"
+          impact: "Unreliable submission data"
+      
+      gap_indicators:
+        - "PPQ Cpk < 1.33 for critical process"
+        - "RTA Gap Report shows 'Fail' or 'Missing' items"
+        - "Two Alpha Rev DMRs with different part numbers"
+        - "Clinical study required but CDP says 'N/A'"
+    
+    quality_metrics:
+      process_capability:
+        - "Cpk ≥ 1.33 (minimum acceptable)"
+        - "Process in statistical control (SPC charts)"
+        - "Equipment qualified (IQ/OQ/PQ complete)"
+        - "Operators trained and certified"
+        - "PFMECA risks addressed with controls verified"
+      
+      submission_quality:
+        - "All mandatory sections present (1-21 + appendices)"
+        - "Correct format per FDA eCopy requirements"
+        - "Source-verified content (100% traceable)"
+        - "No hallucinated data (AI confidence ≥ 95%)"
+        - "Audit trail for all claims"
+        - "Consistent terminology throughout"
+      
+      rta_readiness:
+        - "Administrative information complete"
+        - "Indications for use clear and specific"
+        - "510(k) Summary meets 21 CFR 807.92"
+        - "Truthful and Accuracy Statement signed"
+        - "Predicate comparison complete with SE justification"
+    
+    narrative_summary:
+      phase_overview:
+        - "PPQ results and Cpk metrics"
+        - "RTA checklist status (Pass count / Total)"
+        - "Submission sections complete count"
+        - "Outstanding gaps requiring resolution"
+        - "Regulatory clearance status"
+      
+      submission_readiness:
+        - "RTA compliance: Pass/Fail"
+        - "All Alpha Rev documents: Yes/No"
+        - "Conflicts resolved: Yes/No"
+        - "Ready to submit: Yes/No"
+        - "Critical blockers"
+
+contextual_triggers:
+  description: "How AI behavior changes based on phase context"
+  
+  phase_dependent_actions:
+    draft_document_in_phase_1_2:
+      action: "Accept preliminary data, don't enforce full approval chain"
+    
+    alpha_rev_required_phase_4:
+      condition: "Alpha Rev required but only Numeric found"
+      action: "FLAG ERROR - Version Conflict, block submission"
+    
+    predicate_device_identified:
+      action: "Prompt human to confirm legal marketing status"
+    
+    conflicting_alpha_revs:
+      action: "BLOCK SYNTHESIS - Trigger mandatory human review"
+    
+    verification_contradicts_spec:
+      action: "FLAG - Design Compliance Gap - Suspend submission"
+    
+    missing_biocompat_phase_4:
+      action: "BLOCK SUBMISSION - RTA risk"
+    
+    design_change_after_dvt:
+      action: "REQUIRE Design Change Assessment (DCA)"
+    
+    ppq_failure:
+      action: "BLOCK Phase 4 exit until corrected"
+    
+    clinical_study_required_na:
+      action: "FLAG - Inconsistency, require justification memo"

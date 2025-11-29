@@ -1,0 +1,425 @@
+# FILE-LEVEL ANALYSIS CONTEXT
+# Individual document analysis within phase context
+
+file_analysis:
+  description: |
+    Analysis of individual documents changes based on:
+    1. The phase context in which the file is being viewed
+    2. The document type and its role in the PDP
+    3. The revision level and approval status
+  
+  contextual_principle: |
+    The SAME file analyzed in different phase contexts will have DIFFERENT requirements,
+    expectations, and assessment criteria applied to it.
+
+phase_context_sensitivity:
+  description: "How file analysis changes based on viewing context"
+  
+  example_risk_management_workbook:
+    document: "Risk Management Workbook (RMW)"
+    
+    phase_1_context:
+      document_type: "Risk Management Plan (RMP)"
+      status_expected: "Approved"
+      analysis_focus:
+        - "Risk management strategy defined"
+        - "Risk acceptability criteria established"
+        - "Methods outlined (PHA, FMECA)"
+        - "Scope of risk activities clear"
+      extraction:
+        - "Risk management approach for project"
+        - "Risk acceptability matrix"
+        - "Planned risk analysis methods"
+      flags:
+        - "Acceptability criteria too vague"
+        - "Methods not aligned with device complexity"
+    
+    phase_2_context:
+      document_type: "RMW - PHA, UFMECA, DFMECA"
+      status_expected: "Approved"
+      analysis_focus:
+        - "Initial risk evaluation complete"
+        - "Hazards identified comprehensively"
+        - "Risk controls proposed for each hazard"
+        - "Design requirements derived from risk controls"
+      extraction:
+        - "Proposed labeling warnings from residual risks"
+        - "Design requirements for risk mitigation"
+        - "High-severity hazards requiring immediate controls"
+      flags:
+        - "Any unmitigated high-severity risks"
+        - "Risk controls without traceability to design requirements"
+        - "Missing reasonably foreseeable hazards"
+    
+    phase_3_context:
+      document_type: "RMW - Updated"
+      status_expected: "Updated with post-V&V residual risks"
+      analysis_focus:
+        - "Residual risks documented post-verification/validation"
+        - "New risks identified during testing"
+        - "Verification that proposed controls are effective"
+        - "Final residual risk levels calculated"
+      extraction:
+        - "Final labeling requirements (warnings, precautions)"
+        - "Verification that design controls work as intended"
+        - "Residual risks requiring user notification"
+      cross_checks:
+        - "All residual risks appear in labeling (IFU)"
+        - "Risk controls traceable to V&V test results"
+      flags:
+        - "Residual risk in RMW but NOT in labeling (Critical Gap)"
+        - "Risk severity increased post-testing without re-evaluation"
+    
+    phase_4_context:
+      document_type: "RMW - Final Update + Risk Management Report (RMR)"
+      status_expected: "RMR Approved with risk acceptance signatures"
+      analysis_focus:
+        - "Risk acceptability decision formally made"
+        - "Post-PPQ/Clinical risks incorporated"
+        - "Overall benefit-risk profile acceptable"
+        - "Risk management file complete"
+      extraction:
+        - "Final risk profile for SE discussion (Section 13)"
+        - "Risk acceptance rationale"
+        - "Benefit-risk conclusion"
+      cross_checks:
+        - "RMR signed by authorized personnel"
+        - "All residual risks have acceptance rationale"
+      flags:
+        - "RMR not signed (blocks submission)"
+        - "Unacceptable residual risk without mitigation plan"
+
+  example_specification_conformance_matrix:
+    document: "Specification Conformance Matrix (SCM)"
+    
+    phase_1_context:
+      document_type: "SCM - Draft User Needs"
+      status_expected: "Draft (X# Rev)"
+      analysis_focus:
+        - "Preliminary user requirements identified"
+        - "CTQ candidates marked"
+        - "User needs prioritized"
+      extraction:
+        - "Initial user needs list"
+        - "CTQ requirements"
+        - "Prioritization (High/Medium/Low)"
+      validation:
+        - "User needs include measurable criteria where possible"
+        - "CTQ selection has rationale"
+      flags:
+        - "Ambiguous user needs (containing 'approximately', 'adequate')"
+        - "User needs without prioritization"
+        - "Missing CTQ justification"
+    
+    phase_2_context:
+      document_type: "SCM - User Needs & Technical Specifications"
+      status_expected: "Approved (Numeric Rev minimum)"
+      analysis_focus:
+        - "Translation from user needs to engineering specs complete"
+        - "Traceability established (UN-xxx → TS-xxx)"
+        - "Acceptance criteria defined for all specs"
+        - "Test methods assigned"
+      extraction:
+        - "Complete requirements matrix"
+        - "Technical specifications with quantitative criteria"
+        - "Test method linkages"
+      validation:
+        - "Every user need maps to ≥1 technical spec"
+        - "Every technical spec has acceptance criteria"
+        - "Every spec has assigned test method"
+      flags:
+        - "User need without technical spec (traceability gap)"
+        - "Technical spec without test method assignment"
+        - "Acceptance criteria too vague ('shall be adequate')"
+    
+    phase_3_context:
+      document_type: "SCM - Updated with V&V Results"
+      status_expected: "Updated with test traceability"
+      analysis_focus:
+        - "Verification/validation results linked to requirements"
+        - "Test coverage complete (100% of specs tested)"
+        - "Pass/fail status documented"
+      extraction:
+        - "Requirements-to-test traceability matrix"
+        - "V&V results for each requirement"
+        - "Coverage analysis"
+      validation:
+        - "All requirements have associated test results"
+        - "All tests passed or deviations dispositioned"
+      cross_checks:
+        - "Test results match those in DVT/DVAL reports"
+      flags:
+        - "Requirement without test coverage (traceability gap)"
+        - "Test failed but no disposition documented"
+        - "Test result contradicts acceptance criteria"
+    
+    phase_4_context:
+      document_type: "SCM - Final (part of submission evidence)"
+      status_expected: "Alpha Rev or final Numeric Rev"
+      analysis_focus:
+        - "Complete traceability for submission"
+        - "All requirements satisfied"
+        - "No open gaps or failures"
+      extraction:
+        - "Final requirements matrix for 510(k) appendix"
+        - "Traceability summary for submission narrative"
+      validation:
+        - "100% traceability forward and backward"
+        - "All test results = Pass"
+      flags:
+        - "Any requirement with 'Not Tested' or 'TBD' status"
+        - "Version mismatch (references outdated test reports)"
+
+document_type_behaviors:
+  description: "Standard analysis patterns for common document types"
+  
+  protocols:
+    types:
+      - "Biocompatibility Test Protocol"
+      - "Sterilization Validation Protocol"
+      - "Clinical Study Protocol"
+      - "Equipment Qualification Protocol"
+    
+    phase_1_2_context:
+      purpose: "Planning and design of testing strategy"
+      extraction:
+        - "Draft sections for 510(k) (methods, acceptance criteria)"
+        - "Test plan summary"
+      validation:
+        - "Methods align with applicable standards"
+        - "Acceptance criteria pre-defined and quantitative"
+      human_review: "Protocol content requires expert review before execution"
+    
+    phase_3_4_context:
+      purpose: "Protocols should have corresponding reports"
+      validation:
+        - "Protocol version matches report protocol reference"
+        - "Report execution aligns with protocol methods"
+      flags:
+        - "Protocol exists but no corresponding report in Phase 3/4"
+        - "Report deviates from protocol without deviation justification"
+  
+  test_reports:
+    types:
+      - "DVT Report"
+      - "DVAL Report"
+      - "Biocompatibility Test Report"
+      - "Sterilization Validation Report"
+      - "PPQ Report"
+    
+    phase_3_context:
+      purpose: "Generate objective evidence for V&V"
+      extraction:
+        - "Test results for each requirement"
+        - "Pass/fail conclusions"
+        - "Statistical analysis results"
+      validation:
+        - "Sample size statistically valid"
+        - "Test method validated and documented"
+        - "Results within specification limits"
+        - "Deviations from protocol documented"
+      flags:
+        - "Test failures without CAPA or disposition"
+        - "Statistical analysis missing or incomplete"
+        - "Non-validated test method used"
+    
+    phase_4_context:
+      purpose: "Final synthesis into 510(k) technical sections"
+      extraction:
+        - "Summary data for Sections 15, 17, 18, 20, 21"
+        - "Conclusions for SE discussion"
+      validation:
+        - "Report at Alpha Rev or final Numeric Rev"
+        - "All tests passed or failures resolved"
+        - "GLP compliance documented (if applicable)"
+      flags:
+        - "Report at Draft or early Numeric Rev in Phase 4"
+        - "Unresolved test failures"
+  
+  design_outputs:
+    types:
+      - "Design Drawings"
+      - "Device Master Records (DMR)"
+      - "Labels & IFU"
+    
+    phase_2_context:
+      purpose: "Design being iterated and optimized"
+      extraction:
+        - "Design features for device description"
+        - "Materials and components list"
+      validation:
+        - "Design outputs trace to design inputs (SCM)"
+        - "Numeric Rev (controlled document)"
+      flags:
+        - "Design outputs without traceability to requirements"
+    
+    phase_3_context:
+      purpose: "Design verified and validated"
+      extraction:
+        - "Final design features for 510(k) description"
+        - "Materials for biocompatibility assessment"
+      validation:
+        - "Equivalency to test units demonstrated"
+        - "Design changes from Phase 2 assessed via DCA"
+      flags:
+        - "Design change without DCA"
+        - "Materials in DMR don't match biocompat tested materials"
+    
+    phase_4_context:
+      purpose: "Released production documentation"
+      extraction:
+        - "Final device description (Section 11)"
+        - "Materials and components (Section 12)"
+        - "Manufacturing information (Section 19)"
+      validation:
+        - "DMR at Alpha Rev (released)"
+        - "Labels/IFU approved and include all risk warnings"
+      flags:
+        - "DMR not at Alpha Rev in Phase 4"
+        - "Labels missing residual risk warnings from RMW"
+
+risk_gap_assessment:
+  file_level_errors:
+    missing_data:
+      description: "Required source document not found or incomplete"
+      severity: "Major"
+      examples:
+        - "DVT Report expected in Phase 3 but not in DHF"
+        - "Required signature missing on approval page"
+      action: "Block synthesis for affected section, flag gap"
+    
+    version_conflict:
+      description: "Document at incorrect revision level for phase"
+      severity: "Major"
+      examples:
+        - "Draft document used in Phase 4 when Alpha Rev required"
+        - "Outdated revision referenced when newer exists"
+      action: "Flag error, use correct version if available"
+    
+    data_conflict:
+      description: "Contradictory information across documents"
+      severity: "Critical"
+      examples:
+        - "Specification in SCM says '10±2 mm' but DVT tested '10±5 mm'"
+        - "Two Alpha Rev DMRs with different part numbers"
+      action: "BLOCK synthesis, trigger mandatory human review"
+    
+    unsupported_rationale:
+      description: "Claims without supporting evidence"
+      severity: "Major"
+      examples:
+        - "N/A claimed for clinical data without justification"
+        - "SE claimed but predicate differences not addressed"
+      action: "Flag gap, require supporting documentation or memo"
+    
+    traceability_gap:
+      description: "Missing linkages in requirements flow"
+      severity: "Moderate to Major"
+      examples:
+        - "User need without corresponding technical spec"
+        - "Technical spec without test method assignment"
+        - "Test result without requirement traceability"
+      action: "Flag gap, identify missing element"
+    
+    low_confidence:
+      description: "AI extraction confidence < 95%"
+      severity: "Moderate"
+      examples:
+        - "Handwritten values on test form"
+        - "Ambiguous table structure"
+        - "Conflicting statements in narrative"
+      action: "Flag for human review and verification"
+    
+    standards_error:
+      description: "Unrecognized or non-FDA-recognized standards cited"
+      severity: "Major"
+      examples:
+        - "ISO standard not on FDA Recognized Consensus Standards list"
+        - "Outdated version of standard cited"
+      action: "Flag error, suggest FDA-recognized alternative"
+
+quality_assessment:
+  file_level_quality:
+    document_completeness:
+      criteria:
+        - "All required sections present"
+        - "All tables/figures complete"
+        - "No 'TBD' or placeholder content"
+        - "Approval signatures present"
+      score: "Complete / Partial / Incomplete"
+    
+    data_integrity:
+      criteria:
+        - "No conflicting values within document"
+        - "Calculations verified and correct"
+        - "Units consistent throughout"
+        - "References to other documents accurate"
+      score: "High / Medium / Low"
+    
+    traceability:
+      criteria:
+        - "Requirements uniquely identified"
+        - "Cross-references to related documents present"
+        - "Revision history documented"
+        - "Change control tracked"
+      score: "Traceable / Partially Traceable / Non-Traceable"
+    
+    compliance:
+      criteria:
+        - "Meets applicable standard requirements"
+        - "Format per regulatory guidance"
+        - "GLP/GMP compliance documented (if applicable)"
+        - "Signature authority appropriate"
+      score: "Compliant / Minor Issues / Non-Compliant"
+
+narrative_summary:
+  file_overview:
+    elements:
+      - "Document type and revision level"
+      - "Phase context being analyzed from"
+      - "Approval status and signatures"
+      - "Key data extracted"
+      - "Linkages to other documents"
+  
+  analysis_results:
+    elements:
+      - "Compliance status (meets phase expectations)"
+      - "Quality assessment score"
+      - "Traceability status"
+      - "Gaps or errors identified"
+      - "Action items or flags"
+  
+  risk_summary:
+    elements:
+      - "File-level risks identified"
+      - "Impact on phase or project completion"
+      - "Recommended remediation"
+  
+  contextual_notes:
+    elements:
+      - "Phase-specific observations"
+      - "Requirements that apply vs. don't apply in this phase"
+      - "Forward-looking considerations for next phase"
+
+analysis_outputs:
+  file_level_reports:
+    - name: "Document Analysis Summary"
+      content: "Overview of document with key extracted data"
+    
+    - name: "Compliance Assessment"
+      content: "Pass/Fail for phase-specific requirements"
+    
+    - name: "Traceability Map"
+      content: "Links to upstream/downstream documents"
+    
+    - name: "Gap/Error Report"
+      content: "List of identified issues with severity and remediation"
+    
+    - name: "Quality Score"
+      content: "Overall quality rating with breakdown by criteria"
+  
+  contextual_indicators:
+    - "Phase context indicator (analyzing as Phase X document)"
+    - "Applicable requirements for this phase"
+    - "Requirements that don't apply yet (future phases)"
+    - "Status: Meets Phase Expectations / Has Gaps / Blocked"
