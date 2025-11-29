@@ -15,11 +15,28 @@
 
     <!-- Main Content -->
     <div class="space-y-6">
-      <!-- Input Section -->
+      <!-- Input Section (only show if no project is bound) -->
       <app-input-form 
+        *ngIf="!project"
         [isProcessing]="isProcessing" 
         (submit)="handleAnalysis($event)">
       </app-input-form>
+
+      <!-- Analyze Button (when project is bound) -->
+      <div *ngIf="project" class="bg-white rounded-lg shadow-md p-6">
+        <button
+          (click)="analyzeProject()"
+          [disabled]="isProcessing"
+          class="w-full py-3 px-6 rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          [ngClass]="
+            isProcessing
+              ? 'bg-gray-300 text-gray-500'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          "
+        >
+          {{ isProcessing ? 'Analyzing...' : 'Analyze Folder' }}
+        </button>
+      </div>
 
       <!-- Output Section -->
       <app-output-display [output]="analysisOutput"></app-output-display>
