@@ -24,32 +24,52 @@
         </div>
 
         <!-- Phase Items -->
-        <div 
-          class="nav-item"
-          (click)="selectNavItem({ id: 'phase1', label: 'Phase 1: Planning', type: 'phase', phaseId: 1, icon: '1' })">
-          <span class="nav-icon-number">1</span>
-          <span class="nav-label">Phase 1: Planning</span>
+        <div class="nav-item-container">
+          <div 
+            class="nav-item"
+            (click)="selectNavItem({ id: 'phase1', label: 'Phase 1: Planning', type: 'phase', phaseId: 1, icon: '1' })">
+            <span class="nav-icon-number">1</span>
+            <span class="nav-label">Phase 1: Planning</span>
+          </div>
+          <div *ngIf="project?.targetDates?.phase1" class="phase-deadline">
+            Deadline: {{ formatDate(project!.targetDates!.phase1!) }}
+          </div>
         </div>
 
-        <div 
-          class="nav-item"
-          (click)="selectNavItem({ id: 'phase2', label: 'Phase 2: Design', type: 'phase', phaseId: 2, icon: '2' })">
-          <span class="nav-icon-number">2</span>
-          <span class="nav-label">Phase 2: Design</span>
+        <div class="nav-item-container">
+          <div 
+            class="nav-item"
+            (click)="selectNavItem({ id: 'phase2', label: 'Phase 2: Design', type: 'phase', phaseId: 2, icon: '2' })">
+            <span class="nav-icon-number">2</span>
+            <span class="nav-label">Phase 2: Design</span>
+          </div>
+          <div *ngIf="project?.targetDates?.phase2" class="phase-deadline">
+            Deadline: {{ formatDate(project!.targetDates!.phase2!) }}
+          </div>
         </div>
 
-        <div 
-          class="nav-item"
-          (click)="selectNavItem({ id: 'phase3', label: 'Phase 3: Development', type: 'phase', phaseId: 3, icon: '3' })">
-          <span class="nav-icon-number">3</span>
-          <span class="nav-label">Phase 3: Development</span>
+        <div class="nav-item-container">
+          <div 
+            class="nav-item"
+            (click)="selectNavItem({ id: 'phase3', label: 'Phase 3: Development', type: 'phase', phaseId: 3, icon: '3' })">
+            <span class="nav-icon-number">3</span>
+            <span class="nav-label">Phase 3: Development</span>
+          </div>
+          <div *ngIf="project?.targetDates?.phase3" class="phase-deadline">
+            Deadline: {{ formatDate(project!.targetDates!.phase3!) }}
+          </div>
         </div>
 
-        <div 
-          class="nav-item"
-          (click)="selectNavItem({ id: 'phase4', label: 'Phase 4: Testing', type: 'phase', phaseId: 4, icon: '4' })">
-          <span class="nav-icon-number">4</span>
-          <span class="nav-label">Phase 4: Testing</span>
+        <div class="nav-item-container">
+          <div 
+            class="nav-item"
+            (click)="selectNavItem({ id: 'phase4', label: 'Phase 4: Testing', type: 'phase', phaseId: 4, icon: '4' })">
+            <span class="nav-icon-number">4</span>
+            <span class="nav-label">Phase 4: Testing</span>
+          </div>
+          <div *ngIf="project?.targetDates?.phase4" class="phase-deadline">
+            Deadline: {{ formatDate(project!.targetDates!.phase4!) }}
+          </div>
         </div>
 
         <!-- Regulatory Submission -->
@@ -71,6 +91,10 @@
   <main class="dashboard-main">
     <!-- Header -->
     <div class="dashboard-header">
+      <div class="header-actions">
+        <button class="btn-text" (click)="backToProjects()">← Back to Projects</button>
+        <button class="btn-text" (click)="editProject()">✎ Edit Project</button>
+      </div>
       <h1 class="page-title">Entire Project</h1>
     </div>
 

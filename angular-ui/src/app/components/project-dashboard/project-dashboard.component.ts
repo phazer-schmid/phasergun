@@ -237,7 +237,25 @@ export class ProjectDashboardComponent implements OnInit {
 
   formatDate(dateString: string): string {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  getDeadlineClass(dateString: string): string {
+    const deadline = new Date(dateString);
+    const today = new Date();
+    const diffTime = deadline.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Convert days to months (approximate)
+    const diffMonths = diffDays / 30;
+    
+    if (diffMonths >= 4) {
+      return 'deadline-safe'; // Green - 4+ months left
+    } else if (diffMonths >= 2) {
+      return 'deadline-warning'; // Orange - 2-4 months left
+    } else {
+      return 'deadline-critical'; // Red - Less than 2 months left
+    }
   }
 
   getProgressStyle(): any {
