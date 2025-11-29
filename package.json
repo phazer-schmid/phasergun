@@ -11,11 +11,12 @@
     "install-all": "npm install && npm run build-packages",
     "build-packages": "npm run build --workspaces --if-present",
     "test-file-parser": "cd src/file-parser && npm run dev",
+    "test-file-source": "cd src/file-source && npm run dev",
     "test-chunker": "cd src/chunker && npm run dev",
     "test-rag": "cd src/rag-service && npm run dev",
     "test-llm": "cd src/llm-service && npm run dev",
     "test-orchestrator": "cd src/orchestrator && npm run dev",
-    "test-all-modules": "npm run test-file-parser && npm run test-chunker && npm run test-rag && npm run test-llm && npm run test-orchestrator",
+    "test-all-modules": "npm run test-file-parser && npm run test-file-source && npm run test-chunker && npm run test-rag && npm run test-llm && npm run test-orchestrator",
     "start-ui": "cd angular-ui && npm start"
   },
   "keywords": ["fda", "510k", "compliance", "medical-device", "rag", "ai"],

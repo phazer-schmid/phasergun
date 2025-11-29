@@ -1,0 +1,19 @@
+{
+  "name": "@fda-compliance/file-source",
+  "version": "0.1.0",
+  "description": "File source abstraction for accessing DHF from various storage providers",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "node dist/cli.js",
+    "dev": "tsc && node dist/cli.js"
+  },
+  "dependencies": {
+    "@fda-compliance/shared-types": "file:../shared-types"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.0",
+    "@types/node": "^20.0.0"
+  }
+}

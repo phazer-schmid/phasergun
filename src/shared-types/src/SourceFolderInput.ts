@@ -3,4 +3,10 @@
  */
 export interface SourceFolderInput {
   folderPath: string;
+  sourceType?: 'local' | 'google-drive' | 'dropbox' | 'onedrive' | 's3';
+  credentials?: {
+    apiKey?: string;
+    accessToken?: string;
+    refreshToken?: string;
+  };
 }

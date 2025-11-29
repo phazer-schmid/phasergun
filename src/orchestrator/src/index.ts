@@ -28,6 +28,7 @@ export class OrchestratorService implements Orchestrator {
     try {
       console.log('=== Orchestrator: Starting Analysis ===');
       console.log(`Input folder: ${input.folderPath}`);
+      console.log(`Source type: ${input.sourceType || 'local'}`);
       console.log('');
 
       // Step 1: Parse documents from folder
