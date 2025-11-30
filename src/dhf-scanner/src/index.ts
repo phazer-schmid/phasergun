@@ -265,28 +265,49 @@ export class DHFScanner {
     doc: ScannedDocument,
     dhfCategories: string
   ): Promise<{ dhfFileId: string; dhfFileName: string }> {
-    // Truncate content to first 2000 characters for classification
-    const contentSnippet = doc.content.substring(0, 2000);
+    // Truncate content to first 3000 characters for classification
+    const contentSnippet = doc.content.substring(0, 3000);
     
-    const prompt = `You are an FDA regulatory compliance expert. Classify the following medical device document into the appropriate Design History File (DHF) category.
+    const prompt = `You are an FDA regulatory compliance expert specializing in medical device Design History Files (DHF). Your task is to classify the following document into the appropriate DHF category based on its content.
 
-DOCUMENT INFO:
+DOCUMENT TO CLASSIFY:
 - Filename: ${doc.fileName}
 - Phase: Phase ${doc.phase}
-- Content Preview: ${contentSnippet}
+- Content Preview (first 3000 chars):
+"""
+${contentSnippet}
+"""
 
 AVAILABLE DHF CATEGORIES FOR PHASE ${doc.phase}:
 ${dhfCategories}
 
-Analyze the document and respond with ONLY a JSON object in this format:
+CLASSIFICATION INSTRUCTIONS:
+1. Read the document content carefully
+2. Identify the main purpose and type of the document (e.g., test report, specifications, risk analysis, validation, etc.)
+3. Match it to the most appropriate DHF category from the list above
+4. Consider the document reference patterns (e.g., PS for Product Specs, VR for Verification Reports, etc.)
+5. If the document clearly belongs to a DHF category, mark confidence as "high"
+6. If unsure but there's a reasonable match, mark as "medium"
+7. If no good match exists, use dhfFileId "unknown"
+
+KEY MATCHING CRITERIA:
+- Product Specifications: user requirements, product requirements, feature specifications
+- Risk Analysis/FMEA: risk assessments, failure mode analysis, hazard analysis
+- Design Verification: test reports, bench testing, performance testing results
+- Biocompatibility: biocompatibility testing, cytotoxicity, ISO 10993
+- Sterilization: sterilization validation, radiation sterilization, sterility assurance
+- Shelf Life: accelerated aging, package integrity, stability testing
+- Traceability Matrix: requirements traceability, design traceability
+- Manufacturing: DMR, manufacturing flow, work instructions
+- Labeling: IFU (Instructions for Use), product labels
+
+Respond with ONLY a JSON object in this exact format:
 {
   "dhfFileId": "the_matching_dhf_file_id",
   "dhfFileName": "The matching DHF file name",
   "confidence": "high|medium|low",
-  "reasoning": "brief explanation"
-}
-
-If no good match exists, use dhfFileId "unknown" and dhfFileName "Uncategorized Documents".`;
+  "reasoning": "brief explanation of why this document matches this category"
+}`;
 
     const message = await this.anthropic.messages.create({
       model: 'claude-3-5-sonnet-20241022',
@@ -303,7 +324,7 @@ If no good match exists, use dhfFileId "unknown" and dhfFileName "Uncategorized 
     
     if (jsonMatch) {
       const classification = JSON.parse(jsonMatch[0]);
-      console.log(`[DHFScanner] Classified "${doc.fileName}" -> ${classification.dhfFileName} (${classification.confidence})`);
+      console.log(`[DHFScanner] Classified "${doc.fileName}" -> ${classification.dhfFileName} (${classification.confidence}): ${classification.reasoning}`);
       return {
         dhfFileId: classification.dhfFileId,
         dhfFileName: classification.dhfFileName,
@@ -311,6 +332,7 @@ If no good match exists, use dhfFileId "unknown" and dhfFileName "Uncategorized 
     }
     
     // Fallback
+    console.warn(`[DHFScanner] Could not parse classification for "${doc.fileName}"`);
     return {
       dhfFileId: 'unknown',
       dhfFileName: 'Uncategorized Documents',
@@ -324,12 +346,14 @@ If no good match exists, use dhfFileId "unknown" and dhfFileName "Uncategorized 
     let categories = '';
     
     for (const phaseMapping of this.dhfMapping) {
-      categories += `\nPHASE ${phaseMapping.phaseId} DHF FILES:\n`;
+      categories += `\n=== PHASE ${phaseMapping.phaseId} DHF FILES ===\n`;
       for (const dhfFile of phaseMapping.dhfFiles) {
-        categories += `- ID: ${dhfFile.id}\n`;
-        categories += `  Name: ${dhfFile.name}\n`;
-        categories += `  Reference: ${dhfFile.documentReference}\n`;
-        categories += `  Description: ${dhfFile.submissionSection}\n\n`;
+        categories += `\nDHF Category ID: ${dhfFile.id}\n`;
+        categories += `Name: ${dhfFile.name.replace(/\\n/g, ' ')}\n`;
+        categories += `Document Reference Pattern: ${dhfFile.documentReference}\n`;
+        categories += `Purpose/Section: ${dhfFile.submissionSection}\n`;
+        categories += `Required: ${dhfFile.required ? 'YES' : 'NO'}\n`;
+        categories += `---\n`;
       }
     }
     

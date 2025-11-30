@@ -21,7 +21,8 @@ interface ScanResponse {
 })
 export class DhfService {
   private apiUrl = 'http://localhost:3001/api';
-  // Mock DHF phase mapping based on the YAML file
+  // DHF phase mapping based on the YAML file
+  // Documents are populated dynamically via scanning, not statically
   private dhfPhaseMapping: PhaseDHFMapping[] = [
     {
       phaseId: 1,
@@ -34,7 +35,7 @@ export class DhfService {
           submissionSection: 'Section 11 - Device Description',
           required: true,
           status: 'missing',
-          documents: []
+          documents: []  // Populated by scanning
         },
         {
           id: 'preliminary_design_traceability',

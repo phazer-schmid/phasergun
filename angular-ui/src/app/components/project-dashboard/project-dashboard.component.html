@@ -168,14 +168,17 @@
                   <!-- Status Badge - Right aligned -->
                   <span 
                     *ngIf="dhfFile.status === 'missing'" 
-                    class="badge badge-orange">NOT STARTED</span>
+                    class="badge badge-orange">NOT FOUND</span>
                   <span 
                     *ngIf="dhfFile.status === 'in_progress'" 
                     class="badge badge-yellow">IN PROGRESS</span>
+                  <span 
+                    *ngIf="dhfFile.status === 'complete'" 
+                    class="badge badge-green">{{ dhfFile.documents?.length || 0 }} DOC(S)</span>
                 </div>
                 
-                <!-- Document Reference below -->
-                <div class="dhf-reference" [innerHTML]="formatDocumentReference(dhfFile.documentReference)"></div>
+                <!-- Show submission section reference -->
+                <div class="dhf-reference">{{ dhfFile.submissionSection }}</div>
               </div>
             </div>
 
