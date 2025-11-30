@@ -76,11 +76,11 @@ app.get('/api/health', (_req: Request, res: Response) => {
  */
 app.post('/api/projects/:projectId/scan-dhf', async (req: Request, res: Response) => {
   const { projectId } = req.params;
-  const { projectPath, phaseId } = req.body;
+  let { projectPath, phaseId } = req.body;
 
   const scanScope = phaseId ? `Phase ${phaseId}` : 'entire project';
   console.log(`[API] Received scan request for ${scanScope} in project ${projectId}`);
-  console.log(`[API] Project path: ${projectPath}`);
+  console.log(`[API] Raw project path: ${projectPath}`);
 
   if (!projectPath) {
     return res.status(400).json({ 
@@ -88,6 +88,11 @@ app.post('/api/projects/:projectId/scan-dhf', async (req: Request, res: Response
       message: 'Please provide projectPath in request body'
     });
   }
+
+  // Normalize the path by removing shell escape sequences
+  // Replace escaped spaces (\ ) with actual spaces
+  projectPath = projectPath.replace(/\\ /g, ' ');
+  console.log(`[API] Normalized project path: ${projectPath}`);
 
   // Verify Anthropic API key
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
