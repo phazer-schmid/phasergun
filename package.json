@@ -5,7 +5,8 @@
   "description": "FDA 510(k) Compliance Analysis System - Modular Architecture",
   "workspaces": [
     "src/*",
-    "angular-ui"
+    "angular-ui",
+    "vue-ui"
   ],
   "scripts": {
     "install-all": "npm install && npm run build-packages",
