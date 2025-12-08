@@ -158,6 +158,100 @@ app.get('/api/dhf-mapping', (_req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/analyze
+ * Analyze a single file through the complete pipeline
+ */
+app.post('/api/analyze', async (req: Request, res: Response) => {
+  const { filePath } = req.body;
+
+  if (!filePath) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'File path is required',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  console.log(`[API] Analyzing file: ${filePath}`);
+
+  try {
+    // Verify file exists
+    await fs.access(filePath);
+    const fileStats = await fs.stat(filePath);
+
+    // Simulate processing steps
+    console.log('[API] Step 1: Parsing file...');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    console.log('[API] Step 2: Chunking document...');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    console.log('[API] Step 3: RAG analysis...');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    console.log('[API] Step 4: LLM analysis...');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Mock analysis result
+    const analysis = `
+📄 Document Analysis Complete
+
+File: ${path.basename(filePath)}
+Size: ${(fileStats.size / 1024).toFixed(2)} KB
+Type: ${path.extname(filePath)}
+
+Summary:
+The document has been successfully processed through the analysis pipeline.
+
+Pipeline Steps:
+✅ Step 1: File Parsing - Document structure extracted
+✅ Step 2: Semantic Chunking - Content segmented for analysis
+✅ Step 3: RAG Indexing - Regulatory context retrieved
+✅ Step 4: LLM Analysis - Compliance assessment generated
+
+Analysis Results:
+This is a MOCK analysis for the simple POC. In production, this would contain:
+- Detailed regulatory compliance assessment
+- Comparison against FDA 510(k) requirements
+- Identification of missing documentation
+- Recommendations for addressing gaps
+- Risk analysis and mitigation strategies
+
+Next Steps for Full Implementation:
+1. Integrate actual file-parser module for PDF/DOCX extraction
+2. Apply semantic chunking with proper boundaries
+3. Index chunks in RAG vector database
+4. Retrieve relevant regulatory context
+5. Generate detailed LLM analysis with Claude/GPT
+6. Provide actionable compliance recommendations
+
+Status: ✅ POC Pipeline Complete
+Time: ${new Date().toLocaleTimeString()}
+`;
+
+    res.json({
+      status: 'complete',
+      message: 'Analysis successful',
+      detailedReport: analysis,
+      timestamp: new Date().toISOString(),
+      metadata: {
+        fileName: path.basename(filePath),
+        fileSize: (fileStats.size / 1024).toFixed(2) + ' KB',
+        fileType: path.extname(filePath)
+      }
+    });
+
+  } catch (error) {
+    console.error('[API] Analysis error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Analysis failed',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
  * Start server
  */
 async function startServer() {
