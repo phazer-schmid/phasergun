@@ -1,0 +1,280 @@
+planning_and_scope:
+  display_name: Planning & Scope
+  folder_path: Phase 1/Planning & Scope
+  check_count: 4
+  validation_checks:
+  - check_id: P1-PLAN-001
+    check_name: 'Verify project plan includes: device description, intended use, indications for use, technological c'
+    severity: high
+    regulatory_source: 21 CFR 820.30(b)
+    source_section: Design and development planning
+    estar_section: Section 3.2 (Device Description)
+    design_vv_reference: V&V Planning
+    testing_ref: ''
+    llm_validation:
+      question: 'Verify project plan includes: device description, intended use, indications for use, technological characteristics,
+        and comparison to predicate'
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P1-PLAN-001 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+  - check_id: P1-PLAN-002
+    check_name: Confirm design plan identifies key milestones, deliverables, roles/responsibilities, approval gates,
+    severity: high
+    regulatory_source: 21 CFR 820.30(b)
+    source_section: Design planning
+    estar_section: Section 5 (510(k) Summary)
+    design_vv_reference: V&V Planning
+    testing_ref: ''
+    llm_validation:
+      question: Confirm design plan identifies key milestones, deliverables, roles/responsibilities, approval gates, and planned
+        verification/validation activities
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P1-PLAN-002 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+  - check_id: P1-PLAN-003
+    check_name: Check that planning documents define scope boundaries (patient population, environments of use, devi
+    severity: high
+    regulatory_source: ISO 13485:2016
+    source_section: Clause 7.3.2
+    estar_section: Section 3.2
+    design_vv_reference: V&V Planning
+    testing_ref: ''
+    llm_validation:
+      question: Check that planning documents define scope boundaries (patient population, environments of use, device configurations)
+        and V&V approach
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P1-PLAN-003 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+  - check_id: P1-PLAN-004
+    check_name: 'Verify V&V strategy is documented early including: test methods to be used, acceptance criteria appr'
+    severity: high
+    regulatory_source: 21 CFR 820.30(f)(g)
+    source_section: Design verification and validation
+    estar_section: Section 4.2, 4.3
+    design_vv_reference: V&V Planning
+    testing_ref: ''
+    llm_validation:
+      question: 'Verify V&V strategy is documented early including: test methods to be used, acceptance criteria approach,
+        statistical methods for sample sizing, and planned validation conditions'
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P1-PLAN-004 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: Early planning reduces downstream deficiencies
+predicate_selection:
+  display_name: Predicate Selection
+  folder_path: Phase 1/Predicate Selection
+  check_count: 3
+  validation_checks:
+  - check_id: P1-PRED-001
+    check_name: 'Verify predicate device identification includes: 510(k) number, trade name, manufacturer, clearance '
+    severity: high
+    regulatory_source: 21 CFR 807.92
+    source_section: Substantial equivalence
+    estar_section: Section 4 (Comparison), 5.3
+    design_vv_reference: ''
+    testing_ref: ''
+    llm_validation:
+      question: 'Verify predicate device identification includes: 510(k) number, trade name, manufacturer, clearance date,
+        and technological characteristics'
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P1-PRED-001 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+  - check_id: P1-PRED-002
+    check_name: 'Confirm comparison table addresses: intended use, technological characteristics, and performance dat'
+    severity: high
+    regulatory_source: 21 CFR 807.87(f)
+    source_section: Comparison with similar devices
+    estar_section: Section 4.1-4.3
+    design_vv_reference: ''
+    testing_ref: ''
+    llm_validation:
+      question: 'Confirm comparison table addresses: intended use, technological characteristics, and performance data side-by-side
+        with objective evidence'
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P1-PRED-002 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+  - check_id: P1-PRED-003
+    check_name: Check for documented rationale if predicates have different technological characteristics but same i
+    severity: high
+    regulatory_source: 21 CFR 807 Subpart E
+    source_section: Substantial equivalence
+    estar_section: Section 4
+    design_vv_reference: ''
+    testing_ref: ''
+    llm_validation:
+      question: Check for documented rationale if predicates have different technological characteristics but same intended
+        use; verify differences do not affect safety/effectiveness
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P1-PRED-003 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+regulatory:
+  display_name: Regulatory
+  folder_path: Phase 1/Regulatory
+  check_count: 3
+  validation_checks:
+  - check_id: P1-REGU-001
+    check_name: 'Verify presence of: device classification, product code, regulation number, submission type (Traditi'
+    severity: high
+    regulatory_source: 21 CFR 807.87 / eSTAR Guidance
+    source_section: Premarket notification content
+    estar_section: Section 1 (Cover Letter), Section 2 (Admin)
+    design_vv_reference: ''
+    testing_ref: ''
+    llm_validation:
+      question: 'Verify presence of: device classification, product code, regulation number, submission type (Traditional/Special/Abbreviated),
+        and FDA Form 3514 info'
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P1-REGU-001 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: eSTAR automates Form 3514 population
+  - check_id: P1-REGU-002
+    check_name: Confirm indications for use statement (FDA Form 3881) is clearly defined, matches intended use in pl
+    severity: high
+    regulatory_source: 21 CFR 807.92 / eSTAR
+    source_section: Substantial equivalence determination
+    estar_section: Section 5.1 (Indications for Use)
+    design_vv_reference: ''
+    testing_ref: ''
+    llm_validation:
+      question: Confirm indications for use statement (FDA Form 3881) is clearly defined, matches intended use in planning
+        documents, and uses proper IFU definition per 21 CFR 814.20(b)(3)(i)
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P1-REGU-002 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+  - check_id: P1-REGU-003
+    check_name: Check that regulatory strategy addresses labeling requirements per device classification and plans f
+    severity: high
+    regulatory_source: 21 CFR 801 / eSTAR
+    source_section: Labeling requirements
+    estar_section: Section 6 (Labeling)
+    design_vv_reference: ''
+    testing_ref: ''
+    llm_validation:
+      question: Check that regulatory strategy addresses labeling requirements per device classification and plans for draft/final
+        labeling submissions
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P1-REGU-003 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+user_needs_and_claims:
+  display_name: User Needs & Claims
+  folder_path: Phase 1/User Needs & Claims
+  check_count: 3
+  validation_checks:
+  - check_id: P1-USER-001
+    check_name: 'Verify user needs are documented with: source (users, clinical literature, complaints), priority, ac'
+    severity: high
+    regulatory_source: ISO 13485:2016
+    source_section: Clause 7.3.2 (Design inputs)
+    estar_section: Section 3.2, 4.2
+    design_vv_reference: Design Validation Basis
+    testing_ref: ''
+    llm_validation:
+      question: 'Verify user needs are documented with: source (users, clinical literature, complaints), priority, acceptance
+        criteria, and traceability to validation plans'
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P1-USER-001 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: User needs drive validation testing
+  - check_id: P1-USER-002
+    check_name: 'Confirm user needs are traceable to: intended use, patient population, clinical benefits, use enviro'
+    severity: high
+    regulatory_source: 21 CFR 820.30(c)
+    source_section: Design input
+    estar_section: Section 3.2
+    design_vv_reference: Design Validation
+    testing_ref: ''
+    llm_validation:
+      question: 'Confirm user needs are traceable to: intended use, patient population, clinical benefits, use environment,
+        and can be validated in actual/simulated use'
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P1-USER-002 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+  - check_id: P1-USER-003
+    check_name: Check that performance claims are derived from user needs and supported by objective evidence or ref
+    severity: high
+    regulatory_source: 21 CFR 820.30(c)
+    source_section: Design input
+    estar_section: Section 4.2, 5.2
+    design_vv_reference: ''
+    testing_ref: ''
+    llm_validation:
+      question: Check that performance claims are derived from user needs and supported by objective evidence or references;
+        verify all claims can be tested
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P1-USER-003 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''

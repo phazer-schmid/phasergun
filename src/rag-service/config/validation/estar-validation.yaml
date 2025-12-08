@@ -1,0 +1,339 @@
+structured_data:
+  display_name: Structured Data
+  check_count: 7
+  validation_checks:
+  - check_id: ESTAR-STRUCT-001
+    check_name: 'Verify Form FDA 3514 Section A information is complete: submission type (Traditional/Special/Abbrevi'
+    estar_section: Submission Type
+    fda_guidance: eSTAR Guidance Table 1
+    llm_validation:
+      question: 'Verify Form FDA 3514 Section A information is complete: submission type (Traditional/Special/Abbreviated),
+        expedited review designation, device classification'
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: Auto-populated in eSTAR
+  - check_id: ESTAR-STRUCT-002
+    check_name: 'Verify applicant and correspondent information matches Form FDA 3514 Sections B and C with complete '
+    estar_section: Applicant Information
+    fda_guidance: eSTAR Guidance Table 1 / Form 3514
+    llm_validation:
+      question: Verify applicant and correspondent information matches Form FDA 3514 Sections B and C with complete contact
+        details
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+  - check_id: ESTAR-STRUCT-003
+    check_name: 'Check for documentation of prior submissions: NSE determinations, withdrawn 510(k)s, Q-Submissions, '
+    estar_section: Pre-Submission Correspondence
+    fda_guidance: eSTAR Guidance Table 1
+    llm_validation:
+      question: 'Check for documentation of prior submissions: NSE determinations, withdrawn 510(k)s, Q-Submissions, IDE,
+        PMA, HDE, De Novo with submission numbers'
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+  - check_id: ESTAR-STRUCT-004
+    check_name: Verify FDA-recognized and non-recognized consensus standards are identified with proper standard num
+    estar_section: Consensus Standards
+    fda_guidance: eSTAR Guidance Table 1
+    llm_validation:
+      question: Verify FDA-recognized and non-recognized consensus standards are identified with proper standard numbers and
+        declaration of conformity
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: eSTAR has integrated FDA standards database
+  - check_id: ESTAR-STRUCT-005
+    check_name: Verify FDA listing number is provided if device is already listed with FDA
+    estar_section: Device Description - Listing
+    fda_guidance: eSTAR Guidance Table 1
+    llm_validation:
+      question: Verify FDA listing number is provided if device is already listed with FDA
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+  - check_id: ESTAR-STRUCT-006
+    check_name: 'Check Form FDA 3881 completeness: disease/condition, patient population, anatomical location, clinic'
+    estar_section: Indications for Use (Form 3881)
+    fda_guidance: eSTAR Guidance Table 1 / 21 CFR 814.20(b)(3)(i)
+    llm_validation:
+      question: 'Check Form FDA 3881 completeness: disease/condition, patient population, anatomical location, clinical benefits
+        per IFU definition'
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: IFU definition from PMA regulation
+  - check_id: ESTAR-STRUCT-007
+    check_name: Verify classification regulation number, product code, and device class are correctly identified; ch
+    estar_section: Classification
+    fda_guidance: eSTAR Guidance Table 1 / 21 CFR 807.87(c)
+    llm_validation:
+      question: Verify classification regulation number, product code, and device class are correctly identified; check against
+        FDA database
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: eSTAR integrates product code database
+unstructured_data:
+  display_name: Unstructured Data
+  check_count: 15
+  validation_checks:
+  - check_id: ESTAR-UNSTRU-001
+    check_name: Confirm cover letter is attached and references any prior submissions, pre-submission meetings, or r
+    estar_section: Cover Letter
+    fda_guidance: eSTAR Guidance Table 1
+    llm_validation:
+      question: Confirm cover letter is attached and references any prior submissions, pre-submission meetings, or regulatory
+        correspondence
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+  - check_id: ESTAR-UNSTRU-002
+    check_name: 'For Special 510(k)s: verify device changes, risk analysis method, risk assessment results, risk cont'
+    estar_section: Design/Special Controls
+    fda_guidance: eSTAR Guidance Table 1 / Special 510(k) Guidance
+    llm_validation:
+      question: 'For Special 510(k)s: verify device changes, risk analysis method, risk assessment results, risk control measures
+        are documented'
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: Special 510(k) only
+  - check_id: ESTAR-UNSTRU-003
+    check_name: Verify proposed labeling satisfies 21 CFR 807.87(e) and 21 CFR 809.10 (IVDs) with complete label, IF
+    estar_section: Labeling
+    fda_guidance: eSTAR Guidance Table 1 / 21 CFR 807.87(e)
+    llm_validation:
+      question: Verify proposed labeling satisfies 21 CFR 807.87(e) and 21 CFR 809.10 (IVDs) with complete label, IFU, patient
+        labeling
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+  - check_id: ESTAR-UNSTRU-004
+    check_name: Check reprocessing validation and labeling per FDA Reprocessing Guidance if device is reusable
+    estar_section: Reprocessing
+    fda_guidance: eSTAR Guidance Table 1 / Reprocessing Guidance
+    llm_validation:
+      question: Check reprocessing validation and labeling per FDA Reprocessing Guidance if device is reusable
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+  - check_id: ESTAR-UNSTRU-005
+    check_name: 'Verify sterility information per FDA Sterility Guidance including method and validation for devices '
+    estar_section: Sterility
+    fda_guidance: eSTAR Guidance Table 1 / Sterility Guidance
+    llm_validation:
+      question: Verify sterility information per FDA Sterility Guidance including method and validation for devices labeled
+        sterile
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+  - check_id: ESTAR-UNSTRU-006
+    check_name: Confirm shelf life methods establish performance maintenance throughout proposed shelf-life with acc
+    estar_section: Shelf Life
+    fda_guidance: eSTAR Guidance Table 1 / Shelf Life Guidance
+    llm_validation:
+      question: Confirm shelf life methods establish performance maintenance throughout proposed shelf-life with accelerated/real-time
+        data
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+  - check_id: ESTAR-UNSTRU-007
+    check_name: Verify biocompatibility assessment per ISO 10993-1 and FDA Guidance for patient-contacting materials
+    estar_section: Biocompatibility
+    fda_guidance: eSTAR Guidance Table 1 / ISO 10993 Guidance
+    llm_validation:
+      question: Verify biocompatibility assessment per ISO 10993-1 and FDA Guidance for patient-contacting materials
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+  - check_id: ESTAR-UNSTRU-008
+    check_name: 'Check software documentation per FDA Software Guidance: level of concern, software description, veri'
+    estar_section: Software/Firmware
+    fda_guidance: eSTAR Guidance Table 1 / Software Guidance
+    llm_validation:
+      question: 'Check software documentation per FDA Software Guidance: level of concern, software description, verification/validation'
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+  - check_id: ESTAR-UNSTRU-009
+    check_name: Verify cybersecurity assessment per FDA Cybersecurity Guidance including threat model, security cont
+    estar_section: Cybersecurity
+    fda_guidance: eSTAR Guidance Table 1 / Cybersecurity Guidance
+    llm_validation:
+      question: Verify cybersecurity assessment per FDA Cybersecurity Guidance including threat model, security controls,
+        SBOM
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+  - check_id: ESTAR-UNSTRU-010
+    check_name: Confirm EMC, electrical, mechanical, wireless, thermal safety testing or justification for why testi
+    estar_section: EMC/Electrical/Mechanical Safety
+    fda_guidance: eSTAR Guidance Table 1 / EMC Guidance
+    llm_validation:
+      question: Confirm EMC, electrical, mechanical, wireless, thermal safety testing or justification for why testing not
+        needed
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+  - check_id: ESTAR-UNSTRU-011
+    check_name: Verify non-clinical and clinical test reports per FDA Bench Testing Guidance with protocols, results
+    estar_section: Performance Testing - Non-IVD
+    fda_guidance: eSTAR Guidance Table 1 / Bench Testing Guidance
+    llm_validation:
+      question: Verify non-clinical and clinical test reports per FDA Bench Testing Guidance with protocols, results, acceptance
+        criteria
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+  - check_id: ESTAR-UNSTRU-012
+    check_name: 'For IVDs: confirm analytical performance, comparison studies, reference ranges, clinical study infor'
+    estar_section: Performance Testing - IVD
+    fda_guidance: eSTAR Guidance Table 1
+    llm_validation:
+      question: 'For IVDs: confirm analytical performance, comparison studies, reference ranges, clinical study information'
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+  - check_id: ESTAR-UNSTRU-013
+    check_name: Check that all literature references are included and properly cited in submission
+    estar_section: References
+    fda_guidance: eSTAR Guidance Table 1
+    llm_validation:
+      question: Check that all literature references are included and properly cited in submission
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+  - check_id: ESTAR-UNSTRU-014
+    check_name: 'Verify: executive summary (recommended), Truthful and Accuracy Statement (21 CFR 807.87(l)), 510(k) '
+    estar_section: Administrative Documentation
+    fda_guidance: eSTAR Guidance Table 1
+    llm_validation:
+      question: 'Verify: executive summary (recommended), Truthful and Accuracy Statement (21 CFR 807.87(l)), 510(k) Summary
+        (21 CFR 807.92) or Statement (807.93)'
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+  - check_id: ESTAR-UNSTRU-015
+    check_name: Confirm responses to Additional Information requests are included with changes reflected in appropri
+    estar_section: Amendment/AI Response
+    fda_guidance: eSTAR Guidance Table 1
+    llm_validation:
+      question: Confirm responses to Additional Information requests are included with changes reflected in appropriate eSTAR
+        sections
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+structured_&_unstructured:
+  display_name: Structured & Unstructured
+  check_count: 2
+  validation_checks:
+  - check_id: ESTAR-STRUCT-001
+    check_name: 'Confirm device description includes: technological characteristics, materials, design, energy source'
+    estar_section: Device Description
+    fda_guidance: eSTAR Guidance Table 1 / 21 CFR 807.92(a)(4)
+    llm_validation:
+      question: 'Confirm device description includes: technological characteristics, materials, design, energy source, principle
+        of operation, conditions of use per 513(i)(1)(B)'
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+  - check_id: ESTAR-STRUCT-002
+    check_name: Confirm predicate identification with 510(k)/De Novo number and SE comparison addressing technologic
+    estar_section: Predicates and SE
+    fda_guidance: eSTAR Guidance Table 1 / 21 CFR 807.87(f)
+    llm_validation:
+      question: Confirm predicate identification with 510(k)/De Novo number and SE comparison addressing technological characteristics
+        and performance per 513(i)(1)(A)
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+technical_validation:
+  display_name: Technical Validation
+  check_count: 2
+  validation_checks:
+  - check_id: ESTAR-TECHNI-001
+    check_name: Verify eSTAR status message shows 'eSTAR Complete' indicating all mandatory sections are properly fi
+    estar_section: eSTAR Completeness Status
+    fda_guidance: eSTAR Guidance Section V
+    llm_validation:
+      question: Verify eSTAR status message shows 'eSTAR Complete' indicating all mandatory sections are properly filled
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: Auto-validated by eSTAR
+  - check_id: ESTAR-TECHNI-002
+    check_name: Check that eSTAR responses accurately describe device and at least one attachment exists per applica
+    estar_section: Technical Screening Readiness
+    fda_guidance: eSTAR Guidance Section V.A
+    llm_validation:
+      question: Check that eSTAR responses accurately describe device and at least one attachment exists per applicable attachment-type
+        question
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: Technical screening within 15 days
+data_validation:
+  display_name: Data Validation
+  check_count: 1
+  validation_checks:
+  - check_id: ESTAR-DATA_V-001
+    check_name: Verify all structured data fields (dropdowns, checkboxes, text fields) are populated consistently wi
+    estar_section: Structured Data Accuracy
+    fda_guidance: eSTAR Guidance
+    llm_validation:
+      question: Verify all structured data fields (dropdowns, checkboxes, text fields) are populated consistently with unstructured
+        data attachments
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+document_organization:
+  display_name: Document Organization
+  check_count: 1
+  validation_checks:
+  - check_id: ESTAR-DOCUME-001
+    check_name: Confirm all attachments appear in appropriate eSTAR bookmarks and are properly named for reviewer ac
+    estar_section: Attachment Organization
+    fda_guidance: eSTAR Guidance
+    llm_validation:
+      question: Confirm all attachments appear in appropriate eSTAR bookmarks and are properly named for reviewer access
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''
+document_linking:
+  display_name: Document Linking
+  check_count: 1
+  validation_checks:
+  - check_id: ESTAR-DOCUME-001
+    check_name: Verify cross-references between eSTAR sections are accurate and attachments can be located using boo
+    estar_section: Cross-Reference Integrity
+    fda_guidance: eSTAR Guidance
+    llm_validation:
+      question: Verify cross-references between eSTAR sections are accurate and attachments can be located using bookmark
+        structure
+      validation_criteria:
+        must_include: []
+    priority: ''
+    notes: ''

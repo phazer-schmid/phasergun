@@ -1,0 +1,143 @@
+# DHF Validation Orchestrator
+# Routes folders to validation configs
+# Total: 148 checks (89 analysis + 18 cross-phase + 29 eSTAR + 12 Phase 5 generated)
+
+version: "1.0.0"
+
+display_thresholds:
+  comfortable: 6
+  manageable: 10
+  overwhelming: 11
+
+folder_validations:
+  # PHASE 1 (13 checks)
+  "Phase 1/Planning & Scope":
+    validation_file: "phase1-validation.yaml"
+    section: "planning_and_scope"
+    check_count: 5
+  "Phase 1/Predicate Selection":
+    validation_file: "phase1-validation.yaml"
+    section: "predicate_selection"
+    check_count: 3
+  "Phase 1/Regulatory":
+    validation_file: "phase1-validation.yaml"
+    section: "regulatory"
+    check_count: 3
+  "Phase 1/User Needs & Claims":
+    validation_file: "phase1-validation.yaml"
+    section: "user_needs_and_claims"
+    check_count: 3
+  
+  # PHASE 2 (15 checks)
+  "Phase 2/Design Inputs":
+    validation_file: "phase2-validation.yaml"
+    section: "design_inputs"
+    check_count: 5
+  "Phase 2/Risk Management Planning":
+    validation_file: "phase2-validation.yaml"
+    section: "risk_management_planning"
+    check_count: 4
+  "Phase 2/Prototype and Drawings":
+    validation_file: "phase2-validation.yaml"
+    section: "prototype_and_drawings"
+    check_count: 3
+  "Phase 2/Labeling Drafts":
+    validation_file: "phase2-validation.yaml"
+    section: "labeling_drafts"
+    check_count: 3
+  
+  # PHASE 3 (30 checks)
+  "Phase 3/Design Outputs":
+    validation_file: "phase3-validation.yaml"
+    section: "design_outputs"
+    check_count: 4
+  "Phase 3/Design Verification (Bench)":
+    validation_file: "phase3-validation.yaml"
+    section: "design_verification_bench"
+    check_count: 5
+  "Phase 3/Biocompatibility":
+    validation_file: "phase3-validation.yaml"
+    section: "biocompatibility"
+    check_count: 5
+  "Phase 3/Sterilization & Shelf Life":
+    validation_file: "phase3-validation.yaml"
+    section: "sterilization_and_shelf_life"
+    check_count: 4
+  "Phase 3/Software & Cybersecurity":
+    validation_file: "phase3-validation.yaml"
+    section: "software_and_cybersecurity"
+    check_count: 4
+  "Phase 3/Electrical & EMC":
+    validation_file: "phase3-validation.yaml"
+    section: "electrical_and_emc"
+    check_count: 3
+  "Phase 3/Device-Specific Testing":
+    validation_file: "phase3-validation.yaml"
+    section: "devicespecific_testing"
+    check_count: 5
+  
+  # PHASE 4 (18 checks)
+  "Phase 4/Design Validation (Human Factors)":
+    validation_file: "phase4-validation.yaml"
+    section: "design_validation_human_factors"
+    check_count: 4
+  "Phase 4/Clinical Data (if required)":
+    validation_file: "phase4-validation.yaml"
+    section: "clinical_data_if_required"
+    check_count: 3
+  "Phase 4/Final Labeling & Packaging":
+    validation_file: "phase4-validation.yaml"
+    section: "final_labeling_and_packaging"
+    check_count: 4
+  "Phase 4/Risk Management (Final)":
+    validation_file: "phase4-validation.yaml"
+    section: "risk_management_final"
+    check_count: 4
+  "Phase 4/Manufacturing Transfer":
+    validation_file: "phase4-validation.yaml"
+    section: "manufacturing_transfer"
+    check_count: 3
+  
+  # PHASE 5 (13 checks)
+  "Phase 5/510(k) Compilation":
+    validation_file: "phase5-validation.yaml"
+    section: "510k_compilation"
+    check_count: 5
+  "Phase 5/DHF Compilation":
+    validation_file: "phase5-validation.yaml"
+    section: "dhf_compilation"
+    check_count: 5
+  "Phase 5/Post-Market Surveillance Plan":
+    validation_file: "phase5-validation.yaml"
+    section: "postmarket_surveillance_plan"
+    check_count: 3
+
+cross_cutting_validations:
+  - name: "traceability"
+    validation_file: "cross-cutting-validation.yaml"
+    check_count: 6
+  - name: "consistency"
+    validation_file: "cross-cutting-validation.yaml"
+    check_count: 7
+  - name: "completeness"
+    validation_file: "cross-cutting-validation.yaml"
+    check_count: 3
+  - name: "vv_integration"
+    validation_file: "cross-cutting-validation.yaml"
+    check_count: 2
+
+estar_validations:
+  enabled: true
+  validation_file: "estar-validation.yaml"
+  check_count: 29
+
+validation_summary:
+  total_checks: 148
+  by_phase:
+    phase1: 14
+    phase2: 15
+    phase3: 30
+    phase4: 18
+    phase5: 13
+    cross_cutting: 18
+    estar: 29

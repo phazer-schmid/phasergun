@@ -1,0 +1,320 @@
+design_inputs:
+  display_name: Design Inputs
+  folder_path: Phase 2/Design Inputs
+  check_count: 5
+  validation_checks:
+  - check_id: P2-DESI-001
+    check_name: 'Verify design inputs are: documented, measurable/testable, approved, traceable to user needs, and ea'
+    severity: high
+    regulatory_source: 21 CFR 820.30(c)
+    source_section: Design input
+    estar_section: Section 3.2, 4.2
+    design_vv_reference: Design Verification
+    testing_ref: ''
+    llm_validation:
+      question: 'Verify design inputs are: documented, measurable/testable, approved, traceable to user needs, and each has
+        corresponding verification test planned'
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P2-DESI-001 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: Each input needs verification method
+  - check_id: P2-DESI-002
+    check_name: 'Confirm design inputs address: functional requirements, performance requirements, safety requirement'
+    severity: high
+    regulatory_source: ISO 13485:2016
+    source_section: Clause 7.3.2
+    estar_section: Design and development inputs
+    design_vv_reference: Design Verification
+    testing_ref: ''
+    llm_validation:
+      question: 'Confirm design inputs address: functional requirements, performance requirements, safety requirements, regulatory
+        requirements, standards, and risk controls'
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P2-DESI-002 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+  - check_id: P2-DESI-003
+    check_name: Check that conflicting design input requirements are identified and resolved with documented rationa
+    severity: high
+    regulatory_source: 21 CFR 820.30(c)
+    source_section: Design input
+    estar_section: Section 4.2
+    design_vv_reference: ''
+    testing_ref: ''
+    llm_validation:
+      question: Check that conflicting design input requirements are identified and resolved with documented rationale; verify
+        resolution maintains safety/effectiveness
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P2-DESI-003 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+  - check_id: P2-DESI-004
+    check_name: Verify design input review/approval by authorized personnel with documented sign-off, date, and esta
+    severity: high
+    regulatory_source: ISO 13485:2016 / Design V&V Guidance
+    source_section: Clause 7.3.2
+    estar_section: Section 4.2
+    design_vv_reference: Design Verification Planning
+    testing_ref: ''
+    llm_validation:
+      question: Verify design input review/approval by authorized personnel with documented sign-off, date, and establishment
+        of verification acceptance criteria
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P2-DESI-004 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+  - check_id: P2-DESI-005
+    check_name: Confirm traceability matrix is established linking User Needs → Design Inputs → Planned Verification
+    severity: high
+    regulatory_source: Design V&V Best Practice
+    source_section: Traceability Matrix
+    estar_section: Section 4.2
+    design_vv_reference: Traceability
+    testing_ref: ''
+    llm_validation:
+      question: Confirm traceability matrix is established linking User Needs → Design Inputs → Planned Verification Tests
+        with version control
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P2-DESI-005 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: Matrix prevents orphaned requirements
+labeling_drafts:
+  display_name: Labeling Drafts
+  folder_path: Phase 2/Labeling Drafts
+  check_count: 3
+  validation_checks:
+  - check_id: P2-LABE-001
+    check_name: 'Verify draft labeling includes: device name, intended use, indications for use, contraindications, w'
+    severity: high
+    regulatory_source: 21 CFR 801.1 / eSTAR
+    source_section: Labeling requirements
+    estar_section: Section 6 (Labeling)
+    design_vv_reference: ''
+    testing_ref: ''
+    llm_validation:
+      question: 'Verify draft labeling includes: device name, intended use, indications for use, contraindications, warnings,
+        precautions consistent with risk analysis'
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P2-LABE-001 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+  - check_id: P2-LABE-002
+    check_name: Confirm draft indications for use statement in labeling matches regulatory documents, user needs, an
+    severity: high
+    regulatory_source: 21 CFR 801.4 / eSTAR
+    source_section: Meaning of 'intended use'
+    estar_section: Section 5.1, 6.1
+    design_vv_reference: Design Validation
+    testing_ref: ''
+    llm_validation:
+      question: Confirm draft indications for use statement in labeling matches regulatory documents, user needs, and planned
+        validation scope
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P2-LABE-002 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+  - check_id: P2-LABE-003
+    check_name: 'Check that draft IFU addresses user needs and includes: device description, operating instructions, '
+    severity: high
+    regulatory_source: 21 CFR 801.109
+    source_section: Prescription devices
+    estar_section: Section 6.2
+    design_vv_reference: ''
+    testing_ref: ''
+    llm_validation:
+      question: 'Check that draft IFU addresses user needs and includes: device description, operating instructions, warnings,
+        storage/handling, risk mitigations'
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P2-LABE-003 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+prototype_and_drawings:
+  display_name: Prototype and Drawings
+  folder_path: Phase 2/Prototype and Drawings
+  check_count: 3
+  validation_checks:
+  - check_id: P2-PROT-001
+    check_name: 'Verify engineering drawings include: part numbers, materials, dimensions, tolerances, revision histo'
+    severity: high
+    regulatory_source: 21 CFR 820.30(d)
+    source_section: Design output
+    estar_section: Section 3.2
+    design_vv_reference: Design Output
+    testing_ref: ''
+    llm_validation:
+      question: 'Verify engineering drawings include: part numbers, materials, dimensions, tolerances, revision history, and
+        are under configuration control'
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P2-PROT-001 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+  - check_id: P2-PROT-002
+    check_name: Confirm design outputs (drawings, CAD files, BOMs) are approved, under configuration control, and tr
+    severity: high
+    regulatory_source: ISO 13485:2016
+    source_section: Clause 7.3.3
+    estar_section: Design outputs
+    design_vv_reference: Design Output
+    testing_ref: ''
+    llm_validation:
+      question: Confirm design outputs (drawings, CAD files, BOMs) are approved, under configuration control, and traceable
+        to design inputs
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P2-PROT-002 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+  - check_id: P2-PROT-003
+    check_name: 'Check that prototype specifications are traceable to design inputs with acceptance criteria defined '
+    severity: high
+    regulatory_source: 21 CFR 820.30(e) / Design V&V
+    source_section: Design review
+    estar_section: Section 4.2
+    design_vv_reference: Verification Planning
+    testing_ref: ''
+    llm_validation:
+      question: Check that prototype specifications are traceable to design inputs with acceptance criteria defined and verification
+        test plans established
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P2-PROT-003 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+risk_management_planning:
+  display_name: Risk Management Planning
+  folder_path: Phase 2/Risk Management Planning
+  check_count: 4
+  validation_checks:
+  - check_id: P2-RISK-001
+    check_name: 'Verify risk management plan includes: scope, hazard identification methods, risk acceptability crite'
+    severity: high
+    regulatory_source: ISO 14971
+    source_section: Clause 4.1-4.3
+    estar_section: Section 4.2, 5.2, Section 7
+    design_vv_reference: ''
+    testing_ref: ''
+    llm_validation:
+      question: 'Verify risk management plan includes: scope, hazard identification methods, risk acceptability criteria,
+        review schedule, and link to design controls'
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P2-RISK-001 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+  - check_id: P2-RISK-002
+    check_name: 'Confirm risk management file structure is defined with links to: design inputs, hazards, harms, miti'
+    severity: high
+    regulatory_source: ISO 14971
+    source_section: Clause 5
+    estar_section: Section 4.2
+    design_vv_reference: Risk Control Verification
+    testing_ref: ''
+    llm_validation:
+      question: 'Confirm risk management file structure is defined with links to: design inputs, hazards, harms, mitigations,
+        and verification activities'
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P2-RISK-002 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+  - check_id: P2-RISK-003
+    check_name: Check that risk acceptability criteria are defined (e.g., risk matrix, severity/probability threshol
+    severity: high
+    regulatory_source: ISO 14971
+    source_section: Clause 4.4
+    estar_section: Section 7 (Conclusions)
+    design_vv_reference: ''
+    testing_ref: ''
+    llm_validation:
+      question: Check that risk acceptability criteria are defined (e.g., risk matrix, severity/probability thresholds), approved,
+        and documented
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P2-RISK-003 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
+  - check_id: P2-RISK-004
+    check_name: Verify risk management plan identifies when risk reviews will occur (e.g., after each phase gate) an
+    severity: high
+    regulatory_source: 21 CFR 820.30(g) / ISO 14971
+    source_section: Design review / Risk management
+    estar_section: Section 4.2
+    design_vv_reference: Risk Verification
+    testing_ref: ''
+    llm_validation:
+      question: Verify risk management plan identifies when risk reviews will occur (e.g., after each phase gate) and how
+        risks will be controlled/verified
+      validation_criteria:
+        must_include: []
+    failure_message: Validation check P2-RISK-004 failed
+    remediation:
+    - Review regulatory requirements
+    - Update documentation per guidance
+    priority: ''
+    automation_feasibility: ''
+    notes: ''
