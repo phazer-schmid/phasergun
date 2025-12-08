@@ -43,15 +43,25 @@ export class OrchestratorService implements Orchestrator {
       await this.ragService.initializeKnowledgeBase();
       console.log('✓ RAG Service ready');
 
-      // Step 4: Retrieve relevant context
-      console.log('\n[Step 4] Retrieving knowledge context...');
-      const query = `Analyze documents for FDA 510(k) compliance`;
-      const context = await this.ragService.retrieveContext(query);
-      console.log(`✓ Retrieved context from ${context.sourceMetadata.length} sources`);
+      // Step 4: Index the document chunks
+      console.log('\n[Step 4] Indexing document chunks...');
+      await this.ragService.indexDocuments(chunks);
+      console.log('✓ Documents indexed into knowledge base');
 
-      // Step 5: Generate LLM response
-      console.log('\n[Step 5] Calling LLM Service...');
-      const prompt = this.constructPrompt(chunks, context);
+      // Step 5: Create analysis query based on documents
+      console.log('\n[Step 5] Building analysis query...');
+      const documentTypes = parsedDocuments.map(doc => doc.metadata?.documentType || 'Unknown').join(', ');
+      const query = `Analyze Design History File (DHF) documents for FDA 510(k) regulatory compliance. Document types: ${documentTypes}. Identify gaps, verify completeness, assess risk management, and provide compliance recommendations.`;
+      console.log(`Query: ${query.substring(0, 100)}...`);
+
+      // Step 6: Retrieve relevant context (from indexed docs + regulatory guidelines)
+      console.log('\n[Step 6] Retrieving knowledge context...');
+      const context = await this.ragService.retrieveContext(query, 8); // Get top 8 relevant contexts
+      console.log(`✓ Retrieved ${context.contextSnippets.length} contexts from ${context.sourceMetadata.length} sources`);
+
+      // Step 7: Generate LLM response
+      console.log('\n[Step 7] Calling LLM Service...');
+      const prompt = this.constructPrompt(parsedDocuments, chunks, context);
       const llmResponse = await this.llmService.generateText(prompt, context);
       console.log(`✓ Generated response (${llmResponse.usageStats.tokensUsed} tokens used)`);
 
@@ -75,11 +85,32 @@ export class OrchestratorService implements Orchestrator {
     }
   }
 
-  private constructPrompt(chunks: any[], context: any): string {
-    return `Analyze the following documents for regulatory compliance...
-    
-Documents: ${chunks.length} chunks
-Context: ${context.contextSnippets.length} relevant guidelines
+  private constructPrompt(documents: any[], chunks: any[], context: any): string {
+    const documentSummary = documents.map(doc => 
+      `- ${doc.metadata.fileName || 'Unknown'} (${doc.metadata.documentType || 'Unknown Type'})`
+    ).join('\n');
+
+    return `You are a regulatory compliance expert analyzing Design History File (DHF) documents for FDA 510(k) submission.
+
+DOCUMENTS ANALYZED:
+${documentSummary}
+
+Total chunks analyzed: ${chunks.length}
+
+REGULATORY CONTEXT:
+${context.contextSnippets.map((snippet: string, i: number) => 
+  `${i + 1}. ${snippet}`
+).join('\n\n')}
+
+TASK:
+Analyze the documents for regulatory compliance and provide:
+1. Document completeness assessment
+2. Gap analysis (missing or incomplete sections)
+3. Risk management evaluation
+4. Traceability verification
+5. Specific recommendations for improvement
+
+Focus on FDA 510(k) requirements, ISO 13485 standards, and ISO 14971 risk management principles.
     `;
   }
 }

@@ -15,6 +15,10 @@ export class MockRAGService implements RAGService {
     console.log('[MockRAGService] Knowledge base initialized');
   }
 
+  async indexDocuments(chunks: any[]): Promise<void> {
+    console.log(`[MockRAGService] Indexing ${chunks.length} chunks (mock - no actual indexing)`);
+  }
+
   async retrieveContext(query: string): Promise<KnowledgeContext> {
     if (!this.isInitialized) {
       throw new Error('Knowledge base not initialized');
@@ -44,6 +48,10 @@ export class MockRAGService implements RAGService {
         }
       ]
     };
+  }
+
+  async clearDocuments(): Promise<void> {
+    console.log('[MockRAGService] Clearing documents (mock)');
   }
 
   private delay(ms: number): Promise<void> {

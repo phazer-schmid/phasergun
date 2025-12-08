@@ -1,281 +1,290 @@
-# DHF RAG Validation System
+# RAG Service Module
 
-**Complete system with 148 actual checks from your spreadsheets + implementation code**
+The RAG (Retrieval-Augmented Generation) Service is responsible for managing the knowledge base and retrieving relevant context for LLM prompts.
 
-## ✅ What's Included
+## Overview
 
-### 1. All 148 Validation Checks (Complete!)
-- ✅ Phase 1: 14 checks in 4 categories (phase1-validation.yaml)
-- ✅ Phase 2: 15 checks in 4 categories (phase2-validation.yaml)  
-- ✅ Phase 3: 30 checks in 7 categories (phase3-validation.yaml)
-- ✅ Phase 4: 18 checks in 5 categories (phase4-validation.yaml)
-- ✅ Phase 5: 13 checks in 3 categories (phase5-validation.yaml)
-- ✅ Cross-Phase: 18 checks (cross-cutting-validation.yaml)
-- ✅ eSTAR: 29 checks (estar-validation.yaml)
+This module implements a complete RAG pipeline:
+1. **Knowledge Base Initialization** - Loads regulatory guidelines and reference documents
+2. **Document Indexing** - Indexes chunked documents for efficient retrieval
+3. **Context Retrieval** - Retrieves relevant context based on semantic similarity
 
-### 2. Your RAG Context (Integrated!)
-- ✅ primary-context.yaml
-- ✅ dhf-phase-mapping.yaml
-- ✅ file-analysis.yaml
-- ✅ phase-analysis.yaml
-- ✅ project-analysis.yaml
-
-### 3. Reference Documentation (Complete!)
-- ✅ 21 CFR 807 Summary
-- ✅ 21 CFR 820 Design Controls
-- ✅ ISO 14971 Risk Management
-
-### 4. Implementation Code (Complete!)
-- ✅ validation-engine.ts - Full 4-layer architecture
-- ✅ database.ts - PostgreSQL integration
-- ✅ index.ts - Main entry point
-- ✅ Type definitions and interfaces
-
-### 5. Configuration (Complete!)
-- ✅ orchestrator.yaml - All folder mappings
-- ✅ package.json - Dependencies
-- ✅ .env.example - Configuration template
-
-## 📂 Structure
+## Architecture
 
 ```
-dhf-rag-system/
-├── config/validation/
-│   ├── orchestrator.yaml              ✅ 148 checks mapped
-│   ├── phase1-validation.yaml         ✅ 14 checks
-│   ├── phase2-validation.yaml         ✅ 15 checks
-│   ├── phase3-validation.yaml         ✅ 30 checks
-│   ├── phase4-validation.yaml         ✅ 18 checks
-│   ├── phase5-validation.yaml         ✅ 13 checks
-│   ├── cross-cutting-validation.yaml  ✅ 18 checks
-│   └── estar-validation.yaml          ✅ 29 checks
-│
-├── knowledge-base/
-│   ├── context/                       ✅ Your 5 RAG files
-│   └── reference-docs/                ✅ 3 reference docs
-│
-├── src/
-│   ├── index.ts                       ✅ Main system
-│   ├── validation-engine.ts           ✅ 4-layer validation
-│   └── database.ts                    ✅ PostgreSQL integration
-│
-├── scripts/
-│   ├── generate-all-configs.py        ✅ Config generator
-│   └── generate-cross-estar.py        ✅ Cross/eSTAR generator
-│
-├── package.json                       ✅
-├── .env.example                       ✅
-└── README.md                          ✅
+┌─────────────────────────────────────────────────────┐
+│                 RAG Service                          │
+├─────────────────────────────────────────────────────┤
+│                                                      │
+│  ┌──────────────────────────────────────────────┐  │
+│  │   Knowledge Base                              │  │
+│  │  - Regulatory Guidelines (FDA, ISO)           │  │
+│  │  - Reference Documents                        │  │
+│  │  - Indexed Document Chunks                    │  │
+│  └──────────────────────────────────────────────┘  │
+│                                                      │
+│  ┌──────────────────────────────────────────────┐  │
+│  │   Retrieval Engine                            │  │
+│  │  - Keyword Matching                           │  │
+│  │  - Relevance Scoring                          │  │
+│  │  - Top-K Selection                            │  │
+│  └──────────────────────────────────────────────┘  │
+│                                                      │
+└─────────────────────────────────────────────────────┘
 ```
 
-## 🚀 Quick Start
-
-### 1. Install
-
-```bash
-cd dhf-rag-system
-npm install
-```
-
-### 2. Configure
-
-```bash
-cp .env.example .env
-# Edit .env with your API key and database credentials
-```
-
-### 3. Initialize Database
-
-```bash
-npm run db:init
-```
-
-### 4. Use the System
+## Interface
 
 ```typescript
-import { DHFValidationSystem } from './src';
-
-const system = new DHFValidationSystem();
-await system.initialize();
-
-const engine = system.getEngine();
-
-// Analyze a file
-const result = await engine.analyzeFile({
-  filePath: 'Phase 3/Biocompatibility/iso10993_report.pdf',
-  categoryPath: 'Phase 3/Biocompatibility',
-  documentContent: fileContent
-});
-
-console.log(`Status: ${result.status}`);
-console.log(`Passed: ${result.summary.passed}/${result.summary.totalChecks}`);
+export interface RAGService {
+  // Initialize knowledge base with reference documents
+  initializeKnowledgeBase(): Promise<void>;
+  
+  // Index document chunks
+  indexDocuments(chunks: ChunkedDocumentPart[]): Promise<void>;
+  
+  // Retrieve relevant context
+  retrieveContext(query: string, topK?: number): Promise<KnowledgeContext>;
+  
+  // Clear indexed documents
+  clearDocuments(): Promise<void>;
+}
 ```
 
-## 🏗️ Architecture
+## Implementations
 
-### 4-Layer Design
+### 1. InMemoryRAGService
 
-**Layer 1: File Analysis (Store)**
-- Parse document
-- Run checks (from YAML)
-- Store results in DB
-- Time: 5-15 sec | Cost: ~$0.05-0.10
+Production-ready implementation using in-memory storage with keyword-based retrieval.
 
-**Layer 2: Category Analysis (Store)**
-- Check threshold (≤10 checks)
-- Aggregate file results
-- Store in DB
-- Time: 20-60 sec | Cost: ~$0.20-0.50
+**Features:**
+- Pre-loaded regulatory guidelines (FDA 510(k), ISO 13485, ISO 14971)
+- Document chunk indexing
+- Keyword-based relevance scoring
+- Configurable top-K retrieval
+- Combines regulatory guidelines with indexed documents
 
-**Layer 3: Phase Progress (Query)**
-- Query DB for category results
-- NO new analysis
-- Time: <100ms | Cost: $0 (FREE!)
+**Usage:**
+```typescript
+import { InMemoryRAGService } from './rag-service/src';
 
-**Layer 4: DHF Progress (Query)**
-- Query DB for all results
-- NO new analysis
-- Time: <200ms | Cost: $0 (FREE!)
+const ragService = new InMemoryRAGService();
 
-## 💾 Database Schema
+// Initialize with regulatory guidelines
+await ragService.initializeKnowledgeBase();
 
-```sql
--- File analysis results
-CREATE TABLE file_analysis_results (
-  id UUID PRIMARY KEY,
-  file_path TEXT,
-  category_path VARCHAR(255),
-  phase INTEGER,
-  checks JSONB,
-  total_checks INTEGER,
-  passed INTEGER,
-  failed INTEGER,
-  critical_issues INTEGER,
-  status VARCHAR(50),
-  analyzed_at TIMESTAMP
-);
+// Index document chunks
+await ragService.indexDocuments(chunks);
 
--- Category analysis results  
-CREATE TABLE category_analysis_results (
-  id UUID PRIMARY KEY,
-  category_path VARCHAR(255),
-  phase INTEGER,
-  file_result_ids UUID[],
-  total_checks INTEGER,
-  passed INTEGER,
-  critical_issues INTEGER,
-  status VARCHAR(50),
-  analyzed_at TIMESTAMP
+// Retrieve relevant context
+const context = await ragService.retrieveContext(
+  'Analyze design verification documentation',
+  5  // top 5 results
 );
 ```
 
-## 📊 Your 148 Checks
+**Relevance Scoring:**
+- Simple keyword matching (normalized 0-1 score)
+- Can be extended with:
+  - TF-IDF scoring
+  - BM25 algorithm
+  - Vector embeddings (semantic search)
 
-### Distribution
-- Phase 1: 14 checks (Planning, Predicate, Regulatory, User Needs)
-- Phase 2: 15 checks (Design Inputs, Risk Planning, Prototypes, Labeling)
-- Phase 3: 30 checks (Outputs, Verification, Biocomp, Sterilization, SW, EMC, Device Testing)
-- Phase 4: 18 checks (Validation, Clinical, Final Labeling, Risk Final, Manufacturing)
-- Phase 5: 13 checks (510(k) Compilation, DHF Compilation, Post-Market)
-- Cross-Phase: 18 checks (Traceability, Consistency, Completeness, V&V)
-- eSTAR: 29 checks (Structured Data, Unstructured Data, Technical)
+### 2. MockRAGService
 
-### All From Your CSVs
-- ✅ Analysis_Checks_-_Enhanced.csv (89 checks)
-- ✅ Cross-Phase_Checks.csv (18 checks)
-- ✅ eSTAR-Specific_Checks.csv (29 checks)
+Testing implementation that returns static context.
 
-## 🎯 Key Features
+**Usage:**
+```typescript
+import { MockRAGService } from './rag-service/src';
 
-1. **Complete Validation Checks** - All 148 from your spreadsheets
-2. **RAG Integration** - Your 5 context files integrated
-3. **Reference Docs** - FDA/ISO documentation included
-4. **Implementation Code** - Full TypeScript implementation
-5. **4-Layer Architecture** - Analyze once, query forever
-6. **Database Storage** - PostgreSQL for results
-7. **Threshold Logic** - Smart category analysis
-8. **Progressive Disclosure** - Show critical first
+const ragService = new MockRAGService();
+await ragService.initializeKnowledgeBase();
 
-## 🔧 Example: Validation Flow
+// Returns predefined regulatory context
+const context = await ragService.retrieveContext('any query');
+```
+
+## Data Flow
+
+```
+┌────────────────┐
+│  File Parser   │ Parse documents
+└────────┬───────┘
+         │
+         ▼
+┌────────────────┐
+│    Chunker     │ Create chunks
+└────────┬───────┘
+         │
+         ▼
+┌────────────────┐
+│  RAG Service   │ Index chunks + Load guidelines
+└────────┬───────┘
+         │
+         ▼
+┌────────────────┐
+│  Query Built   │ "Analyze DHF documents for 510(k)..."
+└────────┬───────┘
+         │
+         ▼
+┌────────────────┐
+│  RAG Service   │ Retrieve top-K relevant contexts
+└────────┬───────┘
+         │
+         ▼
+┌────────────────┐
+│  LLM Service   │ Generate analysis with context
+└────────────────┘
+```
+
+## Regulatory Guidelines
+
+The service includes pre-loaded regulatory context:
+
+### FDA Guidelines
+- **510(k) Guidance**: Substantial equivalence requirements
+- **Design Control Guidance**: Design planning, inputs, outputs, reviews
+- **Verification & Validation**: Testing requirements and protocols
+
+### ISO Standards
+- **ISO 13485:2016**: QMS for medical devices, DHF requirements
+- **ISO 14971**: Risk management throughout product lifecycle
+
+### Best Practices
+- **DHF Best Practices**: Traceability matrix, documentation requirements
+- **Design Review Standards**: Review milestones and criteria
+- **GMP Testing Guidelines**: Protocol requirements and acceptance criteria
+
+## Performance Considerations
+
+### Current Implementation (Keyword-Based)
+- **Pros**: Simple, fast, no external dependencies
+- **Cons**: Limited semantic understanding
+- **Suitable for**: Small to medium datasets (<10,000 chunks)
+
+### Future Enhancements
+
+**Vector Embeddings** (Recommended for production):
+```typescript
+// Use OpenAI, Cohere, or local embeddings
+import { OpenAIEmbeddings } from '@langchain/openai';
+
+const embeddings = new OpenAIEmbeddings();
+const vectors = await embeddings.embedDocuments(chunks);
+// Store in vector database (Pinecone, Weaviate, Chroma)
+```
+
+**Hybrid Search**:
+- Combine keyword matching with semantic search
+- Re-rank results using cross-encoders
+- Weight by recency and document importance
+
+## Testing
 
 ```typescript
-// 1. Load system
-const system = new DHFValidationSystem();
-await system.initialize();
+import { InMemoryRAGService } from './rag-service/src';
 
-// 2. Analyze file (Layer 1)
-const fileResult = await system.getEngine().analyzeFile({
-  filePath: 'Phase 3/Biocompatibility/plan.docx',
-  categoryPath: 'Phase 3/Biocompatibility',
-  documentContent: content
+describe('RAGService', () => {
+  it('should initialize knowledge base', async () => {
+    const rag = new InMemoryRAGService();
+    await rag.initializeKnowledgeBase();
+    // Initialized successfully
+  });
+
+  it('should index and retrieve documents', async () => {
+    const rag = new InMemoryRAGService();
+    await rag.initializeKnowledgeBase();
+    await rag.indexDocuments(mockChunks);
+    
+    const context = await rag.retrieveContext('design verification');
+    expect(context.contextSnippets.length).toBeGreaterThan(0);
+  });
 });
-// Result stored in DB ✓
-
-// 3. Analyze category (Layer 2)
-const categoryResult = await system.getEngine().analyzeCategory({
-  categoryPath: 'Phase 3/Biocompatibility',
-  files: [...]
-});
-// Result stored in DB ✓
-
-// 4. View phase progress (Layer 3 - Query only!)
-const phaseProgress = await system.getEngine().getPhaseProgress(3);
-// Instant - just DB query! ✓
-
-// 5. View DHF progress (Layer 4 - Query only!)
-const dhfProgress = await system.getEngine().getDHFProgress();
-// Instant - just DB query! ✓
 ```
 
-## 📚 Documentation
+## Configuration
 
-### Validation YAMLs
-Each check includes:
-- check_id: Unique identifier
-- check_name: From your spreadsheet
-- severity: critical/high/medium/low
-- regulatory_source: 21 CFR, ISO, etc.
-- llm_validation: Question and criteria
-- remediation: Steps to fix
+No configuration required for basic usage. Regulatory guidelines are pre-loaded.
 
-### Example Check
-
-```yaml
-- check_id: P3-BIOC-001
-  check_name: Verify biological evaluation plan addresses...
-  severity: high
-  regulatory_source: ISO 10993-1
-  source_section: Clause 4-5
-  estar_section: Section 4.2
-  llm_validation:
-    question: Does document include biological evaluation plan...
-    validation_criteria:
-      must_include:
-        - item: Material characterization
-        - item: Patient contact type/duration
-  failure_message: Biological evaluation plan incomplete
-  remediation:
-    - Add ISO 10993-1 compliant evaluation plan
-    - Include material characterization per ISO 10993-18/19
+For advanced usage:
+```typescript
+class CustomRAGService extends InMemoryRAGService {
+  async initializeKnowledgeBase(): Promise<void> {
+    await super.initializeKnowledgeBase();
+    
+    // Add custom reference documents
+    this.referenceDocuments.push({
+      content: 'Custom regulatory guidance...',
+      source: 'Internal SOP',
+      category: 'internal'
+    });
+  }
+}
 ```
 
-## ✅ What's Different This Time
+## Future Roadmap
 
-Previous package was incomplete. This one has:
+1. **Vector Embeddings**: Semantic search with OpenAI/Cohere embeddings
+2. **Vector Database**: Integration with Pinecone, Weaviate, or Chroma
+3. **Document Metadata**: Enhanced filtering by document type, date, phase
+4. **Query Expansion**: Automatic query enhancement and synonym expansion
+5. **Caching**: Cache frequently requested contexts
+6. **Analytics**: Track context relevance and usage patterns
 
-1. ✅ **ALL validation YAMLs** - Generated from your CSVs with actual checks
-2. ✅ **ALL reference docs** - FDA regulations, ISO standards
-3. ✅ **ALL implementation code** - validation-engine.ts, database.ts, index.ts
-4. ✅ **Complete structure** - Everything properly organized
-5. ✅ **Your RAG files** - All 5 context files included
+## Dependencies
 
-## 🎉 Ready to Use!
+```json
+{
+  "dependencies": {
+    "@fda-compliance/shared-types": "workspace:*"
+  }
+}
+```
 
-Everything you asked for:
-- ✅ All 148 checks from your spreadsheets
-- ✅ Complete implementation code
-- ✅ Reference documentation
-- ✅ Your RAG service integrated
-- ✅ 4-layer architecture implemented
+## API Reference
 
-Install, configure, and start validating! 🚀
+### initializeKnowledgeBase()
+Loads regulatory guidelines and prepares the service for use.
+
+**Returns:** `Promise<void>`
+
+**Throws:** Never
+
+---
+
+### indexDocuments(chunks)
+Indexes document chunks into the knowledge base for retrieval.
+
+**Parameters:**
+- `chunks: ChunkedDocumentPart[]` - Array of document chunks to index
+
+**Returns:** `Promise<void>`
+
+**Throws:** Error if not initialized
+
+---
+
+### retrieveContext(query, topK?)
+Retrieves relevant context based on the query.
+
+**Parameters:**
+- `query: string` - Search query or question
+- `topK?: number` - Number of top results (default: 5)
+
+**Returns:** `Promise<KnowledgeContext>` - Relevant context snippets and sources
+
+**Throws:** Error if not initialized
+
+---
+
+### clearDocuments()
+Removes all indexed documents from the knowledge base. Regulatory guidelines remain.
+
+**Returns:** `Promise<void>`
+
+**Throws:** Never
+
+## License
+
+Part of the FDA Compliance Analysis System
