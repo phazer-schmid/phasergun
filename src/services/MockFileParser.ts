@@ -1,4 +1,5 @@
-import type { FileParser, ParsedDocument } from '@/interfaces/ParsedDocument';
+import type { ParsedDocument } from '@fda-compliance/shared-types';
+import type { FileParser } from '../file-parser/src';
 
 /**
  * Mock implementation of FileParser

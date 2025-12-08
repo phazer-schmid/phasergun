@@ -1,5 +1,5 @@
-import type { Chunker, ChunkedDocumentPart } from '@/interfaces/ChunkedDocumentPart';
-import type { ParsedDocument } from '@/interfaces/ParsedDocument';
+import type { ChunkedDocumentPart, ParsedDocument } from '@fda-compliance/shared-types';
+import type { Chunker } from '../chunker/src';
 
 /**
  * Mock implementation of Chunker

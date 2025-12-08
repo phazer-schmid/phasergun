@@ -71,7 +71,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { AppStatusOutput } from '@/interfaces/AppStatusOutput';
+import type { AppStatusOutput } from '@fda-compliance/shared-types';
 
 const props = defineProps<{
   output: AppStatusOutput | null;

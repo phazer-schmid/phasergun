@@ -66,7 +66,7 @@
 import { ref } from 'vue';
 import InputForm from './InputForm.vue';
 import OutputDisplay from './OutputDisplay.vue';
-import type { AppStatusOutput } from '@/interfaces/AppStatusOutput';
+import type { AppStatusOutput } from '@fda-compliance/shared-types';
 import { OrchestratorService } from '@/services/Orchestrator';
 import { MockFileParser } from '@/services/MockFileParser';
 import { MockChunker } from '@/services/MockChunker';

@@ -1,4 +1,5 @@
-import type { RAGService, KnowledgeContext } from '@/interfaces/KnowledgeContext';
+import type { KnowledgeContext } from '@fda-compliance/shared-types';
+import type { RAGService } from '../rag-service/src';
 
 /**
  * Mock implementation of RAGService

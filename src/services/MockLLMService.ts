@@ -1,6 +1,5 @@
-import type { LLMService, LLMResponse } from '@/interfaces/LLMResponse';
-import type { ChunkedDocumentPart } from '@/interfaces/ChunkedDocumentPart';
-import type { KnowledgeContext } from '@/interfaces/KnowledgeContext';
+import type { LLMResponse, ChunkedDocumentPart, KnowledgeContext } from '@fda-compliance/shared-types';
+import type { LLMService } from '../llm-service/src';
 
 /**
  * Mock implementation of LLMService

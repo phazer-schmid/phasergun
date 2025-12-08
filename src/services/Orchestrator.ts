@@ -1,9 +1,8 @@
-import type { SourceFolderInput } from '@/interfaces/SourceFolderInput';
-import type { AppStatusOutput } from '@/interfaces/AppStatusOutput';
-import type { FileParser } from '@/interfaces/ParsedDocument';
-import type { Chunker } from '@/interfaces/ChunkedDocumentPart';
-import type { RAGService } from '@/interfaces/KnowledgeContext';
-import type { LLMService } from '@/interfaces/LLMResponse';
+import type { SourceFolderInput, AppStatusOutput } from '@fda-compliance/shared-types';
+import type { FileParser } from '../file-parser/src';
+import type { Chunker } from '../chunker/src';
+import type { RAGService } from '../rag-service/src';
+import type { LLMService } from '../llm-service/src';
 
 /**
  * Interface for the Orchestrator
