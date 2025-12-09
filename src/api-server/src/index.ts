@@ -307,77 +307,50 @@ Size: ${(fileStats.size / 1024).toFixed(2)} KB
 `;
 
       if (validationCriteria) {
-        // Category-specific analysis
+        // Category-specific analysis with ultra-compact output
         prompt += `Phase: ${pathInfo.phaseName}
 Category: ${validationCriteria.displayName}
 
-This document should be analyzed ONLY against the following ${validationCriteria.checkCount} specific validation criteria for ${validationCriteria.displayName}:
-
+VALIDATION CRITERIA:
 `;
         validationCriteria.validationChecks.forEach((check: any, index: number) => {
-          prompt += `${index + 1}. [${check.check_id}] ${check.llm_validation.question}
-   Regulatory Source: ${check.regulatory_source}
-   Severity: ${check.severity}
-
-`;
+          prompt += `${index + 1}. [${check.check_id}] ${check.llm_validation.question} (${check.severity})\n`;
         });
 
         prompt += `
-Content:
+DOCUMENT CONTENT:
 ${fileContent}
 
-Please provide a focused analysis addressing ONLY these ${validationCriteria.checkCount} validation criteria:
+OUTPUT ONLY critical action items as a numbered list. No explanations. No summaries. Maximum 10 items.
 
-1. DOCUMENT ASSESSMENT
-   - Document type and purpose
-   - Relevance to ${validationCriteria.displayName}
+Format:
+1. [Action item]
+2. [Action item]
+...
 
-2. VALIDATION CHECK RESULTS
-   For each of the ${validationCriteria.checkCount} checks listed above:
-   - Status: PASS/FAIL/PARTIAL
-   - Evidence found (or missing)
-   - Specific findings
-
-3. COMPLIANCE SUMMARY
-   - How many checks passed
-   - Critical gaps identified
-   - Overall readiness for this category
-
-4. SPECIFIC RECOMMENDATIONS
-   - What needs to be added/improved
-   - References to regulatory requirements
-   - Priority actions for ${validationCriteria.displayName}
-
-Format as a professional regulatory analysis report focused on ${validationCriteria.displayName}.`;
+Requirements:
+- Only list CRITICAL gaps requiring immediate action
+- One line per item
+- Reference specific validation criteria by ID when applicable
+- Include regulatory requirement if relevant`;
       } else {
-        // Generic analysis if category not detected
+        // Generic analysis - ultra-compact format
         prompt += `
-Content:
+DOCUMENT CONTENT:
 ${fileContent}
 
-Please provide a comprehensive FDA 510(k) compliance analysis covering:
+OUTPUT ONLY critical action items for FDA 510(k) compliance as a numbered list. Maximum 10 items.
 
-1. DOCUMENT ASSESSMENT
-   - What type of document this appears to be
-   - Quality and completeness of the content
-   - Regulatory relevance
+Format:
+1. [Action item]
+2. [Action item]
+...
 
-2. KEY FINDINGS
-   - Strengths of the documentation
-   - Compliance with FDA requirements
-   - Alignment with ISO standards
-
-3. RECOMMENDATIONS
-   - Specific actions needed
-   - Documentation gaps to address
-   - Next steps for 510(k) readiness
-
-4. REGULATORY COMPLIANCE STATUS
-   - Overall readiness assessment
-   - Risk areas
-   - Timeline considerations
-
-Format your response as a professional regulatory analysis report.`;
+Requirements:
+- Only CRITICAL gaps or missing elements
+- One line per item
+- Reference FDA/ISO requirements when applicable
+- No explanations or summaries`;
       }
 
       // Call real LLM

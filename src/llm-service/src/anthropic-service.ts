@@ -10,7 +10,7 @@ export class AnthropicLLMService implements LLMService {
   private client: Anthropic;
   private model: string;
 
-  constructor(apiKey: string, model: string = 'claude-3-5-sonnet-20241022') {
+  constructor(apiKey: string, model: string = 'claude-3-haiku-20240307') {
     this.client = new Anthropic({ apiKey });
     this.model = model;
     console.log(`[AnthropicLLMService] Initialized with model: ${model}`);
@@ -31,7 +31,7 @@ export class AnthropicLLMService implements LLMService {
       const startTime = Date.now();
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 4096,
+        max_tokens: 500, // Ultra-compact for cost savings (critical recommendations only)
         temperature: 0.3, // Lower temperature for more focused, technical responses
         messages: [{
           role: 'user',
@@ -51,10 +51,18 @@ export class AnthropicLLMService implements LLMService {
       console.log(`[AnthropicLLMService] Input tokens: ${response.usage.input_tokens}`);
       console.log(`[AnthropicLLMService] Output tokens: ${response.usage.output_tokens}`);
 
-      // Calculate approximate cost (Claude 3.5 Sonnet pricing)
-      const inputCost = (response.usage.input_tokens / 1000000) * 3.00;  // $3 per 1M input tokens
-      const outputCost = (response.usage.output_tokens / 1000000) * 15.00; // $15 per 1M output tokens
+      // Calculate approximate cost based on model
+      // Haiku: $0.25 input / $1.25 output per 1M tokens
+      // Sonnet: $3 input / $15 output per 1M tokens
+      const isHaiku = this.model.includes('haiku');
+      const inputRate = isHaiku ? 0.25 : 3.00;
+      const outputRate = isHaiku ? 1.25 : 15.00;
+      
+      const inputCost = (response.usage.input_tokens / 1000000) * inputRate;
+      const outputCost = (response.usage.output_tokens / 1000000) * outputRate;
       const totalCost = inputCost + outputCost;
+
+      console.log(`[AnthropicLLMService] Cost: $${totalCost.toFixed(4)} (${isHaiku ? 'Haiku' : 'Sonnet'} pricing)`);
 
       return {
         generatedText: textContent,
