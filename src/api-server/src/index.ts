@@ -272,6 +272,8 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
     const llmMode = process.env.LLM_MODE || 'mock';
     const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
     const anthropicModel = process.env.ANTHROPIC_MODEL || 'claude-3-haiku-20240307';
+    const ollamaModel = process.env.OLLAMA_MODEL || 'llama3.1:70b';
+    const ollamaBaseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 
     console.log(`[API] LLM Mode: ${llmMode.toUpperCase()}`);
 
@@ -279,13 +281,23 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
     let llmService;
     let analysis: string;
 
-    if (llmMode === 'real' && anthropicApiKey) {
+    if (llmMode === 'ollama') {
+      // Use Ollama (local open-source models)
+      console.log(`[API] Using Ollama with model: ${ollamaModel}\n`);
+      
+      const { OllamaLLMService } = await import('../../llm-service/dist/ollama-service.js');
+      llmService = new OllamaLLMService(ollamaModel, { baseUrl: ollamaBaseUrl });
+      
+    } else if (llmMode === 'anthropic' && anthropicApiKey) {
       // Use REAL Anthropic Claude
-      console.log(`[API] Using REAL Anthropic Claude API\n`);
+      console.log(`[API] Using Anthropic Claude API (${anthropicModel})\n`);
       
       const { AnthropicLLMService } = await import('../../llm-service/dist/anthropic-service.js');
       llmService = new AnthropicLLMService(anthropicApiKey, anthropicModel);
+    }
 
+    // Generate analysis with selected LLM service
+    if (llmService) {
       // Create phase and category-specific prompt
       let prompt = `You are an FDA regulatory compliance expert analyzing medical device documentation for 510(k) submission readiness.
 
