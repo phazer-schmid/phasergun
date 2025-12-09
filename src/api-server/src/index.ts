@@ -6,7 +6,6 @@ import * as yaml from 'js-yaml';
 import { config } from 'dotenv';
 import { DHFScanner } from '@fda-compliance/dhf-scanner';
 import { PhaseDHFMapping } from '@fda-compliance/shared-types';
-import { estimateTokenCount, splitIntoChunks, aggregateChunkAnalyses } from './chunking-utils';
 
 // Load environment variables
 config();
@@ -308,26 +307,6 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
 
     // Generate analysis with selected LLM service
     if (llmService) {
-      // Estimate token count for file content and decide on strategy
-      const contentTokens = estimateTokenCount(fileContent);
-      const promptOverhead = 2000; // Estimated tokens for instructions, validation criteria, etc.
-      const totalTokens = contentTokens + promptOverhead;
-      
-      // Determine model context limits
-      const contextLimits: Record<string, number> = {
-        'mistral': 120000,  // Mistral: 128K with buffer
-        'anthropic': 190000, // Claude: 200K with buffer
-        'ollama': 120000     // Varies by model, conservative estimate
-      };
-      
-      const modelLimit = contextLimits[llmMode] || 120000;
-      const needsChunking = totalTokens > modelLimit;
-      
-      console.log(`[API] Content tokens: ${contentTokens.toLocaleString()}`);
-      console.log(`[API] Total estimated tokens: ${totalTokens.toLocaleString()}`);
-      console.log(`[API] Model limit: ${modelLimit.toLocaleString()}`);
-      console.log(`[API] Chunking ${needsChunking ? 'REQUIRED' : 'not needed'}\n`);
-      
       // Create phase and category-specific prompt
       let prompt = `You are an FDA regulatory compliance expert analyzing medical device documentation for 510(k) submission readiness.
 
@@ -394,64 +373,15 @@ Analyze this document for FDA 510(k) compliance and provide:
 Keep it concise but informative.`;
       }
 
-      // Process the file - with chunking if needed
-      if (needsChunking) {
-        console.log('[API] ⚙️ Using intelligent chunking for large document...\n');
-        
-        // Split content into chunks
-        const chunks = splitIntoChunks(fileContent, {
-          maxTokens: Math.floor(modelLimit * 0.8), // Use 80% of limit for content
-          overlapTokens: 0, // Calculated from percent
-          overlapPercent: 20 // 20% overlap between chunks
-        });
-        
-        console.log(`[API] Split into ${chunks.length} chunks with 20% overlap`);
-        
-        // Analyze each chunk
-        const chunkResults = [];
-        let totalCost = 0;
-        const startTime = Date.now();
-        
-        for (const chunk of chunks) {
-          console.log(`[API] Processing chunk ${chunk.chunkIndex + 1}/${chunks.length} (${chunk.tokenCount.toLocaleString()} tokens)...`);
-          
-          // Build prompt for this chunk
-          const chunkPrompt = prompt.replace('DOCUMENT CONTENT:\n' + fileContent, 
-            `DOCUMENT CONTENT (Chunk ${chunk.chunkIndex + 1} of ${chunks.length}):\n${chunk.content}`);
-          
-          // Analyze chunk
-          const chunkResponse = await llmService.generateText(chunkPrompt);
-          
-          chunkResults.push({
-            chunkIndex: chunk.chunkIndex,
-            analysis: chunkResponse.generatedText,
-            tokenCount: chunkResponse.usageStats.tokensUsed
-          });
-          
-          totalCost += chunkResponse.usageStats.cost;
-          console.log(`[API] ✓ Chunk ${chunk.chunkIndex + 1} complete ($${chunkResponse.usageStats.cost.toFixed(4)})`);
-        }
-        
-        const processingTime = Date.now() - startTime;
-        console.log(`[API] All chunks processed in ${(processingTime / 1000).toFixed(1)}s`);
-        console.log(`[API] Total cost: $${totalCost.toFixed(4)}\n`);
-        
-        // Aggregate results
-        console.log('[API] Aggregating findings from all chunks...');
-        analysis = aggregateChunkAnalyses(chunkResults, path.basename(filePath), contentTokens);
-        console.log('[API] ✓ Aggregation complete\n');
-        
-      } else {
-        // Single analysis for files that fit in context
-        console.log('[API] Calling LLM API (single analysis)...');
-        const llmResponse = await llmService.generateText(prompt);
-        
-        console.log(`[API] ✓ Analysis complete`);
-        console.log(`[API] Tokens used: ${llmResponse.usageStats.tokensUsed}`);
-        console.log(`[API] Cost: $${llmResponse.usageStats.cost.toFixed(4)}\n`);
+      // Call LLM API for analysis
+      console.log('[API] Calling LLM API...');
+      const llmResponse = await llmService.generateText(prompt);
+      
+      console.log(`[API] ✓ Analysis complete`);
+      console.log(`[API] Tokens used: ${llmResponse.usageStats.tokensUsed}`);
+      console.log(`[API] Cost: $${llmResponse.usageStats.cost.toFixed(4)}\n`);
 
-        analysis = llmResponse.generatedText;
-      }
+      analysis = llmResponse.generatedText;
 
     } else {
       // Use MOCK service
