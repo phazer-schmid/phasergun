@@ -24,6 +24,7 @@ export interface LLMService {
 
 // Export the real LLM services
 export { AnthropicLLMService } from './anthropic-service';
+export { MistralLLMService } from './mistral-service';
 export { OllamaLLMService } from './ollama-service';
 
 /**

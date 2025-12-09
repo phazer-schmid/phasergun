@@ -31,7 +31,7 @@ export class AnthropicLLMService implements LLMService {
       const startTime = Date.now();
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 500, // Ultra-compact for cost savings (critical recommendations only)
+        max_tokens: 1500, // Balanced: enough for findings + recommendations while staying cost-effective
         temperature: 0.3, // Lower temperature for more focused, technical responses
         messages: [{
           role: 'user',
