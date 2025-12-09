@@ -10,10 +10,11 @@
     "dev": "tsc && node dist/cli.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.3",
     "@fda-compliance/shared-types": "file:../shared-types"
   },
   "devDependencies": {
-    "typescript": "~5.9.0",
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "typescript": "~5.9.0"
   }
 }

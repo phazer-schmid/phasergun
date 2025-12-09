@@ -1,6 +1,6 @@
 planning_and_scope:
   display_name: Planning & Scope
-  folder_path: Phase 1/Planning & Scope
+  folder_path: Phase 1/Planning and Scope
   check_count: 4
   validation_checks:
   - check_id: P1-PLAN-001

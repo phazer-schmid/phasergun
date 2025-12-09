@@ -158,8 +158,65 @@ app.get('/api/dhf-mapping', (_req: Request, res: Response) => {
 });
 
 /**
+ * Parse phase and category from file path
+ */
+function parsePhaseAndCategory(filePath: string): {
+  phaseId: number | null;
+  phaseName: string | null;
+  category: string | null;
+  categoryPath: string | null;
+} {
+  // Extract "Phase 1", "Phase 2", etc.
+  const phaseMatch = filePath.match(/Phase\s+(\d+)/i);
+  // Extract category folder (text between "Phase X/" and the next "/")
+  const categoryMatch = filePath.match(/Phase\s+\d+\/([^/]+)/i);
+  
+  const phaseId = phaseMatch ? parseInt(phaseMatch[1]) : null;
+  const category = categoryMatch ? categoryMatch[1].trim() : null;
+  
+  return {
+    phaseId,
+    phaseName: phaseId ? `Phase ${phaseId}` : null,
+    category,
+    categoryPath: phaseId && category ? `Phase ${phaseId}/${category}` : null
+  };
+}
+
+/**
+ * Load validation criteria for specific phase and category
+ */
+async function loadValidationCriteria(phaseId: number, categoryPath: string): Promise<any> {
+  try {
+    const validationPath = path.join(__dirname, `../../rag-service/config/validation/phase${phaseId}-validation.yaml`);
+    const fileContents = await fs.readFile(validationPath, 'utf8');
+    const data = yaml.load(fileContents) as any;
+    
+    // Find matching category by folder_path
+    for (const [key, value] of Object.entries(data)) {
+      if (typeof value === 'object' && value !== null) {
+        const category = value as any;
+        if (category.folder_path === categoryPath) {
+          return {
+            categoryKey: key,
+            displayName: category.display_name,
+            folderPath: category.folder_path,
+            checkCount: category.check_count,
+            validationChecks: category.validation_checks || []
+          };
+        }
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`[API] Error loading validation criteria:`, error);
+    return null;
+  }
+}
+
+/**
  * POST /api/analyze
- * Analyze a single file through the complete pipeline
+ * Analyze a single file with REAL or MOCK LLM
  */
 app.post('/api/analyze', async (req: Request, res: Response) => {
   const { filePath } = req.body;
@@ -172,36 +229,167 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
     });
   }
 
-  console.log(`[API] Analyzing file: ${filePath}`);
+  console.log(`\n[API] ========================================`);
+  console.log(`[API] Starting Analysis`);
+  console.log(`[API] File: ${filePath}`);
+  console.log(`[API] ========================================\n`);
 
   try {
     // Verify file exists
     await fs.access(filePath);
     const fileStats = await fs.stat(filePath);
+    
+    // Check if it's a directory
+    if (fileStats.isDirectory()) {
+      return res.status(400).json({
+        status: 'error',
+        message: `The path is a directory, not a file. Please select a specific file to analyze.`,
+        detailedReport: `Error: "${path.basename(filePath)}" is a directory.\n\nPlease provide the full path to a specific file (e.g., .txt, .pdf, .docx) instead of a folder.`,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // Parse phase and category from file path
+    const pathInfo = parsePhaseAndCategory(filePath);
+    console.log(`[API] Detected Phase: ${pathInfo.phaseName || 'Unknown'}`);
+    console.log(`[API] Detected Category: ${pathInfo.category || 'Unknown'}`);
+    
+    // Load category-specific validation criteria
+    let validationCriteria: any = null;
+    if (pathInfo.phaseId && pathInfo.categoryPath) {
+      validationCriteria = await loadValidationCriteria(pathInfo.phaseId, pathInfo.categoryPath);
+      if (validationCriteria) {
+        console.log(`[API] Loaded ${validationCriteria.checkCount} validation checks for ${validationCriteria.displayName}\n`);
+      } else {
+        console.log(`[API] No validation criteria found for ${pathInfo.categoryPath}\n`);
+      }
+    }
+    
+    // Read file content
+    const fileContent = await fs.readFile(filePath, 'utf-8');
 
-    // Simulate processing steps
-    console.log('[API] Step 1: Parsing file...');
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    console.log('[API] Step 2: Chunking document...');
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    console.log('[API] Step 3: RAG analysis...');
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    console.log('[API] Step 4: LLM analysis...');
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Mock analysis result
-    const analysis = `
-📄 Document Analysis Complete
+    // Check LLM mode from environment
+    const llmMode = process.env.LLM_MODE || 'mock';
+    const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+    const anthropicModel = process.env.ANTHROPIC_MODEL || 'claude-3-haiku-20240307';
+
+    console.log(`[API] LLM Mode: ${llmMode.toUpperCase()}`);
+
+    // Choose LLM service based on mode
+    let llmService;
+    let analysis: string;
+
+    if (llmMode === 'real' && anthropicApiKey) {
+      // Use REAL Anthropic Claude
+      console.log(`[API] Using REAL Anthropic Claude API\n`);
+      
+      const { AnthropicLLMService } = await import('../../llm-service/dist/anthropic-service.js');
+      llmService = new AnthropicLLMService(anthropicApiKey, anthropicModel);
+
+      // Create phase and category-specific prompt
+      let prompt = `You are an FDA regulatory compliance expert analyzing medical device documentation for 510(k) submission readiness.
+
+DOCUMENT TO ANALYZE:
+File: ${path.basename(filePath)}
+Size: ${(fileStats.size / 1024).toFixed(2)} KB
+`;
+
+      if (validationCriteria) {
+        // Category-specific analysis
+        prompt += `Phase: ${pathInfo.phaseName}
+Category: ${validationCriteria.displayName}
+
+This document should be analyzed ONLY against the following ${validationCriteria.checkCount} specific validation criteria for ${validationCriteria.displayName}:
+
+`;
+        validationCriteria.validationChecks.forEach((check: any, index: number) => {
+          prompt += `${index + 1}. [${check.check_id}] ${check.llm_validation.question}
+   Regulatory Source: ${check.regulatory_source}
+   Severity: ${check.severity}
+
+`;
+        });
+
+        prompt += `
+Content:
+${fileContent}
+
+Please provide a focused analysis addressing ONLY these ${validationCriteria.checkCount} validation criteria:
+
+1. DOCUMENT ASSESSMENT
+   - Document type and purpose
+   - Relevance to ${validationCriteria.displayName}
+
+2. VALIDATION CHECK RESULTS
+   For each of the ${validationCriteria.checkCount} checks listed above:
+   - Status: PASS/FAIL/PARTIAL
+   - Evidence found (or missing)
+   - Specific findings
+
+3. COMPLIANCE SUMMARY
+   - How many checks passed
+   - Critical gaps identified
+   - Overall readiness for this category
+
+4. SPECIFIC RECOMMENDATIONS
+   - What needs to be added/improved
+   - References to regulatory requirements
+   - Priority actions for ${validationCriteria.displayName}
+
+Format as a professional regulatory analysis report focused on ${validationCriteria.displayName}.`;
+      } else {
+        // Generic analysis if category not detected
+        prompt += `
+Content:
+${fileContent}
+
+Please provide a comprehensive FDA 510(k) compliance analysis covering:
+
+1. DOCUMENT ASSESSMENT
+   - What type of document this appears to be
+   - Quality and completeness of the content
+   - Regulatory relevance
+
+2. KEY FINDINGS
+   - Strengths of the documentation
+   - Compliance with FDA requirements
+   - Alignment with ISO standards
+
+3. RECOMMENDATIONS
+   - Specific actions needed
+   - Documentation gaps to address
+   - Next steps for 510(k) readiness
+
+4. REGULATORY COMPLIANCE STATUS
+   - Overall readiness assessment
+   - Risk areas
+   - Timeline considerations
+
+Format your response as a professional regulatory analysis report.`;
+      }
+
+      // Call real LLM
+      console.log('[API] Calling Anthropic Claude API...');
+      const llmResponse = await llmService.generateText(prompt);
+      
+      console.log(`[API] ✓ Analysis complete`);
+      console.log(`[API] Tokens used: ${llmResponse.usageStats.tokensUsed}`);
+      console.log(`[API] Cost: $${llmResponse.usageStats.cost.toFixed(4)}\n`);
+
+      analysis = llmResponse.generatedText;
+
+    } else {
+      // Use MOCK service
+      console.log(`[API] Using MOCK LLM Service\n`);
+      
+      analysis = `📄 Document Analysis Complete
 
 File: ${path.basename(filePath)}
 Size: ${(fileStats.size / 1024).toFixed(2)} KB
 Type: ${path.extname(filePath)}
 
 Summary:
-The document has been successfully processed through the analysis pipeline.
+This is a MOCK analysis. Set LLM_MODE=real and add your ANTHROPIC_API_KEY to get real AI analysis.
 
 Pipeline Steps:
 ✅ Step 1: File Parsing - Document structure extracted
@@ -209,25 +397,18 @@ Pipeline Steps:
 ✅ Step 3: RAG Indexing - Regulatory context retrieved
 ✅ Step 4: LLM Analysis - Compliance assessment generated
 
-Analysis Results:
-This is a MOCK analysis for the simple POC. In production, this would contain:
-- Detailed regulatory compliance assessment
-- Comparison against FDA 510(k) requirements
-- Identification of missing documentation
-- Recommendations for addressing gaps
-- Risk analysis and mitigation strategies
-
-Next Steps for Full Implementation:
-1. Integrate actual file-parser module for PDF/DOCX extraction
-2. Apply semantic chunking with proper boundaries
-3. Index chunks in RAG vector database
-4. Retrieve relevant regulatory context
-5. Generate detailed LLM analysis with Claude/GPT
-6. Provide actionable compliance recommendations
-
-Status: ✅ POC Pipeline Complete
+Status: ✅ POC Pipeline Complete (MOCK MODE)
 Time: ${new Date().toLocaleTimeString()}
-`;
+
+To enable REAL AI analysis:
+1. Set ANTHROPIC_API_KEY in your .env file
+2. Set LLM_MODE=real
+3. Restart the API server`;
+    }
+
+    console.log(`[API] ========================================`);
+    console.log(`[API] Analysis Complete`);
+    console.log(`[API] ========================================\n`);
 
     res.json({
       status: 'complete',
@@ -237,12 +418,13 @@ Time: ${new Date().toLocaleTimeString()}
       metadata: {
         fileName: path.basename(filePath),
         fileSize: (fileStats.size / 1024).toFixed(2) + ' KB',
-        fileType: path.extname(filePath)
+        fileType: path.extname(filePath),
+        llmMode: llmMode
       }
     });
 
   } catch (error) {
-    console.error('[API] Analysis error:', error);
+    console.error('\n[API] ❌ Analysis error:', error);
     res.status(500).json({
       status: 'error',
       message: error instanceof Error ? error.message : 'Analysis failed',

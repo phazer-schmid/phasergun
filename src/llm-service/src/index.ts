@@ -22,6 +22,9 @@ export interface LLMService {
   assessDocument(docs: ChunkedDocumentPart[], guidelines: string): Promise<LLMResponse>;
 }
 
+// Export the real Anthropic service
+export { AnthropicLLMService } from './anthropic-service';
+
 /**
  * Mock Implementation of LLM Service
  * Returns simulated AI responses for testing
