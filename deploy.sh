@@ -89,7 +89,23 @@ if command -v nginx &> /dev/null; then
     DEPLOY_DIR=$(pwd)
     
     # Get server IP (or use domain if provided)
-    SERVER_NAME="${DOMAIN:-$(curl -s ifconfig.me)}"
+    if [ -z "$DOMAIN" ]; then
+        # Try multiple methods to get IP
+        SERVER_NAME=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || \
+                      curl -s --max-time 5 icanhazip.com 2>/dev/null || \
+                      hostname -I | awk '{print $1}' 2>/dev/null || \
+                      echo "")
+        
+        if [ -z "$SERVER_NAME" ]; then
+            echo -e "${YELLOW}⚠ Could not auto-detect server IP${NC}"
+            echo -e "${YELLOW}Please enter your server IP or domain:${NC}"
+            read -p "Server IP/Domain: " SERVER_NAME
+        fi
+    else
+        SERVER_NAME="$DOMAIN"
+    fi
+    
+    echo "Configuring Nginx for: $SERVER_NAME"
     
     # Create Nginx config
     sudo tee /etc/nginx/sites-available/meddev-pro > /dev/null <<EOF
