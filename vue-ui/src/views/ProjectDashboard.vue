@@ -196,6 +196,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useProjectService } from '../composables/useProjectService';
+import { useGoogleDrive } from '../composables/useGoogleDrive';
 import { Project } from '../models/project.model';
 import { AppStatusOutput } from '@fda-compliance/shared-types';
 import { getApiEndpoint } from '../config/api';
@@ -203,6 +204,7 @@ import { getApiEndpoint } from '../config/api';
 const router = useRouter();
 const route = useRoute();
 const projectService = useProjectService();
+const googleDrive = useGoogleDrive();
 
 const project = ref<Project | null>(null);
 const currentView = ref<'project' | 'phase'>('project');
@@ -226,6 +228,20 @@ const selectedFile = ref<{
 onMounted(async () => {
   const projectId = route.params.id as string;
   project.value = projectService.getProject(projectId);
+  
+  // Initialize Google Drive if project uses it
+  if (project.value?.sourceType === 'google-drive') {
+    try {
+      await googleDrive.initializeGapi();
+      if (!googleDrive.isSignedIn.value) {
+        await googleDrive.signIn();
+      }
+      console.log('[Dashboard] Google Drive initialized and signed in');
+    } catch (error) {
+      console.error('[Dashboard] Google Drive initialization failed:', error);
+      scanError.value = 'Failed to connect to Google Drive. Please check your credentials.';
+    }
+  }
   
   // Load folder structure from API
   await loadFolderStructure();
@@ -260,22 +276,67 @@ async function loadPhaseFiles(phaseId: number) {
   const phase = folderStructure.value.folder_structure[`phase_${phaseId}`];
   if (!phase) return;
 
-  for (const category of phase.categories) {
-    const fullPath = `${project.value.folderPath}/${category.folder_path}`;
-    
-    try {
-      const response = await fetch(getApiEndpoint('/list-files'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: fullPath })
-      });
+  // Check if using Google Drive
+  if (project.value.sourceType === 'google-drive') {
+    // Google Drive mode
+    for (const category of phase.categories) {
+      // folderPath is actually a Google Drive folder ID
+      const folderId = `${project.value.folderPath}/${category.folder_path}`;
       
-      const result = await response.json();
-      categoryFiles.value.set(category.category_id, result.files || []);
+      try {
+        const accessToken = googleDrive.getAccessToken();
+        if (!accessToken) {
+          console.error('[Dashboard] No Google Drive access token');
+          categoryFiles.value.set(category.category_id, []);
+          continue;
+        }
+
+        const response = await fetch(getApiEndpoint('/google-drive/list-files'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            folderId: folderId,
+            accessToken: accessToken
+          })
+        });
+        
+        const result = await response.json();
+        
+        // Convert Google Drive files to match local file format
+        const files = (result.files || []).map((file: any) => ({
+          name: file.name,
+          path: file.id, // Use Google Drive file ID as path
+          size: parseInt(file.size || '0'),
+          modified: new Date(file.modifiedTime),
+          mimeType: file.mimeType
+        }));
+        
+        categoryFiles.value.set(category.category_id, files);
+        
+      } catch (error) {
+        console.error(`[Dashboard] Failed to load Google Drive files for ${category.category_id}:`, error);
+        categoryFiles.value.set(category.category_id, []);
+      }
+    }
+  } else {
+    // Local file system mode
+    for (const category of phase.categories) {
+      const fullPath = `${project.value.folderPath}/${category.folder_path}`;
       
-    } catch (error) {
-      console.error(`[Dashboard] Failed to load files for ${category.category_id}:`, error);
-      categoryFiles.value.set(category.category_id, []);
+      try {
+        const response = await fetch(getApiEndpoint('/list-files'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: fullPath })
+        });
+        
+        const result = await response.json();
+        categoryFiles.value.set(category.category_id, result.files || []);
+        
+      } catch (error) {
+        console.error(`[Dashboard] Failed to load files for ${category.category_id}:`, error);
+        categoryFiles.value.set(category.category_id, []);
+      }
     }
   }
 }
@@ -324,20 +385,49 @@ async function analyzeSelectedDocument() {
   analysisResult.value = null;
   
   try {
-    const response = await fetch(getApiEndpoint('/analyze'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filePath: selectedFile.value.file.path
-      })
-    });
-    
-    const result = await response.json();
-    
-    if (result.status === 'complete') {
-      analysisResult.value = result;
+    // Check if using Google Drive
+    if (project.value.sourceType === 'google-drive') {
+      // Google Drive analysis
+      const accessToken = googleDrive.getAccessToken();
+      if (!accessToken) {
+        scanError.value = 'Not signed into Google Drive';
+        return;
+      }
+
+      const response = await fetch(getApiEndpoint('/analyze-google-drive'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileId: selectedFile.value.file.path, // path is actually Google Drive file ID
+          fileName: selectedFile.value.file.name,
+          accessToken: accessToken
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.status === 'complete') {
+        analysisResult.value = result;
+      } else {
+        scanError.value = result.message || 'Analysis failed';
+      }
     } else {
-      scanError.value = result.message || 'Analysis failed';
+      // Local file analysis
+      const response = await fetch(getApiEndpoint('/analyze'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filePath: selectedFile.value.file.path
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.status === 'complete') {
+        analysisResult.value = result;
+      } else {
+        scanError.value = result.message || 'Analysis failed';
+      }
     }
     
   } catch (error: any) {
