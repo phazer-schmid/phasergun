@@ -25,64 +25,72 @@
             <span class="nav-label">Entire Project</span>
           </div>
 
-          <!-- Phase Items -->
-          <div class="nav-item-container">
-            <div 
-              class="nav-item"
-              :class="{ 'nav-item-active': selectedPhaseId === 1 }"
-              @click="onPhaseClick(1)">
-              <span class="nav-icon-number">1</span>
-              <span class="nav-label">Phase 1: Planning</span>
+          <!-- Dynamic Phase Items -->
+          <div 
+            v-for="(phase, phaseKey) in folderStructure?.folder_structure" 
+            :key="phaseKey"
+            class="phase-container">
+            
+            <!-- Phase Header -->
+            <div class="nav-item-container">
+              <div 
+                class="nav-item phase-item"
+                @click="togglePhase(phase.phase_id)">
+                <span class="expand-icon">{{ expandedPhases.has(phase.phase_id) ? '▼' : '▶' }}</span>
+                <span class="nav-icon-number">{{ phase.phase_id }}</span>
+                <span class="nav-label">{{ phase.phase_name }}</span>
+              </div>
+              
+              <!-- Deadline -->
+              <div v-if="getPhaseDeadline(phase.phase_id)" class="phase-deadline">
+                Deadline: {{ getPhaseDeadline(phase.phase_id) }}
+              </div>
             </div>
-            <div v-if="project?.targetDates?.phase1" class="phase-deadline">
-              Deadline: {{ formatDate(project.targetDates.phase1) }}
+
+            <!-- Categories (shown when expanded) -->
+            <div v-if="expandedPhases.has(phase.phase_id)" class="categories-container">
+              <div 
+                v-for="category in phase.categories" 
+                :key="category.category_id"
+                class="category-item">
+                
+                <!-- Category with disabled checkbox -->
+                <div class="category-header">
+                  <input 
+                    type="checkbox" 
+                    disabled 
+                    class="category-checkbox">
+                  <span class="category-name">{{ category.category_name }}</span>
+                  <span v-if="category.required" class="required-badge">Required</span>
+                </div>
+
+                <!-- Files under category -->
+                <div 
+                  v-if="getCategoryFiles(category.category_id).length > 0"
+                  class="files-list">
+                  <div 
+                    v-for="file in getCategoryFiles(category.category_id)" 
+                    :key="file.path"
+                    class="file-item"
+                    @click="selectFile(phase.phase_id, category.category_id, file)">
+                    
+                    <input 
+                      type="radio"
+                      :name="`file-selection`"
+                      :checked="isFileSelected(file.path)"
+                      class="file-radio">
+                    <span class="file-name">{{ file.name }}</span>
+                  </div>
+                </div>
+
+                <!-- No files message -->
+                <div v-else class="no-files-message">
+                  No files found
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="nav-item-container">
-            <div 
-              class="nav-item"
-              :class="{ 'nav-item-active': selectedPhaseId === 2 }"
-              @click="onPhaseClick(2)">
-              <span class="nav-icon-number">2</span>
-              <span class="nav-label">Phase 2: Design</span>
-            </div>
-            <div v-if="project?.targetDates?.phase2" class="phase-deadline">
-              Deadline: {{ formatDate(project.targetDates.phase2) }}
-            </div>
-          </div>
-
-          <div class="nav-item-container">
-            <div 
-              class="nav-item"
-              :class="{ 'nav-item-active': selectedPhaseId === 3 }"
-              @click="onPhaseClick(3)">
-              <span class="nav-icon-number">3</span>
-              <span class="nav-label">Phase 3: Development</span>
-            </div>
-            <div v-if="project?.targetDates?.phase3" class="phase-deadline">
-              Deadline: {{ formatDate(project.targetDates.phase3) }}
-            </div>
-          </div>
-
-          <div class="nav-item-container">
-            <div 
-              class="nav-item"
-              :class="{ 'nav-item-active': selectedPhaseId === 4 }"
-              @click="onPhaseClick(4)">
-              <span class="nav-icon-number">4</span>
-              <span class="nav-label">Phase 4: Testing</span>
-            </div>
-            <div v-if="project?.targetDates?.phase4" class="phase-deadline">
-              Deadline: {{ formatDate(project.targetDates.phase4) }}
-            </div>
-          </div>
-
-          <!-- Regulatory Submission -->
-          <div class="nav-item">
-            <span class="nav-icon">✓</span>
-            <span class="nav-label">Regulatory Submission</span>
-          </div>
         </div>
       </nav>
 
@@ -105,10 +113,10 @@
           <h1 class="page-title">{{ currentViewTitle }}</h1>
           <button 
             class="btn-refresh"
-            :disabled="isScanning"
-            @click="scanDhfDocuments()">
-            <span v-if="!isScanning">🔄 Scan Documents</span>
-            <span v-if="isScanning">⏳ Scanning...</span>
+            :disabled="!selectedFile || isScanning"
+            @click="analyzeSelectedDocument()">
+            <span v-if="!isScanning">🔍 Analyze Document</span>
+            <span v-if="isScanning">⏳ Analyzing...</span>
           </button>
         </div>
       </div>
@@ -153,28 +161,23 @@
 
           <div class="analysis-content">
             <div v-if="scanError" class="analysis-error">
-              <p><strong>Scan Error:</strong> {{ scanError }}</p>
+              <p><strong>Analysis Error:</strong> {{ scanError }}</p>
             </div>
 
             <div v-if="!analysisResult && !isScanning && !scanError" class="analysis-empty">
-              <p>No documents scanned yet. Click "Scan Documents" to analyze your project folder using AI-powered classification.</p>
+              <p>No document analyzed yet. Select a file from the left navigation and click "Analyze Document".</p>
             </div>
 
             <div v-if="isScanning" class="analysis-loading">
-              <p>🤖 Scanning project folder and classifying documents using Claude AI...</p>
-              <p class="scan-details">This may take a minute depending on the number of documents.</p>
+              <p>🤖 Analyzing document using AI...</p>
+              <p class="scan-details">This may take a moment depending on document size.</p>
             </div>
 
             <div v-if="analysisResult?.status === 'complete'" class="analysis-narrative">
-              <h3 class="narrative-title">Project Status & AI Recommendations</h3>
+              <h3 class="narrative-title">Document Analysis Results</h3>
               
               <div class="narrative-text">
-                <p>Your medical device project is progressing well with 57% document completion rate. The quality score of 68/100 indicates moderate risk in submitted documents. Key areas requiring attention: Shelf Life Testing shows critical gaps, and Sterilization Validation documentation needs strengthening. Current trajectory suggests Phase 4 completion within 8 weeks if risk mitigation actions are implemented immediately.</p>
-              </div>
-
-              <!-- Show detailed report if available -->
-              <div v-if="analysisResult.detailedReport" class="narrative-details">
-                {{ analysisResult.detailedReport }}
+                <pre>{{ analysisResult.detailedReport }}</pre>
               </div>
             </div>
 
@@ -190,141 +193,175 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useProjectService } from '../composables/useProjectService';
-import { useDhfService } from '../composables/useDhfService';
 import { Project } from '../models/project.model';
-import { DHFFile, DHFDocument, AppStatusOutput } from '@fda-compliance/shared-types';
+import { AppStatusOutput } from '@fda-compliance/shared-types';
 
 const router = useRouter();
 const route = useRoute();
 const projectService = useProjectService();
-const dhfService = useDhfService();
 
 const project = ref<Project | null>(null);
 const currentView = ref<'project' | 'phase'>('project');
-const selectedPhaseId = ref<number | undefined>(undefined);
-const dhfFiles = ref<DHFFile[]>([]);
+const currentViewTitle = ref('Entire Project');
 const isScanning = ref(false);
 const scanError = ref<string | null>(null);
-const currentViewTitle = ref('Entire Project');
 const analysisResult = ref<AppStatusOutput | null>(null);
 
-onMounted(() => {
+// Folder structure state
+const folderStructure = ref<any>(null);
+const expandedPhases = ref<Set<number>>(new Set());
+const categoryFiles = ref<Map<string, any[]>>(new Map());
+
+// Selected file state
+const selectedFile = ref<{
+  phaseId: number;
+  categoryId: string;
+  file: any;
+} | null>(null);
+
+onMounted(async () => {
   const projectId = route.params.id as string;
   project.value = projectService.getProject(projectId);
   
-  if (project.value) {
-    loadDhfFiles();
-  }
+  // Load folder structure from API
+  await loadFolderStructure();
 });
 
-const loadDhfFiles = () => {
-  dhfFiles.value = dhfService.getAllDhfFiles();
-};
-
-const onPhaseClick = (phaseId: number) => {
-  selectedPhaseId.value = phaseId;
-  currentView.value = 'phase';
-  dhfFiles.value = dhfService.getDhfFilesForPhase(phaseId);
-  
-  const phaseNames: { [key: number]: string } = {
-    1: 'Phase 1: Planning',
-    2: 'Phase 2: Design',
-    3: 'Phase 3: Development',
-    4: 'Phase 4: Testing'
-  };
-  currentViewTitle.value = phaseNames[phaseId] || `Phase ${phaseId}`;
-};
-
-const onEntireProjectClick = () => {
-  currentView.value = 'project';
-  selectedPhaseId.value = undefined;
-  dhfFiles.value = dhfService.getAllDhfFiles();
-  currentViewTitle.value = 'Entire Project';
-};
-
-const getCompletedCount = (): number => {
-  return dhfFiles.value.filter(f => f.status === 'complete').length;
-};
-
-const hasIssues = (doc: DHFDocument): boolean => {
-  return !!(doc.issues && doc.issues.length > 0);
-};
-
-const formatDate = (dateString: string): string => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-};
-
-const scanDhfDocuments = async () => {
-  if (!project.value || isScanning.value) return;
-
-  if (!project.value.folderPath) {
-    scanError.value = 'Project folder path not configured';
-    return;
+// Load folder structure from API
+async function loadFolderStructure() {
+  try {
+    const response = await fetch('http://localhost:3001/api/folder-structure');
+    folderStructure.value = await response.json();
+    console.log('[Dashboard] Loaded folder structure:', folderStructure.value);
+  } catch (error) {
+    console.error('[Dashboard] Failed to load folder structure:', error);
   }
+}
 
-  if (currentView.value === 'project') {
-    const confirmed = confirm(
-      'Scan Entire Project?\n\n' +
-      'This will scan all phase folders and may take several minutes depending on the number of documents.\n\n' +
-      'Click OK to proceed or Cancel to abort.'
-    );
+// Toggle phase expand/collapse
+async function togglePhase(phaseId: number) {
+  if (expandedPhases.value.has(phaseId)) {
+    expandedPhases.value.delete(phaseId);
+  } else {
+    expandedPhases.value.add(phaseId);
+    // Load files for this phase's categories
+    await loadPhaseFiles(phaseId);
+  }
+}
+
+// Load files for all categories in a phase
+async function loadPhaseFiles(phaseId: number) {
+  if (!project.value?.folderPath || !folderStructure.value) return;
+
+  const phase = folderStructure.value.folder_structure[`phase_${phaseId}`];
+  if (!phase) return;
+
+  for (const category of phase.categories) {
+    const fullPath = `${project.value.folderPath}/${category.folder_path}`;
     
-    if (!confirmed) {
-      return;
+    try {
+      const response = await fetch('http://localhost:3001/api/list-files', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: fullPath })
+      });
+      
+      const result = await response.json();
+      categoryFiles.value.set(category.category_id, result.files || []);
+      
+    } catch (error) {
+      console.error(`[Dashboard] Failed to load files for ${category.category_id}:`, error);
+      categoryFiles.value.set(category.category_id, []);
     }
   }
+}
+
+// Get files for a category
+function getCategoryFiles(categoryId: string): any[] {
+  return categoryFiles.value.get(categoryId) || [];
+}
+
+// Select a file
+function selectFile(phaseId: number, categoryId: string, file: any) {
+  selectedFile.value = { phaseId, categoryId, file };
+  console.log('[Dashboard] Selected file:', file.path);
+}
+
+// Check if file is selected
+function isFileSelected(filePath: string): boolean {
+  return selectedFile.value?.file.path === filePath;
+}
+
+// Get phase deadline
+function getPhaseDeadline(phaseId: number): string | null {
+  if (!project.value?.targetDates) return null;
+  
+  const deadlineKey = `phase${phaseId}` as keyof typeof project.value.targetDates;
+  const deadline = project.value.targetDates[deadlineKey];
+  
+  if (deadline) {
+    return formatDate(deadline);
+  }
+  return null;
+}
+
+// Format date
+function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// Analyze selected document
+async function analyzeSelectedDocument() {
+  if (!selectedFile.value || !project.value) return;
 
   isScanning.value = true;
   scanError.value = null;
+  analysisResult.value = null;
   
   try {
-    const phaseToScan = currentView.value === 'phase' ? selectedPhaseId.value : undefined;
+    const response = await fetch('http://localhost:3001/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filePath: selectedFile.value.file.path
+      })
+    });
     
-    const scannedFiles = await dhfService.scanProjectFolder(
-      project.value.id,
-      project.value.folderPath,
-      phaseToScan
-    );
+    const result = await response.json();
     
-    if (currentView.value === 'phase' && selectedPhaseId.value) {
-      dhfFiles.value = scannedFiles.filter(f => isFileInPhase(f.id, selectedPhaseId.value!));
+    if (result.status === 'complete') {
+      analysisResult.value = result;
     } else {
-      dhfFiles.value = scannedFiles;
+      scanError.value = result.message || 'Analysis failed';
     }
     
-    // Set mock analysis result
-    analysisResult.value = {
-      status: 'complete',
-      message: 'Analysis complete',
-      timestamp: new Date().toISOString()
-    };
-    
-    isScanning.value = false;
   } catch (error: any) {
-    console.error('[Dashboard] Scan failed:', error);
-    scanError.value = error.response?.data?.message || 'Failed to scan project. Check console for details.';
+    console.error('[Dashboard] Analysis failed:', error);
+    scanError.value = error.message || 'Failed to analyze document';
+  } finally {
     isScanning.value = false;
   }
-};
+}
 
-const isFileInPhase = (fileId: string, phaseId: number): boolean => {
-  const phase = dhfService.getDhfFilesForPhase(phaseId);
-  return phase.some(f => f.id === fileId);
-};
+// Navigation
+function onEntireProjectClick() {
+  currentView.value = 'project';
+  currentViewTitle.value = 'Entire Project';
+}
 
-const backToProjects = () => {
+function backToProjects() {
   router.push('/');
-};
+}
 
-const editProject = () => {
+function editProject() {
   if (project.value) {
     router.push(`/projects/${project.value.id}/edit`);
   }
-};
+}
 </script>
 
 <style scoped>
@@ -337,7 +374,7 @@ const editProject = () => {
 
 /* Sidebar Styles */
 .dashboard-sidebar {
-  width: 280px;
+  width: 320px;
   background: var(--light-bg);
   padding: var(--spacing-lg);
   display: flex;
@@ -394,19 +431,20 @@ const editProject = () => {
 /* Navigation */
 .sidebar-nav {
   flex: 1;
+  overflow-y: auto;
 }
 
 .nav-section {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  padding: 12px 16px;
+  padding: 10px 12px;
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -433,9 +471,16 @@ const editProject = () => {
   flex-shrink: 0;
 }
 
+.expand-icon {
+  width: 16px;
+  font-size: 12px;
+  color: var(--text-gray);
+  flex-shrink: 0;
+}
+
 .nav-icon-number {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: var(--border-light);
   display: flex;
@@ -447,34 +492,116 @@ const editProject = () => {
   flex-shrink: 0;
 }
 
-.nav-item:hover .nav-icon-number {
+.phase-item:hover .nav-icon-number {
   background: rgba(74, 59, 140, 0.15);
   color: var(--primary-purple);
 }
 
-.nav-item-active .nav-icon-number {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-}
-
 .nav-label {
   flex: 1;
+  font-size: var(--font-size-sm);
 }
 
 .nav-item-container {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+}
+
+.phase-container {
+  margin-bottom: 4px;
 }
 
 .phase-deadline {
   font-size: var(--font-size-xs);
   font-style: italic;
   font-weight: var(--font-weight-bold);
-  padding-left: 64px;
-  margin-top: -4px;
+  padding-left: 56px;
+  margin-top: 2px;
   margin-bottom: 4px;
   color: var(--text-gray);
+}
+
+/* Categories Container */
+.categories-container {
+  margin-left: 40px;
+  margin-top: 4px;
+  margin-bottom: 8px;
+  border-left: 2px solid var(--border-light);
+  padding-left: 8px;
+}
+
+.category-item {
+  margin-bottom: 8px;
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: var(--font-size-xs);
+  color: var(--text-dark);
+}
+
+.category-checkbox {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.category-name {
+  flex: 1;
+  font-weight: var(--font-weight-medium);
+}
+
+.required-badge {
+  font-size: var(--font-size-xs);
+  padding: 2px 6px;
+  background: rgba(74, 59, 140, 0.1);
+  color: var(--primary-purple);
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Files List */
+.files-list {
+  margin-left: 20px;
+  margin-top: 4px;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.file-item:hover {
+  background: rgba(74, 59, 140, 0.06);
+}
+
+.file-radio {
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.file-name {
+  font-size: var(--font-size-xs);
+  color: var(--text-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.no-files-message {
+  margin-left: 20px;
+  font-size: var(--font-size-xs);
+  color: var(--text-light);
+  font-style: italic;
+  padding: 4px 8px;
 }
 
 /* Sidebar Footer */
@@ -497,7 +624,7 @@ const editProject = () => {
 
 /* Main Content */
 .dashboard-main {
-  margin-left: 280px;
+  margin-left: 320px;
   flex: 1;
   padding: var(--spacing-3xl);
   background: var(--light-bg);
@@ -682,112 +809,6 @@ const editProject = () => {
   margin: 0;
 }
 
-.section-meta {
-  font-size: var(--font-size-sm);
-  color: var(--text-gray);
-  font-weight: var(--font-weight-medium);
-}
-
-/* Checklist */
-.checklist-card {
-  padding: var(--spacing-xl);
-}
-
-.checklist-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-/* DHF File Item */
-.dhf-file-item {
-  border-bottom: 1px solid var(--border-light);
-  padding: var(--spacing-md) 0;
-}
-
-.dhf-file-item:last-child {
-  border-bottom: none;
-}
-
-.dhf-file-header {
-  display: flex;
-  gap: var(--spacing-sm);
-  align-items: flex-start;
-  margin-bottom: var(--spacing-sm);
-}
-
-.dhf-file-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.dhf-file-title-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--spacing-md);
-}
-
-.dhf-file-name {
-  flex: 1;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-dark);
-  white-space: pre-line;
-}
-
-.dhf-reference {
-  font-size: var(--font-size-xs);
-  color: var(--text-gray);
-  line-height: 1.5;
-}
-
-/* DHF Documents (nested under DHF files) */
-.dhf-documents {
-  margin-left: 32px;
-  padding-left: var(--spacing-md);
-  border-left: 2px solid var(--border-light);
-  margin-top: var(--spacing-sm);
-}
-
-.dhf-document-item {
-  display: flex;
-  gap: var(--spacing-xs);
-  align-items: flex-start;
-  padding: 6px 0;
-  font-size: var(--font-size-sm);
-}
-
-.document-bullet {
-  color: var(--text-gray);
-  flex-shrink: 0;
-}
-
-.document-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.document-name {
-  color: var(--text-dark);
-  font-weight: var(--font-weight-medium);
-}
-
-.document-meta {
-  color: var(--text-gray);
-  font-size: var(--font-size-xs);
-}
-
-.issue-icon {
-  color: var(--orange-alert);
-  font-size: 16px;
-  cursor: help;
-}
-
 /* Analysis Panel */
 .analysis-card {
   padding: var(--spacing-xl);
@@ -831,21 +852,15 @@ const editProject = () => {
 }
 
 .narrative-text {
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-sm);
   line-height: var(--line-height-relaxed);
   color: var(--text-dark);
 }
 
-.narrative-text p {
+.narrative-text pre {
+  white-space: pre-wrap;
+  font-family: inherit;
   margin: 0;
-}
-
-.narrative-details {
-  font-size: var(--font-size-sm);
-  color: var(--text-gray);
-  padding: var(--spacing-md);
-  background: var(--light-bg);
-  border-radius: var(--radius-sm);
 }
 
 .analysis-error {
@@ -865,8 +880,12 @@ const editProject = () => {
 
 /* Responsive */
 @media (max-width: 1200px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
+  .dashboard-main {
+    margin-left: 280px;
+  }
+  
+  .dashboard-sidebar {
+    width: 280px;
   }
   
   .stats-row {

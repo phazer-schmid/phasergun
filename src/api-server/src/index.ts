@@ -158,6 +158,72 @@ app.get('/api/dhf-mapping', (_req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/folder-structure
+ * Get the folder structure from folder-structure.yaml
+ */
+app.get('/api/folder-structure', async (_req: Request, res: Response) => {
+  try {
+    const yamlPath = path.join(__dirname, '../../rag-service/config/folder-structure.yaml');
+    const fileContents = await fs.readFile(yamlPath, 'utf8');
+    const folderStructure = yaml.load(fileContents) as any;
+    
+    res.json(folderStructure);
+  } catch (error) {
+    console.error('[API] Error loading folder structure:', error);
+    res.status(500).json({
+      error: 'Failed to load folder structure',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * POST /api/list-files
+ * List files in a specific directory
+ */
+app.post('/api/list-files', async (req: Request, res: Response) => {
+  const { path: dirPath } = req.body;
+
+  if (!dirPath) {
+    return res.status(400).json({
+      error: 'Path is required',
+      message: 'Please provide path in request body'
+    });
+  }
+
+  try {
+    // Check if directory exists
+    await fs.access(dirPath);
+    
+    // Read directory contents
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    
+    // Filter to files only (not subdirectories)
+    const files = [];
+    for (const entry of entries) {
+      if (entry.isFile()) {
+        const filePath = path.join(dirPath, entry.name);
+        const stats = await fs.stat(filePath);
+        
+        files.push({
+          name: entry.name,
+          path: filePath,
+          size: stats.size,
+          modified: stats.mtime
+        });
+      }
+    }
+    
+    res.json({ files });
+    
+  } catch (error) {
+    // Directory doesn't exist or is inaccessible - return empty list
+    console.log(`[API] Directory not accessible: ${dirPath}`);
+    res.json({ files: [] });
+  }
+});
+
+/**
  * Parse phase and category from file path
  */
 function parsePhaseAndCategory(filePath: string): {
