@@ -82,14 +82,91 @@ if [ $? -ne 0 ]; then
 fi
 cd ..
 
-# Step 8: Restart services (if using PM2)
-echo -e "${YELLOW}[8/8] Restarting services...${NC}"
+# Step 8: Configure Nginx
+echo -e "${YELLOW}[8/10] Configuring Nginx...${NC}"
+if command -v nginx &> /dev/null; then
+    # Get current directory
+    DEPLOY_DIR=$(pwd)
+    
+    # Get server IP (or use domain if provided)
+    SERVER_NAME="${DOMAIN:-$(curl -s ifconfig.me)}"
+    
+    # Create Nginx config
+    sudo tee /etc/nginx/sites-available/meddev-pro > /dev/null <<EOF
+server {
+    listen 80;
+    server_name ${SERVER_NAME};
+
+    # Path to Vue UI dist folder
+    root ${DEPLOY_DIR}/vue-ui/dist;
+    index index.html;
+
+    # Vue Router support (SPA)
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+
+    # API Proxy
+    location /api {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
+        
+        # Timeouts for large file analysis
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+    }
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/json;
+    gzip_min_length 1000;
+
+    # Cache static assets
+    location ~* \.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
+EOF
+
+    # Enable site
+    sudo ln -sf /etc/nginx/sites-available/meddev-pro /etc/nginx/sites-enabled/meddev-pro
+    
+    # Remove default site if it exists
+    sudo rm -f /etc/nginx/sites-enabled/default
+    
+    # Test Nginx configuration
+    sudo nginx -t
+    if [ $? -ne 0 ]; then
+        echo "Error: Nginx configuration test failed"
+        exit 1
+    fi
+    
+    echo -e "${GREEN}✓ Nginx configured for ${SERVER_NAME}${NC}"
+else
+    echo -e "${YELLOW}⚠ Nginx not installed, skipping configuration${NC}"
+fi
+
+# Step 9: Restart services (PM2)
+echo -e "${YELLOW}[9/10] Restarting services...${NC}"
 if command -v pm2 &> /dev/null; then
     pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js
     echo -e "${GREEN}✓ PM2 services restarted${NC}"
+else
+    echo -e "${YELLOW}⚠ PM2 not installed, skipping PM2 start${NC}"
 fi
 
-# If using Nginx
+# Step 10: Reload Nginx
+echo -e "${YELLOW}[10/10] Reloading Nginx...${NC}"
 if command -v nginx &> /dev/null; then
     sudo systemctl reload nginx
     echo -e "${GREEN}✓ Nginx reloaded${NC}"
@@ -98,9 +175,12 @@ fi
 echo ""
 echo -e "${GREEN}=== Deployment Complete! ===${NC}"
 echo ""
-echo "Services should be running at:"
-echo "  - API: http://localhost:3001"
-echo "  - UI:  http://your-domain.com (via Nginx)"
+echo "Services are now running at:"
+echo "  - UI:  http://${SERVER_NAME}"
+echo "  - API: http://localhost:3001 (proxied via /api)"
 echo ""
-echo "Check status with: pm2 status"
-echo "View logs with: pm2 logs"
+echo "Useful commands:"
+echo "  - Check PM2 status: pm2 status"
+echo "  - View API logs: pm2 logs api-server"
+echo "  - View Nginx logs: sudo tail -f /var/log/nginx/error.log"
+echo "  - Nginx status: sudo systemctl status nginx"
