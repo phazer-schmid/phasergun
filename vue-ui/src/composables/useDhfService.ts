@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { DHFFile, DHFDocument, PhaseDHFMapping } from '@fda-compliance/shared-types';
+import { DHFFile, PhaseDHFMapping } from '@fda-compliance/shared-types';
 
 interface ScanResponse {
   projectId: string;

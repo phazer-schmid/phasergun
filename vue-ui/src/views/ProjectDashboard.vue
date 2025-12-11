@@ -193,7 +193,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useProjectService } from '../composables/useProjectService';
 import { Project } from '../models/project.model';
