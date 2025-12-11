@@ -1,0 +1,184 @@
+# FDA 510(k) Project Folder Structure
+# Defines the canonical folder hierarchy for medical device submissions
+# This is the single source of truth for project organization
+
+folder_structure:
+  phase_1:
+    phase_id: 1
+    phase_name: "Phase 1: Planning"
+    phase_path: "Phase 1"
+    description: "Planning, scope definition, and regulatory strategy"
+    categories:
+      - category_id: planning_and_scope
+        category_name: "Planning and Scope"
+        folder_path: "Phase 1/Planning and Scope"
+        description: "Project planning, device description, scope definition, and V&V strategy"
+        required: true
+        
+      - category_id: predicate_selection
+        category_name: "Predicate Selection"
+        folder_path: "Phase 1/Predicate Selection"
+        description: "Predicate device identification, comparison tables, and substantial equivalence rationale"
+        required: true
+        
+      - category_id: regulatory
+        category_name: "Regulatory"
+        folder_path: "Phase 1/Regulatory"
+        description: "Device classification, product code, submission type, and labeling strategy"
+        required: true
+        
+      - category_id: user_needs_and_claims
+        category_name: "User Needs and Claims"
+        folder_path: "Phase 1/User Needs and Claims"
+        description: "User requirements, performance claims, and traceability to validation"
+        required: true
+
+  phase_2:
+    phase_id: 2
+    phase_name: "Phase 2: Design"
+    phase_path: "Phase 2"
+    description: "Design inputs, prototyping, and risk management planning"
+    categories:
+      - category_id: design_inputs
+        category_name: "Design Inputs"
+        folder_path: "Phase 2/Design Inputs"
+        description: "Formal design requirements derived from user needs and regulatory requirements"
+        required: true
+        
+      - category_id: labeling_drafts
+        category_name: "Labeling Drafts"
+        folder_path: "Phase 2/Labeling Drafts"
+        description: "Draft labeling including instructions for use and contraindications"
+        required: true
+        
+      - category_id: prototype_and_drawings
+        category_name: "Prototype and Drawings"
+        folder_path: "Phase 2/Prototype and Drawings"
+        description: "Technical drawings, CAD files, and prototype documentation"
+        required: true
+        
+      - category_id: risk_management_planning
+        category_name: "Risk Management Planning"
+        folder_path: "Phase 2/Risk Management Planning"
+        description: "Initial risk analysis, hazard identification, and risk control planning"
+        required: true
+
+  phase_3:
+    phase_id: 3
+    phase_name: "Phase 3: Development"
+    phase_path: "Phase 3"
+    description: "Design outputs, verification testing, and specialized testing"
+    categories:
+      - category_id: biocompatibility
+        category_name: "Biocompatibility"
+        folder_path: "Phase 3/Biocompatibility"
+        description: "Biocompatibility testing per ISO 10993 and material characterization"
+        required: false
+        
+      - category_id: design_outputs
+        category_name: "Design Outputs"
+        folder_path: "Phase 3/Design Outputs"
+        description: "Final design specifications, manufacturing procedures, and acceptance criteria"
+        required: true
+        
+      - category_id: design_verification_bench
+        category_name: "Design Verification (Bench)"
+        folder_path: "Phase 3/Design Verification (Bench)"
+        description: "Bench testing to verify design meets specifications"
+        required: true
+        
+      - category_id: device_specific_testing
+        category_name: "Device-Specific Testing"
+        folder_path: "Phase 3/Device-Specific Testing"
+        description: "Testing specific to device type and classification"
+        required: true
+        
+      - category_id: electrical_and_emc
+        category_name: "Electrical and EMC"
+        folder_path: "Phase 3/Electrical and EMC"
+        description: "Electrical safety and electromagnetic compatibility testing per IEC 60601"
+        required: false
+        
+      - category_id: software_and_cybersecurity
+        category_name: "Software and Cybersecurity"
+        folder_path: "Phase 3/Software and Cybersecurity"
+        description: "Software validation and cybersecurity documentation per FDA guidance"
+        required: false
+        
+      - category_id: sterilization_and_shelf_life
+        category_name: "Sterilization and Shelf Life"
+        folder_path: "Phase 3/Sterilization and Shelf Life"
+        description: "Sterilization validation, packaging validation, and shelf life studies"
+        required: false
+
+  phase_4:
+    phase_id: 4
+    phase_name: "Phase 4: Testing"
+    phase_path: "Phase 4"
+    description: "Validation testing, human factors, and manufacturing readiness"
+    categories:
+      - category_id: clinical_data
+        category_name: "Clinical Data (if required)"
+        folder_path: "Phase 4/Clinical Data (if required)"
+        description: "Clinical studies or literature review to support safety and effectiveness"
+        required: false
+        
+      - category_id: design_validation_human_factors
+        category_name: "Design Validation (Human Factors)"
+        folder_path: "Phase 4/Design Validation (Human Factors)"
+        description: "Human factors validation and usability testing"
+        required: true
+        
+      - category_id: final_labeling_and_packaging
+        category_name: "Final Labeling and Packaging"
+        folder_path: "Phase 4/Final Labeling and Packaging"
+        description: "Final labeling, packaging design, and validation"
+        required: true
+        
+      - category_id: manufacturing_transfer
+        category_name: "Manufacturing Transfer"
+        folder_path: "Phase 4/Manufacturing Transfer"
+        description: "Manufacturing readiness, process validation, and quality documentation"
+        required: true
+        
+      - category_id: risk_management_final
+        category_name: "Risk Management (Final)"
+        folder_path: "Phase 4/Risk Management (Final)"
+        description: "Final risk analysis, residual risk evaluation, and risk-benefit analysis"
+        required: true
+
+  phase_5:
+    phase_id: 5
+    phase_name: "Phase 5: Submission"
+    phase_path: "Phase 5"
+    description: "510(k) compilation and post-market planning"
+    categories:
+      - category_id: submission_compilation
+        category_name: "510(k) Compilation"
+        folder_path: "Phase 5/510(k) Compilation"
+        description: "Final 510(k) submission package compilation and eSTAR formatting"
+        required: true
+        
+      - category_id: dhf_compilation
+        category_name: "DHF Compilation"
+        folder_path: "Phase 5/DHF Compilation"
+        description: "Design History File final compilation and archiving"
+        required: true
+        
+      - category_id: post_market_surveillance
+        category_name: "Post-Market Surveillance Plan"
+        folder_path: "Phase 5/Post-Market Surveillance Plan"
+        description: "Post-market surveillance plan, complaint handling, and vigilance procedures"
+        required: true
+
+# Metadata
+metadata:
+  version: "1.0.0"
+  last_updated: "2025-12-11"
+  total_phases: 5
+  total_categories: 22
+  notes:
+    - "All folder names use 'and' instead of '&' for consistency"
+    - "Required flag indicates mandatory documentation for 510(k) submission"
+    - "Category IDs use snake_case for programmatic reference"
+    - "This structure aligns with FDA eSTAR template organization"

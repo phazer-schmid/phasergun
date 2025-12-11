@@ -1,6 +1,6 @@
 planning_and_scope:
-  display_name: Planning & Scope
-  folder_path: Phase 1/Planning and Scope
+  display_name: Planning and Scope
+  folder_category_id: planning_and_scope
   check_count: 4
   validation_checks:
   - check_id: P1-PLAN-001
@@ -85,7 +85,7 @@ planning_and_scope:
     notes: Early planning reduces downstream deficiencies
 predicate_selection:
   display_name: Predicate Selection
-  folder_path: Phase 1/Predicate Selection
+  folder_category_id: predicate_selection
   check_count: 3
   validation_checks:
   - check_id: P1-PRED-001
@@ -150,7 +150,7 @@ predicate_selection:
     notes: ''
 regulatory:
   display_name: Regulatory
-  folder_path: Phase 1/Regulatory
+  folder_category_id: regulatory
   check_count: 3
   validation_checks:
   - check_id: P1-REGU-001
@@ -214,8 +214,8 @@ regulatory:
     automation_feasibility: ''
     notes: ''
 user_needs_and_claims:
-  display_name: User Needs & Claims
-  folder_path: Phase 1/User Needs & Claims
+  display_name: User Needs and Claims
+  folder_category_id: user_needs_and_claims
   check_count: 3
   validation_checks:
   - check_id: P1-USER-001
