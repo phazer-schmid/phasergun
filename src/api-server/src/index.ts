@@ -281,6 +281,251 @@ async function loadValidationCriteria(phaseId: number, categoryPath: string): Pr
 }
 
 /**
+ * POST /api/google-drive/list-files
+ * List files in a Google Drive folder using access token from frontend
+ */
+app.post('/api/google-drive/list-files', async (req: Request, res: Response) => {
+  const { folderId, accessToken } = req.body;
+
+  if (!accessToken) {
+    return res.status(401).json({
+      error: 'Access token required',
+      message: 'Please provide Google Drive access token'
+    });
+  }
+
+  if (!folderId) {
+    return res.status(400).json({
+      error: 'Folder ID required',
+      message: 'Please provide Google Drive folder ID'
+    });
+  }
+
+  try {
+    const { google } = await import('googleapis');
+    const drive = google.drive({ version: 'v3', auth: accessToken });
+
+    const response = await drive.files.list({
+      q: `'${folderId}' in parents and trashed = false`,
+      fields: 'files(id, name, mimeType, size, modifiedTime, webViewLink)',
+      orderBy: 'folder,name',
+      pageSize: 100
+    });
+
+    res.json({ files: response.data.files || [] });
+  } catch (error: any) {
+    console.error('[API] Google Drive list error:', error);
+    res.status(500).json({
+      error: 'Failed to list files',
+      message: error.message || 'Unknown error'
+    });
+  }
+});
+
+/**
+ * POST /api/google-drive/download-file
+ * Download file content from Google Drive
+ */
+app.post('/api/google-drive/download-file', async (req: Request, res: Response) => {
+  const { fileId, accessToken } = req.body;
+
+  if (!accessToken) {
+    return res.status(401).json({
+      error: 'Access token required',
+      message: 'Please provide Google Drive access token'
+    });
+  }
+
+  if (!fileId) {
+    return res.status(400).json({
+      error: 'File ID required',
+      message: 'Please provide Google Drive file ID'
+    });
+  }
+
+  try {
+    const { google } = await import('googleapis');
+    const drive = google.drive({ version: 'v3', auth: accessToken });
+
+    const response = await drive.files.get({
+      fileId: fileId,
+      alt: 'media'
+    }, {
+      responseType: 'text'
+    });
+
+    res.json({ content: response.data });
+  } catch (error: any) {
+    console.error('[API] Google Drive download error:', error);
+    res.status(500).json({
+      error: 'Failed to download file',
+      message: error.message || 'Unknown error'
+    });
+  }
+});
+
+/**
+ * POST /api/analyze-google-drive
+ * Analyze a Google Drive file
+ */
+app.post('/api/analyze-google-drive', async (req: Request, res: Response) => {
+  const { fileId, fileName, accessToken } = req.body;
+
+  if (!accessToken) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Access token required',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  if (!fileId) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'File ID required',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  console.log(`\n[API] ========================================`);
+  console.log(`[API] Starting Google Drive Analysis`);
+  console.log(`[API] File: ${fileName || fileId}`);
+  console.log(`[API] ========================================\n`);
+
+  try {
+    // Download file from Google Drive
+    const { google } = await import('googleapis');
+    const drive = google.drive({ version: 'v3', auth: accessToken });
+
+    // Get file metadata
+    const fileMetadata = await drive.files.get({
+      fileId: fileId,
+      fields: 'name, size, mimeType, modifiedTime'
+    });
+
+    const realFileName = fileMetadata.data.name || fileName || 'unknown';
+    const fileSize = parseInt(fileMetadata.data.size || '0');
+
+    console.log(`[API] File name: ${realFileName}`);
+    console.log(`[API] File size: ${(fileSize / 1024).toFixed(2)} KB`);
+
+    // Download file content
+    const response = await drive.files.get({
+      fileId: fileId,
+      alt: 'media'
+    }, {
+      responseType: 'text'
+    });
+
+    const fileContent = response.data as string;
+
+    // Check LLM mode
+    const llmMode = process.env.LLM_MODE || 'mock';
+    const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+    const anthropicModel = process.env.ANTHROPIC_MODEL || 'claude-3-haiku-20240307';
+    
+    console.log(`[API] LLM Mode: ${llmMode.toUpperCase()}`);
+
+    let analysis: string;
+
+    if (llmMode === 'anthropic' && anthropicApiKey) {
+      // Use REAL Anthropic Claude
+      console.log(`[API] Using Anthropic Claude API (${anthropicModel})\n`);
+      
+      const { AnthropicLLMService } = await import('../../llm-service/dist/anthropic-service.js');
+      const llmService = new AnthropicLLMService(anthropicApiKey, anthropicModel);
+
+      const prompt = `You are an FDA regulatory compliance expert analyzing medical device documentation for 510(k) submission readiness.
+
+DOCUMENT TO ANALYZE:
+File: ${realFileName}
+Size: ${(fileSize / 1024).toFixed(2)} KB
+
+DOCUMENT CONTENT:
+${fileContent}
+
+Analyze this document for FDA 510(k) compliance and provide:
+
+1. DOCUMENT ASSESSMENT (2-3 sentences)
+   What type of document is this and its purpose?
+
+2. KEY FINDINGS
+   - ✅ Strengths: What is well-documented
+   - ❌ Gaps: Critical missing elements
+   - ⚠️ Areas for improvement
+
+3. RECOMMENDATIONS (5-10 items max)
+   Specific actions to improve compliance:
+   - What needs to be added/improved
+   - Reference to FDA/ISO requirements
+   - Priority level if applicable
+
+Keep it concise but informative.`;
+
+      const llmResponse = await llmService.generateText(prompt);
+      
+      console.log(`[API] ✓ Analysis complete`);
+      console.log(`[API] Tokens used: ${llmResponse.usageStats.tokensUsed}`);
+      console.log(`[API] Cost: $${llmResponse.usageStats.cost.toFixed(4)}\n`);
+
+      analysis = llmResponse.generatedText;
+    } else {
+      // Use MOCK service
+      console.log(`[API] Using MOCK LLM Service\n`);
+      
+      analysis = `📄 Document Analysis Complete (Google Drive)
+
+File: ${realFileName}
+Size: ${(fileSize / 1024).toFixed(2)} KB
+Source: Google Drive
+
+Summary:
+This is a MOCK analysis of a Google Drive file. Set LLM_MODE=anthropic and add your ANTHROPIC_API_KEY to get real AI analysis.
+
+Pipeline Steps:
+✅ Step 1: Google Drive Authentication - Access token validated
+✅ Step 2: File Download - Content retrieved from Google Drive
+✅ Step 3: File Parsing - Document structure extracted
+✅ Step 4: LLM Analysis - Compliance assessment generated
+
+Status: ✅ Google Drive Integration Complete (MOCK MODE)
+Time: ${new Date().toLocaleTimeString()}
+
+To enable REAL AI analysis:
+1. Set ANTHROPIC_API_KEY in your .env file
+2. Set LLM_MODE=anthropic
+3. Restart the API server`;
+    }
+
+    console.log(`[API] ========================================`);
+    console.log(`[API] Google Drive Analysis Complete`);
+    console.log(`[API] ========================================\n`);
+
+    res.json({
+      status: 'complete',
+      message: 'Analysis successful',
+      detailedReport: analysis,
+      timestamp: new Date().toISOString(),
+      metadata: {
+        fileName: realFileName,
+        fileSize: (fileSize / 1024).toFixed(2) + ' KB',
+        fileType: path.extname(realFileName),
+        llmMode: llmMode,
+        source: 'google-drive'
+      }
+    });
+
+  } catch (error: any) {
+    console.error('\n[API] ❌ Google Drive analysis error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message || 'Analysis failed',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+/**
  * POST /api/analyze
  * Analyze a single file with REAL or MOCK LLM
  */
