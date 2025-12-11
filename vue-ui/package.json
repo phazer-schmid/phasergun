@@ -10,18 +10,8 @@
   },
   "private": true,
   "dependencies": {
-    "@fda-compliance/chunker": "file:../src/chunker",
-    "@fda-compliance/file-parser": "file:../src/file-parser",
-    "@fda-compliance/file-source": "file:../src/file-source",
-    "@fda-compliance/llm-service": "file:../src/llm-service",
-    "@fda-compliance/orchestrator": "file:../src/orchestrator",
-    "@fda-compliance/rag-service": "file:../src/rag-service",
     "@fda-compliance/shared-types": "file:../src/shared-types",
-    "@types/gapi": "^0.0.47",
-    "@types/gapi.auth2": "^0.0.61",
-    "@types/gapi.client.drive": "^3.0.15",
     "axios": "^1.6.2",
-    "gapi-script": "^1.2.0",
     "vue": "^3.4.0",
     "vue-router": "^4.2.5"
   },
