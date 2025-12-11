@@ -144,64 +144,7 @@
       </div>
 
       <!-- Main Content Row -->
-      <div class="dashboard-grid">
-        <!-- DHF Document Checklist -->
-        <div class="card checklist-card">
-          <div class="section-header">
-            <h2 class="section-title">DHF Document Checklist</h2>
-            <span class="section-meta">{{ getCompletedCount() }}/{{ dhfFiles.length }}</span>
-          </div>
-
-          <div class="checklist-content">
-            <!-- DHF File Item -->
-            <div v-for="dhfFile in dhfFiles" :key="dhfFile.id" class="dhf-file-item">
-              <!-- DHF File Header -->
-              <div class="dhf-file-header">
-                <input 
-                  type="checkbox" 
-                  :checked="dhfFile.status === 'complete'" 
-                  disabled 
-                  class="checkbox">
-                
-                <div class="dhf-file-info">
-                  <div class="dhf-file-title-row">
-                    <div class="dhf-file-name" v-html="dhfFile.name"></div>
-                    <!-- Status Badge - Right aligned -->
-                    <span 
-                      v-if="dhfFile.status === 'missing'" 
-                      class="badge badge-orange">NOT FOUND</span>
-                    <span 
-                      v-if="dhfFile.status === 'in_progress'" 
-                      class="badge badge-yellow">IN PROGRESS</span>
-                    <span 
-                      v-if="dhfFile.status === 'complete'" 
-                      class="badge badge-green">{{ dhfFile.documents?.length || 0 }} DOC(S)</span>
-                  </div>
-                  
-                  <!-- Show submission section reference -->
-                  <div class="dhf-reference">{{ dhfFile.submissionSection }}</div>
-                </div>
-              </div>
-
-              <!-- Documents under DHF File -->
-              <div v-if="dhfFile.documents && dhfFile.documents.length > 0" 
-                   class="dhf-documents">
-                <div v-for="(doc, idx) in dhfFile.documents" :key="idx" class="dhf-document-item">
-                  <span class="document-bullet">•</span>
-                  <div class="document-info">
-                    <span class="document-name">{{ doc.name }}</span>
-                    <span v-if="hasIssues(doc)" class="issue-icon" 
-                          title="Issues detected">⚠️</span>
-                    <span v-if="doc.date" class="document-meta">
-                      {{ doc.date }} • {{ doc.reviewer }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
+      <div class="dashboard-content">
         <!-- AI Analysis Panel -->
         <div class="card analysis-card">
           <div class="section-header">
@@ -716,11 +659,10 @@ const editProject = () => {
   );
 }
 
-/* Dashboard Grid */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 40% 1fr;
-  gap: var(--spacing-xl);
+/* Dashboard Content - Full Width */
+.dashboard-content {
+  display: block;
+  width: 100%;
 }
 
 /* Section Header */
