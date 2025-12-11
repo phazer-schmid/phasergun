@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { DHFFile, PhaseDHFMapping } from '@fda-compliance/shared-types';
+import { getApiUrl } from '../config/api';
 
 interface ScanResponse {
   projectId: string;
@@ -14,7 +15,7 @@ interface ScanResponse {
 }
 
 export function useDhfService() {
-  const apiUrl = 'http://localhost:3001/api';
+  const apiUrl = getApiUrl();
   
   // DHF phase mapping based on the YAML file
   // Documents are populated dynamically via scanning, not statically

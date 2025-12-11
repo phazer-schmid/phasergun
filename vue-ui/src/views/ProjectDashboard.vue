@@ -198,6 +198,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { useProjectService } from '../composables/useProjectService';
 import { Project } from '../models/project.model';
 import { AppStatusOutput } from '@fda-compliance/shared-types';
+import { getApiEndpoint } from '../config/api';
 
 const router = useRouter();
 const route = useRoute();
@@ -233,7 +234,7 @@ onMounted(async () => {
 // Load folder structure from API
 async function loadFolderStructure() {
   try {
-    const response = await fetch('http://localhost:3001/api/folder-structure');
+    const response = await fetch(getApiEndpoint('/folder-structure'));
     folderStructure.value = await response.json();
     console.log('[Dashboard] Loaded folder structure:', folderStructure.value);
   } catch (error) {
@@ -263,7 +264,7 @@ async function loadPhaseFiles(phaseId: number) {
     const fullPath = `${project.value.folderPath}/${category.folder_path}`;
     
     try {
-      const response = await fetch('http://localhost:3001/api/list-files', {
+      const response = await fetch(getApiEndpoint('/list-files'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: fullPath })
@@ -323,7 +324,7 @@ async function analyzeSelectedDocument() {
   analysisResult.value = null;
   
   try {
-    const response = await fetch('http://localhost:3001/api/analyze', {
+    const response = await fetch(getApiEndpoint('/analyze'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
