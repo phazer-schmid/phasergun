@@ -79,16 +79,29 @@
             <label for="folderPath" class="block text-sm font-medium text-gray-700 mb-2">
               Folder Path <span class="text-red-500">*</span>
             </label>
-            <input
-              id="folderPath"
-              v-model="formData.folderPath"
-              type="text"
-              required
-              class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              :placeholder="formData.sourceType === 'local' ? '/path/to/dhf/folder' : 'Google Drive folder ID or path'"
-            />
+            <div class="flex gap-2">
+              <input
+                id="folderPath"
+                v-model="formData.folderPath"
+                type="text"
+                required
+                class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                :placeholder="formData.sourceType === 'local' ? '/path/to/dhf/folder' : 'Google Drive folder ID'"
+              />
+              <button
+                v-if="formData.sourceType === 'google-drive'"
+                type="button"
+                @click="showFolderPicker = true"
+                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap"
+              >
+                Browse
+              </button>
+            </div>
             <p class="mt-1 text-sm text-gray-500">
-              {{ formData.sourceType === 'local' ? 'Enter the absolute path to your DHF folder' : 'Enter your Google Drive folder ID' }}
+              {{ formData.sourceType === 'local' ? 'Enter the absolute path to your DHF folder' : 'Click Browse to select your Google Drive folder' }}
+            </p>
+            <p v-if="selectedFolderName" class="mt-1 text-sm text-blue-600">
+              Selected: {{ selectedFolderName }}
             </p>
           </div>
 
@@ -156,6 +169,13 @@
         </form>
       </div>
     </div>
+
+    <!-- Google Drive Folder Picker Modal -->
+    <GoogleDriveFolderPicker
+      :is-open="showFolderPicker"
+      @close="showFolderPicker = false"
+      @select="handleFolderSelect"
+    />
   </div>
 </template>
 
@@ -163,9 +183,13 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useProjectService } from '../composables/useProjectService';
+import GoogleDriveFolderPicker from '../components/GoogleDriveFolderPicker.vue';
 
 const router = useRouter();
 const projectService = useProjectService();
+
+const showFolderPicker = ref(false);
+const selectedFolderName = ref<string>('');
 
 const formData = ref({
   name: '',
@@ -179,6 +203,12 @@ const formData = ref({
     phase4: ''
   }
 });
+
+const handleFolderSelect = (folderId: string, folderName: string) => {
+  formData.value.folderPath = folderId;
+  selectedFolderName.value = folderName;
+  showFolderPicker.value = false;
+};
 
 const handleSubmit = () => {
   const project = projectService.createProject({
