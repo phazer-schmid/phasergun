@@ -1,12 +1,46 @@
-# Nginx configuration for MedDev Pro
-# Location: /etc/nginx/sites-available/meddev-pro
+# Nginx configuration for PhaserGun App
+# Location: /etc/nginx/sites-available/phasergun.app
+#
+# INSTALLATION:
+# 1. sudo cp nginx.conf.template /etc/nginx/sites-available/phasergun.app
+# 2. Update server_name and paths below
+# 3. Get SSL cert: sudo certbot certonly --nginx -d phasergun.app -d www.phasergun.app
+# 4. sudo ln -sf /etc/nginx/sites-available/phasergun.app /etc/nginx/sites-enabled/
+# 5. sudo nginx -t && sudo systemctl reload nginx
 
+# ============================================
+# OPTION 1: PRODUCTION MODE (Static Build)
+# ============================================
+# Use this for production - serves pre-built static files
+
+# HTTP - Redirect all to HTTPS
 server {
     listen 80;
-    server_name your-domain.com;  # Replace with your domain or droplet IP
+    server_name phasergun.app www.phasergun.app;
+    
+    # Redirect all HTTP traffic to HTTPS
+    return 301 https://$server_name$request_uri;
+}
 
-    # Vue UI - Serve static files
-    root /path/to/poc-decoupled-app/vue-ui/dist;
+# HTTPS - Main Server
+server {
+    listen 443 ssl http2;
+    server_name phasergun.app www.phasergun.app;
+
+    # SSL Certificate (Let's Encrypt)
+    ssl_certificate /etc/letsencrypt/live/phasergun.app/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/phasergun.app/privkey.pem;
+    
+    # SSL Configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    # Vue UI - Serve static build files
+    # IMPORTANT: Update this path to match your deployment
+    root /workspace/phasergun/vue-ui/dist;
     index index.html;
 
     # Vue Router support (SPA)
@@ -33,9 +67,11 @@ server {
     }
 
     # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     # Gzip compression
     gzip on;
@@ -50,27 +86,75 @@ server {
     }
 
     # Logs
-    access_log /var/log/nginx/meddev-access.log;
-    error_log /var/log/nginx/meddev-error.log;
+    access_log /var/log/nginx/phasergun-access.log;
+    error_log /var/log/nginx/phasergun-error.log;
 }
 
-# Optional: HTTPS/SSL configuration (use Let's Encrypt)
-# Uncomment after running: sudo certbot --nginx -d your-domain.com
-#
-# server {
-#     listen 443 ssl http2;
-#     server_name your-domain.com;
-#
-#     ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
-#     ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
-#     ssl_protocols TLSv1.2 TLSv1.3;
-#     ssl_ciphers HIGH:!aNULL:!MD5;
-#
-#     # Same configuration as above...
-# }
-#
+# ============================================
+# OPTION 2: DEVELOPMENT MODE (Proxy to Vite)
+# ============================================
+# Use this for development with hot-reload
+# Comment out Option 1 above and uncomment below:
+
+# # HTTP - Redirect to HTTPS
 # server {
 #     listen 80;
-#     server_name your-domain.com;
+#     server_name phasergun.app www.phasergun.app;
 #     return 301 https://$server_name$request_uri;
+# }
+# 
+# # HTTPS - Proxy to Vue Dev Server
+# server {
+#     listen 443 ssl http2;
+#     server_name phasergun.app www.phasergun.app;
+# 
+#     # SSL Certificate
+#     ssl_certificate /etc/letsencrypt/live/phasergun.app/fullchain.pem;
+#     ssl_certificate_key /etc/letsencrypt/live/phasergun.app/privkey.pem;
+#     ssl_protocols TLSv1.2 TLSv1.3;
+#     ssl_ciphers HIGH:!aNULL:!MD5;
+#     ssl_prefer_server_ciphers on;
+# 
+#     # Proxy to Vue dev server (port 5173)
+#     location / {
+#         proxy_pass http://localhost:5173;
+#         proxy_http_version 1.1;
+#         proxy_set_header Upgrade $http_upgrade;
+#         proxy_set_header Connection 'upgrade';
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#         proxy_cache_bypass $http_upgrade;
+#         
+#         # WebSocket support for HMR (Hot Module Replacement)
+#         proxy_set_header X-Forwarded-Host $host;
+#         proxy_set_header X-Forwarded-Port $server_port;
+#     }
+# 
+#     # API Proxy
+#     location /api {
+#         proxy_pass http://localhost:3001;
+#         proxy_http_version 1.1;
+#         proxy_set_header Upgrade $http_upgrade;
+#         proxy_set_header Connection 'upgrade';
+#         proxy_set_header Host $host;
+#         proxy_set_header X-Real-IP $remote_addr;
+#         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#         proxy_set_header X-Forwarded-Proto $scheme;
+#         proxy_cache_bypass $http_upgrade;
+#         proxy_connect_timeout 300s;
+#         proxy_send_timeout 300s;
+#         proxy_read_timeout 300s;
+#     }
+# 
+#     # Security headers
+#     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+#     add_header X-Frame-Options "SAMEORIGIN" always;
+#     add_header X-Content-Type-Options "nosniff" always;
+#     add_header X-XSS-Protection "1; mode=block" always;
+# 
+#     # Logs
+#     access_log /var/log/nginx/phasergun-access.log;
+#     error_log /var/log/nginx/phasergun-error.log;
 # }
