@@ -44,7 +44,7 @@
               </svg>
               My Drive
             </button>
-            <span v-for="(folder, index) in breadcrumbs" :key="folder.id" class="breadcrumb-separator">
+            <span v-for="(folder) in breadcrumbs" :key="folder.id" class="breadcrumb-separator">
               /
               <button @click="navigateToFolder(folder.id)" class="breadcrumb-item">
                 {{ folder.name }}
