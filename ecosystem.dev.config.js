@@ -7,7 +7,19 @@ module.exports = {
       args: 'run dev',
       instances: 1,
       autorestart: true,
-      watch: false,
+      watch: ['src'],
+      ignore_watch: [
+        'node_modules',
+        'logs',
+        '*.log',
+        'dist',
+        '.git',
+        '*.tsbuildinfo'
+      ],
+      watch_options: {
+        followSymlinks: false,
+        usePolling: false
+      },
       max_memory_restart: '1G',
       env: {
         NODE_ENV: 'development',
