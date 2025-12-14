@@ -12,7 +12,7 @@ This system provides a fully decoupled architecture for FDA 510(k) compliance an
 │   ├── rag-service/      # Knowledge base & retrieval  
 │   ├── llm-service/      # AI model integration
 │   └── orchestrator/     # Workflow coordination
-└── angular-ui/           # User interface (completely separate)
+└── vue-ui/               # Vue 3 user interface (completely separate)
 ```
 
 ## Quick Start

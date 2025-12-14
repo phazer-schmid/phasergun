@@ -49,12 +49,6 @@ Location: `src/rag-service/docs/`
 
 - [RAG_CONTEXT_IMPLEMENTATION.md](../src/rag-service/docs/RAG_CONTEXT_IMPLEMENTATION.md) - RAG context implementation details
 
-### Angular Dashboard
-Location: `angular-ui/docs/`
-
-- [DASHBOARD_IMPLEMENTATION.md](../angular-ui/docs/DASHBOARD_IMPLEMENTATION.md) - Dashboard implementation
-- [ANGULAR_DASHBOARD_COMPLETE.md](../angular-ui/docs/ANGULAR_DASHBOARD_COMPLETE.md) - Complete dashboard guide
-- [QUICKSTART_DASHBOARD.md](../angular-ui/docs/QUICKSTART_DASHBOARD.md) - Dashboard quick start
 
 ## 📁 Documentation Organization
 

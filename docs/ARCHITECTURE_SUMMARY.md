@@ -27,8 +27,8 @@ orchestrator/       ← Coordinates complete workflow
    └─ CLI test: npm run test-orchestrator
 ```
 
-### UI (`angular-ui/`)
-Angular 18 standalone components with Tailwind CSS - completely separate from core logic
+### UI (`vue-ui/`)
+Vue 3 with TypeScript and Tailwind CSS - completely separate from core logic
 
 ## Key Architectural Decisions
 
