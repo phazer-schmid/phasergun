@@ -64,8 +64,8 @@ echo -e "${GREEN}✓ Files uploaded${NC}"
 echo -e "\n${BLUE}[3/12] Creating environment files...${NC}"
 
 ssh $DROPLET_USER@$DROPLET_IP "cat > $PROJECT_PATH/vue-ui/.env << 'EOF'
-VITE_GOOGLE_CLIENT_ID=965330043532-krnp3rk2iv5i3psqe1sl78aua2thcp39.apps.googleusercontent.com
-VITE_GOOGLE_API_KEY=AIzaSyB7fS_xGl3FaKsJcVFiKlzhH9XfSawMkuk
+VITE_GOOGLE_CLIENT_ID=[Google Client ID]
+VITE_GOOGLE_API_KEY=[Google API Key]
 EOF"
 
 ssh $DROPLET_USER@$DROPLET_IP "cat > $PROJECT_PATH/src/api-server/.env << 'EOF'

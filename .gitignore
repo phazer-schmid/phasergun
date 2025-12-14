@@ -28,3 +28,4 @@ dist-ssr
 # Misc
 .DS_Store
 architecture
+tsconfig.tsbuildinfo
