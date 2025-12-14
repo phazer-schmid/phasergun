@@ -25,6 +25,25 @@ dist-ssr
 
 **/.env
 
+# Environment files with secrets (CRITICAL - Never commit these)
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+.env.deploy
+vue-ui/.env
+vue-ui/.env.local
+src/api-server/.env
+
+# Secret files
+*.secret
+*.pem
+*.key
+credentials.json
+*_api_key*
+*_secret*
+
 # Misc
 .DS_Store
 architecture

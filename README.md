@@ -59,6 +59,26 @@ Each module:
 
 All modules currently use mocks for rapid development and testing.
 
+## Security
+
+⚠️ **CRITICAL**: Never commit API keys, passwords, or secrets to version control.
+
+This project uses environment variables for sensitive configuration:
+
+```bash
+# Required for deployment
+export VITE_GOOGLE_CLIENT_ID='your-client-id'
+export VITE_GOOGLE_API_KEY='your-api-key'
+```
+
+**See [docs/SECURITY_BEST_PRACTICES.md](docs/SECURITY_BEST_PRACTICES.md) for comprehensive security guidelines.**
+
+Key practices:
+- Use environment variables for all secrets
+- Never hardcode credentials in scripts or code
+- Use `.env.template` files with placeholders
+- Ensure `.gitignore` protects sensitive files
+
 ## Documentation
 
 See detailed documentation in project root:
@@ -66,3 +86,4 @@ See detailed documentation in project root:
 - Module specifications
 - Development roadmap
 - API contracts
+- **[Security Best Practices](docs/SECURITY_BEST_PRACTICES.md)**

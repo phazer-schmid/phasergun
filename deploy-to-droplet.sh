@@ -63,9 +63,21 @@ echo -e "${GREEN}✓ Files uploaded${NC}"
 # Create environment files
 echo -e "\n${BLUE}[3/12] Creating environment files...${NC}"
 
-ssh $DROPLET_USER@$DROPLET_IP "cat > $PROJECT_PATH/vue-ui/.env << 'EOF'
-VITE_GOOGLE_CLIENT_ID=[Google Client ID]
-VITE_GOOGLE_API_KEY=[Google API Key]
+# Check for required environment variables
+if [ -z "$VITE_GOOGLE_CLIENT_ID" ] || [ -z "$VITE_GOOGLE_API_KEY" ]; then
+    echo -e "${RED}✗ Missing required environment variables${NC}"
+    echo ""
+    echo "Please set the following environment variables before deploying:"
+    echo "  ${YELLOW}export VITE_GOOGLE_CLIENT_ID='your-client-id'${NC}"
+    echo "  ${YELLOW}export VITE_GOOGLE_API_KEY='your-api-key'${NC}"
+    echo ""
+    echo "Or add them to your ~/.zshrc or ~/.bashrc for persistent storage"
+    exit 1
+fi
+
+ssh $DROPLET_USER@$DROPLET_IP "cat > $PROJECT_PATH/vue-ui/.env << EOF
+VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+VITE_GOOGLE_API_KEY=$VITE_GOOGLE_API_KEY
 EOF"
 
 ssh $DROPLET_USER@$DROPLET_IP "cat > $PROJECT_PATH/src/api-server/.env << 'EOF'
