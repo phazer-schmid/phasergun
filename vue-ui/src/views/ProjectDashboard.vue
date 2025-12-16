@@ -217,6 +217,7 @@ const analysisResult = ref<AppStatusOutput | null>(null);
 const folderStructure = ref<any>(null);
 const expandedPhases = ref<Set<number>>(new Set());
 const categoryFiles = ref<Map<string, any[]>>(new Map());
+const googleDriveStructure = ref<any>(null); // Cached Google Drive scan result
 
 // Selected file state
 const selectedFile = ref<{
@@ -261,6 +262,62 @@ async function togglePhase(phaseId: number) {
   }
 }
 
+// Load Google Drive structure using backend endpoint
+async function loadGoogleDriveStructure() {
+  if (!project.value?.folderPath) return;
+
+  try {
+    console.log('[Dashboard] Loading Google Drive structure via backend...');
+    
+    const accessToken = googleDrive.getAccessToken();
+    if (!accessToken) {
+      console.log('[Dashboard] No access token available');
+      scanError.value = 'Please sign in to Google Drive';
+      return;
+    }
+
+    const response = await fetch(getApiEndpoint('/google-drive/scan-structure'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rootFolderId: project.value.folderPath,
+        driveId: project.value.driveId,
+        accessToken: accessToken
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Backend error: ${response.status} ${response.statusText}`);
+    }
+
+    googleDriveStructure.value = await response.json();
+    console.log('[Dashboard] Loaded Google Drive structure:', googleDriveStructure.value);
+
+    // Populate categoryFiles map from backend response
+    for (const phase of googleDriveStructure.value.phases) {
+      for (const category of phase.categories) {
+        // Convert files to match expected format
+        const files = (category.files || []).map((file: any) => ({
+          name: file.name,
+          path: file.id, // Use Google Drive file ID as path
+          size: parseInt(file.size || '0'),
+          modified: new Date(file.modifiedTime),
+          mimeType: file.mimeType
+        }));
+        
+        categoryFiles.value.set(category.categoryId, files);
+        console.log(`[Dashboard] Loaded ${files.length} files for ${category.categoryId}`);
+      }
+    }
+
+    console.log('[Dashboard] All files loaded successfully');
+
+  } catch (error: any) {
+    console.error('[Dashboard] Failed to load Google Drive structure:', error);
+    scanError.value = `Failed to load Google Drive files: ${error.message}`;
+  }
+}
+
 // Load files for all categories in a phase
 async function loadPhaseFiles(phaseId: number) {
   if (!project.value?.folderPath || !folderStructure.value) return;
@@ -288,73 +345,11 @@ async function loadPhaseFiles(phaseId: number) {
       return;
     }
     
-    // Google Drive mode - load files
-    for (const category of phase.categories) {
-      try {
-        // Resolve the folder path to get the actual Google Drive folder ID
-        console.log(`[Dashboard] Resolving path: ${project.value.folderPath} / ${category.folder_path}`);
-        
-        const folderId = await googleDrive.resolveFolderPath(
-          project.value.folderPath,
-          category.folder_path
-        );
-        
-        if (!folderId) {
-          console.log(`[Dashboard] Could not resolve folder path for ${category.category_id}`);
-          categoryFiles.value.set(category.category_id, []);
-          continue;
-        }
-        
-        console.log(`[Dashboard] Resolved folder ID: ${folderId}`);
-        
-        const accessToken = googleDrive.getAccessToken();
-        if (!accessToken) {
-          console.log('[Dashboard] No access token available');
-          categoryFiles.value.set(category.category_id, []);
-          continue;
-        }
-
-        const response = await fetch(getApiEndpoint('/google-drive/list-files'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            folderId: folderId,
-            accessToken: accessToken
-          })
-        });
-        
-        // Handle 401 errors from backend
-        if (response.status === 401) {
-          console.log('[Dashboard] 401 error - session expired');
-          scanError.value = 'Your Google Drive session has expired. Please expand the phase again to sign in.';
-          categoryFiles.value.set(category.category_id, []);
-          continue;
-        }
-        
-        const result = await response.json();
-        
-        // Convert Google Drive files to match local file format
-        const files = (result.files || []).map((file: any) => ({
-          name: file.name,
-          path: file.id, // Use Google Drive file ID as path
-          size: parseInt(file.size || '0'),
-          modified: new Date(file.modifiedTime),
-          mimeType: file.mimeType
-        }));
-        
-        categoryFiles.value.set(category.category_id, files);
-        
-      } catch (error: any) {
-        console.error(`[Dashboard] Failed to load Google Drive files for ${category.category_id}:`, error);
-        
-        // Check if this is a session expiry error
-        if (error.message && error.message.includes('session')) {
-          scanError.value = 'Your Google Drive session has expired. Please expand the phase again to sign in.';
-        }
-        
-        categoryFiles.value.set(category.category_id, []);
-      }
+    // Use backend scan-structure endpoint (loads ALL files at once)
+    if (!googleDriveStructure.value) {
+      await loadGoogleDriveStructure();
     }
+    // Files are already populated in categoryFiles map by loadGoogleDriveStructure!
   } else {
     // Local file system mode
     for (const category of phase.categories) {

@@ -27,9 +27,9 @@ folder_structure:
         description: "Device classification, product code, submission type, and labeling strategy"
         required: true
         
-      - category_id: user_needs_and_claims
-        category_name: "User Needs and Claims"
-        folder_path: "Phase 1/User Needs and Claims"
+      - category_id: user_needs
+        category_name: "User Needs"
+        folder_path: "Phase 1/User Needs"
         description: "User requirements, performance claims, and traceability to validation"
         required: true
 
