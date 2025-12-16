@@ -108,7 +108,7 @@ export function useGoogleDrive() {
   /**
    * Restore token from localStorage
    */
-  const restoreToken = (): boolean => {
+  const restoreToken = async (): Promise<boolean> => {
     try {
       const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
       const expiryTime = localStorage.getItem(TOKEN_EXPIRY_KEY);
@@ -127,15 +127,25 @@ export function useGoogleDrive() {
       // Restore token
       accessToken = storedToken;
       gapi.client.setToken({ access_token: storedToken });
-      isSignedIn.value = true;
       
-      // Fetch user info
-      fetchUserInfo();
-      
-      console.log('[GoogleDrive] Token restored from localStorage');
-      return true;
+      // Validate token by fetching user info
+      try {
+        await fetchUserInfo();
+        isSignedIn.value = true;
+        console.log('[GoogleDrive] Token restored and validated');
+        return true;
+      } catch (error) {
+        // Token is invalid, clear it
+        console.log('[GoogleDrive] Stored token is invalid, clearing');
+        clearToken();
+        accessToken = null;
+        gapi.client.setToken(null);
+        isSignedIn.value = false;
+        return false;
+      }
     } catch (error) {
       console.error('[GoogleDrive] Error restoring token:', error);
+      clearToken();
       return false;
     }
   };
@@ -252,8 +262,10 @@ export function useGoogleDrive() {
         gapiInitialized = true;
         console.log('[GoogleDrive] Initialization complete');
         
-        // Try to restore token from localStorage
-        restoreToken();
+        // Try to restore token from localStorage (async, but don't block initialization)
+        restoreToken().catch(err => {
+          console.log('[GoogleDrive] Token restore failed:', err);
+        });
       } catch (error: any) {
         console.error('[GoogleDrive] Initialization error:', error);
         initError.value = error.message || 'Failed to initialize Google Drive';
