@@ -281,6 +281,173 @@ async function loadValidationCriteria(phaseId: number, categoryPath: string): Pr
 }
 
 /**
+ * POST /api/google-drive/scan-structure
+ * Scan Google Drive folder structure and match against folder-structure.yaml
+ * Returns complete file tree for all phases and categories
+ */
+app.post('/api/google-drive/scan-structure', async (req: Request, res: Response) => {
+  const { rootFolderId, driveId, accessToken } = req.body;
+
+  if (!accessToken) {
+    return res.status(401).json({
+      error: 'Access token required',
+      message: 'Please provide Google Drive access token'
+    });
+  }
+
+  if (!rootFolderId) {
+    return res.status(400).json({
+      error: 'Root folder ID required',
+      message: 'Please provide Google Drive root folder ID'
+    });
+  }
+
+  try {
+    const { google } = await import('googleapis');
+    const drive = google.drive({ version: 'v3', auth: accessToken });
+
+    // Load folder structure YAML
+    const yamlPath = path.join(__dirname, '../../rag-service/config/folder-structure.yaml');
+    const fileContents = await fs.readFile(yamlPath, 'utf8');
+    const folderStructure = yaml.load(fileContents) as any;
+
+    console.log(`[API] Scanning Google Drive structure from folder: ${rootFolderId}`);
+    if (driveId) {
+      console.log(`[API] Using Shared Drive: ${driveId}`);
+    }
+
+    // Helper function to find subfolder by name
+    const findSubfolder = async (parentFolderId: string, folderName: string): Promise<string | null> => {
+      const params: any = {
+        q: `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed = false`,
+        fields: 'files(id, name)',
+        pageSize: 1,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true
+      };
+
+      if (driveId) {
+        params.corpora = 'drive';
+        params.driveId = driveId;
+      }
+
+      const response = await drive.files.list(params);
+      const folders = response.data.files || [];
+      
+      if (folders.length > 0 && folders[0].id) {
+        console.log(`[API] Found folder '${folderName}': ${folders[0].id}`);
+        return folders[0].id;
+      }
+      
+      console.log(`[API] Folder '${folderName}' not found in parent ${parentFolderId}`);
+      return null;
+    };
+
+    // Helper function to list files in folder
+    const listFiles = async (folderId: string): Promise<any[]> => {
+      const params: any = {
+        q: `'${folderId}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'`,
+        fields: 'files(id, name, mimeType, size, modifiedTime)',
+        orderBy: 'name',
+        pageSize: 100,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true
+      };
+
+      if (driveId) {
+        params.corpora = 'drive';
+        params.driveId = driveId;
+      }
+
+      const response = await drive.files.list(params);
+      return response.data.files || [];
+    };
+
+    // Build response structure
+    const result: any = {
+      phases: []
+    };
+
+    // Iterate through each phase
+    for (const [phaseKey, phaseData] of Object.entries(folderStructure.folder_structure)) {
+      const phase = phaseData as any;
+      console.log(`[API] Processing ${phase.phase_name}...`);
+
+      // Find phase folder
+      const phaseFolderId = await findSubfolder(rootFolderId, phase.phase_path);
+      
+      if (!phaseFolderId) {
+        console.log(`[API] Phase folder '${phase.phase_path}' not found, skipping`);
+        continue;
+      }
+
+      const phaseResult: any = {
+        phaseId: phase.phase_id,
+        phaseName: phase.phase_name,
+        categories: []
+      };
+
+      // Iterate through categories in this phase
+      for (const category of phase.categories) {
+        console.log(`[API]   Processing category: ${category.category_name}`);
+        
+        // Extract category folder name from path (e.g., "Phase 1/Planning and Scope" -> "Planning and Scope")
+        const categoryFolderName = category.folder_path.split('/').pop();
+        
+        if (!categoryFolderName) {
+          console.log(`[API]   Could not extract category folder name from: ${category.folder_path}`);
+          continue;
+        }
+
+        // Find category folder
+        const categoryFolderId = await findSubfolder(phaseFolderId, categoryFolderName);
+        
+        if (!categoryFolderId) {
+          console.log(`[API]   Category folder '${categoryFolderName}' not found`);
+          phaseResult.categories.push({
+            categoryId: category.category_id,
+            categoryName: category.category_name,
+            required: category.required,
+            files: []
+          });
+          continue;
+        }
+
+        // List files in category folder
+        const files = await listFiles(categoryFolderId);
+        console.log(`[API]   Found ${files.length} files in ${category.category_name}`);
+
+        phaseResult.categories.push({
+          categoryId: category.category_id,
+          categoryName: category.category_name,
+          required: category.required,
+          folderId: categoryFolderId,
+          files: files.map(file => ({
+            id: file.id,
+            name: file.name,
+            mimeType: file.mimeType,
+            size: file.size,
+            modifiedTime: file.modifiedTime
+          }))
+        });
+      }
+
+      result.phases.push(phaseResult);
+    }
+
+    console.log(`[API] Scan complete. Found ${result.phases.length} phases`);
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('[API] Google Drive scan error:', error);
+    res.status(500).json({
+      error: 'Failed to scan Google Drive structure',
+      message: error.message || 'Unknown error'
+    });
+  }
+});
+
+/**
  * POST /api/google-drive/list-files
  * List files in a Google Drive folder using access token from frontend
  */

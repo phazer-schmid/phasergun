@@ -22,6 +22,8 @@ export interface Project {
   folderPath: string;
   folderName?: string; // Human-readable folder name for Google Drive
   sourceType: 'local' | 'google-drive';
+  driveId?: string; // Google Shared Drive ID (if using Shared Drive)
+  driveType?: 'my-drive' | 'shared-drive'; // Type of Google Drive
   credentials?: {
     apiKey?: string;
     accessToken?: string;

@@ -175,7 +175,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void;
-  (e: 'select', folderId: string, folderName: string): void;
+  (e: 'select', data: { 
+    folderId: string; 
+    folderName: string; 
+    driveId?: string; 
+    driveType: 'my-drive' | 'shared-drive';
+  }): void;
 }>();
 
 const googleDrive = useGoogleDrive();
@@ -192,9 +197,11 @@ const breadcrumbs = ref<GoogleDriveFile[]>([]);
 const currentDriveContext = ref<{
   driveId: string | null;
   driveName: string;
+  driveType: 'my-drive' | 'shared-drive';
 }>({
   driveId: null,
-  driveName: ''
+  driveName: '',
+  driveType: 'my-drive'
 });
 
 // Watch for modal opening
@@ -263,7 +270,8 @@ function resetToRoot() {
   folders.value = [];
   currentDriveContext.value = {
     driveId: null,
-    driveName: ''
+    driveName: '',
+    driveType: 'my-drive'
   };
 }
 
@@ -271,7 +279,8 @@ function resetToRoot() {
 async function enterMyDrive() {
   currentDriveContext.value = {
     driveId: null,
-    driveName: 'My Drive'
+    driveName: 'My Drive',
+    driveType: 'my-drive'
   };
   await loadFolders('root');
 }
@@ -280,7 +289,8 @@ async function enterMyDrive() {
 async function enterSharedDrive(drive: SharedDrive) {
   currentDriveContext.value = {
     driveId: drive.id,
-    driveName: drive.name
+    driveName: drive.name,
+    driveType: 'shared-drive'
   };
   // Load root of shared drive
   await loadFolders(drive.id);
@@ -351,7 +361,12 @@ async function navigateToFolder(folderId: string) {
 // Select the current folder
 function selectCurrentFolder() {
   if (currentFolder.value) {
-    emit('select', currentFolder.value.id, currentFolder.value.name);
+    emit('select', {
+      folderId: currentFolder.value.id,
+      folderName: currentFolder.value.name,
+      driveId: currentDriveContext.value.driveId || undefined,
+      driveType: currentDriveContext.value.driveType
+    });
     close();
   }
 }

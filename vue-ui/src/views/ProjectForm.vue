@@ -196,6 +196,9 @@ const formData = ref({
   description: '',
   sourceType: 'local' as 'local' | 'google-drive',
   folderPath: '',
+  folderName: '',
+  driveId: undefined as string | undefined,
+  driveType: 'my-drive' as 'my-drive' | 'shared-drive',
   targetDates: {
     phase1: '',
     phase2: '',
@@ -204,9 +207,16 @@ const formData = ref({
   }
 });
 
-const handleFolderSelect = (folderId: string, folderName: string) => {
-  formData.value.folderPath = folderId;
-  selectedFolderName.value = folderName;
+const handleFolderSelect = (data: { 
+  folderId: string; 
+  folderName: string; 
+  driveId?: string; 
+  driveType: 'my-drive' | 'shared-drive';
+}) => {
+  formData.value.folderPath = data.folderId;
+  formData.value.folderName = data.folderName;
+  formData.value.driveId = data.driveId;
+  formData.value.driveType = data.driveType;
   showFolderPicker.value = false;
 };
 
@@ -216,7 +226,9 @@ const handleSubmit = () => {
     description: formData.value.description,
     sourceType: formData.value.sourceType,
     folderPath: formData.value.folderPath,
-    folderName: selectedFolderName.value || undefined,
+    folderName: formData.value.folderName || undefined,
+    driveId: formData.value.driveId,
+    driveType: formData.value.driveType,
     targetDates: {
       phase1: formData.value.targetDates.phase1 || undefined,
       phase2: formData.value.targetDates.phase2 || undefined,
