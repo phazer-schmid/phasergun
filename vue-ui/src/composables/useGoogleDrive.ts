@@ -337,7 +337,7 @@ export function useGoogleDrive() {
   /**
    * Handle 401 errors by clearing invalid tokens and prompting re-auth
    */
-  const handle401Error = (error: any): void => {
+  const handle401Error = (_error: any): void => {
     console.log('[GoogleDrive] 401 error detected - token is invalid, clearing');
     clearToken();
     accessToken = null;
