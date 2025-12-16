@@ -20,6 +20,7 @@ export interface Project {
   name: string;
   description?: string;
   folderPath: string;
+  folderName?: string; // Human-readable folder name for Google Drive
   sourceType: 'local' | 'google-drive';
   credentials?: {
     apiKey?: string;

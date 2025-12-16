@@ -229,6 +229,11 @@ onMounted(() => {
         phase4: project.value.targetDates?.phase4 || ''
       }
     };
+    
+    // Load saved folder name if it exists
+    if (project.value.folderName) {
+      selectedFolderName.value = project.value.folderName;
+    }
   }
 });
 
@@ -246,6 +251,7 @@ const handleSubmit = () => {
     description: formData.value.description,
     sourceType: formData.value.sourceType,
     folderPath: formData.value.folderPath,
+    folderName: selectedFolderName.value || undefined,
     targetDates: {
       phase1: formData.value.targetDates.phase1 || undefined,
       phase2: formData.value.targetDates.phase2 || undefined,

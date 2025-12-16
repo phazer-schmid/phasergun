@@ -216,6 +216,7 @@ const handleSubmit = () => {
     description: formData.value.description,
     sourceType: formData.value.sourceType,
     folderPath: formData.value.folderPath,
+    folderName: selectedFolderName.value || undefined,
     targetDates: {
       phase1: formData.value.targetDates.phase1 || undefined,
       phase2: formData.value.targetDates.phase2 || undefined,

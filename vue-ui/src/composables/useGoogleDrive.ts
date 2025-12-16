@@ -36,6 +36,10 @@ let gapiInitPromise: Promise<void> | null = null;
 let tokenClient: any = null;
 let accessToken: string | null = null;
 
+// LocalStorage key for token persistence
+const TOKEN_STORAGE_KEY = 'google_drive_access_token';
+const TOKEN_EXPIRY_KEY = 'google_drive_token_expiry';
+
 export function useGoogleDrive() {
   const isSignedIn = ref(false);
   const userEmail = ref<string | null>(null);
@@ -87,6 +91,69 @@ export function useGoogleDrive() {
   };
 
   /**
+   * Save token to localStorage
+   */
+  const saveToken = (token: string, expiresIn: number = 3600): void => {
+    try {
+      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+      // Set expiry time (default 1 hour from now)
+      const expiryTime = Date.now() + (expiresIn * 1000);
+      localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toString());
+      console.log('[GoogleDrive] Token saved to localStorage');
+    } catch (error) {
+      console.error('[GoogleDrive] Error saving token:', error);
+    }
+  };
+
+  /**
+   * Restore token from localStorage
+   */
+  const restoreToken = (): boolean => {
+    try {
+      const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+      const expiryTime = localStorage.getItem(TOKEN_EXPIRY_KEY);
+      
+      if (!storedToken || !expiryTime) {
+        return false;
+      }
+
+      // Check if token is expired
+      if (Date.now() >= parseInt(expiryTime)) {
+        console.log('[GoogleDrive] Stored token expired, clearing');
+        clearToken();
+        return false;
+      }
+
+      // Restore token
+      accessToken = storedToken;
+      gapi.client.setToken({ access_token: storedToken });
+      isSignedIn.value = true;
+      
+      // Fetch user info
+      fetchUserInfo();
+      
+      console.log('[GoogleDrive] Token restored from localStorage');
+      return true;
+    } catch (error) {
+      console.error('[GoogleDrive] Error restoring token:', error);
+      return false;
+    }
+  };
+
+  /**
+   * Clear token from localStorage
+   */
+  const clearToken = (): void => {
+    try {
+      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      localStorage.removeItem(TOKEN_EXPIRY_KEY);
+      console.log('[GoogleDrive] Token cleared from localStorage');
+    } catch (error) {
+      console.error('[GoogleDrive] Error clearing token:', error);
+    }
+  };
+
+  /**
    * Initialize Google Identity Services token client
    */
   const initializeTokenClient = (): void => {
@@ -99,11 +166,16 @@ export function useGoogleDrive() {
           initError.value = response.error_description || 'Authentication failed';
           isSignedIn.value = false;
           accessToken = null;
+          clearToken();
           return;
         }
 
         console.log('[GoogleDrive] Token received successfully');
         accessToken = response.access_token;
+        
+        // Save token to localStorage
+        const expiresIn = response.expires_in || 3600;
+        saveToken(response.access_token, expiresIn);
         
         // Set token for GAPI client
         gapi.client.setToken({ access_token: response.access_token });
@@ -179,6 +251,9 @@ export function useGoogleDrive() {
 
         gapiInitialized = true;
         console.log('[GoogleDrive] Initialization complete');
+        
+        // Try to restore token from localStorage
+        restoreToken();
       } catch (error: any) {
         console.error('[GoogleDrive] Initialization error:', error);
         initError.value = error.message || 'Failed to initialize Google Drive';
@@ -230,6 +305,9 @@ export function useGoogleDrive() {
 
       // Clear token from GAPI client
       gapi.client.setToken(null);
+
+      // Clear token from localStorage
+      clearToken();
 
       // Reset state
       accessToken = null;
