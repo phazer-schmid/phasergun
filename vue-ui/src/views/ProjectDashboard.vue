@@ -290,10 +290,23 @@ async function loadPhaseFiles(phaseId: number) {
     
     // Google Drive mode - load files
     for (const category of phase.categories) {
-      // folderPath is actually a Google Drive folder ID
-      const folderId = `${project.value.folderPath}/${category.folder_path}`;
-      
       try {
+        // Resolve the folder path to get the actual Google Drive folder ID
+        console.log(`[Dashboard] Resolving path: ${project.value.folderPath} / ${category.folder_path}`);
+        
+        const folderId = await googleDrive.resolveFolderPath(
+          project.value.folderPath,
+          category.folder_path
+        );
+        
+        if (!folderId) {
+          console.log(`[Dashboard] Could not resolve folder path for ${category.category_id}`);
+          categoryFiles.value.set(category.category_id, []);
+          continue;
+        }
+        
+        console.log(`[Dashboard] Resolved folder ID: ${folderId}`);
+        
         const accessToken = googleDrive.getAccessToken();
         if (!accessToken) {
           console.log('[Dashboard] No access token available');

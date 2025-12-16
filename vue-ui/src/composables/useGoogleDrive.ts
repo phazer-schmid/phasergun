@@ -487,6 +487,94 @@ export function useGoogleDrive() {
   };
 
   /**
+   * Find a subfolder by name within a parent folder
+   * @param parentFolderId - The parent folder ID
+   * @param folderName - The name of the subfolder to find
+   * @param driveId - Optional: Shared Drive ID
+   * @returns The folder ID if found, null otherwise
+   */
+  const findSubfolderByName = async (
+    parentFolderId: string,
+    folderName: string,
+    driveId?: string
+  ): Promise<string | null> => {
+    ensureToken();
+
+    return withAuthRetry(async () => {
+      try {
+        const params: any = {
+          q: `'${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and name='${folderName}' and trashed = false`,
+          fields: 'files(id, name)',
+          pageSize: 1,
+          supportsAllDrives: true,
+          includeItemsFromAllDrives: true
+        };
+
+        if (driveId) {
+          params.corpora = 'drive';
+          params.driveId = driveId;
+        }
+
+        const response = await gapi.client.drive.files.list(params);
+        const folders = response.result.files || [];
+
+        if (folders.length > 0) {
+          console.log(`[GoogleDrive] Found subfolder '${folderName}' with ID: ${folders[0].id}`);
+          return folders[0].id;
+        }
+
+        console.log(`[GoogleDrive] Subfolder '${folderName}' not found in parent ${parentFolderId}`);
+        return null;
+      } catch (error: any) {
+        console.error(`[GoogleDrive] Error finding subfolder '${folderName}':`, error);
+        throw error;
+      }
+    });
+  };
+
+  /**
+   * Resolve a folder path (like "Phase 1/Planning and Scope") to a folder ID
+   * @param rootFolderId - The root folder ID to start from
+   * @param folderPath - Path like "Phase 1/Planning and Scope"
+   * @param driveId - Optional: Shared Drive ID
+   * @returns The resolved folder ID, or null if path doesn't exist
+   */
+  const resolveFolderPath = async (
+    rootFolderId: string,
+    folderPath: string,
+    driveId?: string
+  ): Promise<string | null> => {
+    // If path is empty or just "/", return root folder ID
+    if (!folderPath || folderPath === '/' || folderPath === '.') {
+      return rootFolderId;
+    }
+
+    // Split path and filter out empty segments
+    const pathSegments = folderPath.split('/').filter(s => s.trim() !== '');
+    
+    if (pathSegments.length === 0) {
+      return rootFolderId;
+    }
+
+    let currentFolderId = rootFolderId;
+
+    // Navigate through each path segment
+    for (const segment of pathSegments) {
+      const subfolderId = await findSubfolderByName(currentFolderId, segment, driveId);
+      
+      if (!subfolderId) {
+        console.log(`[GoogleDrive] Path resolution failed at segment '${segment}'`);
+        return null;
+      }
+
+      currentFolderId = subfolderId;
+    }
+
+    console.log(`[GoogleDrive] Resolved path '${folderPath}' to folder ID: ${currentFolderId}`);
+    return currentFolderId;
+  };
+
+  /**
    * Get current access token for API calls
    */
   const getAccessToken = (): string | null => {
@@ -509,6 +597,8 @@ export function useGoogleDrive() {
     getFolderMetadata,
     downloadFile,
     searchFolders,
+    findSubfolderByName,
+    resolveFolderPath,
     getAccessToken
   };
 }
