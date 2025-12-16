@@ -229,8 +229,15 @@ export function useGoogleDrive() {
       return gapiInitPromise;
     }
 
-    // Return immediately if already initialized
+    // If already initialized, just restore token state and return
     if (gapiInitialized) {
+      // Restore token from localStorage if not already signed in
+      if (!isSignedIn.value) {
+        const restored = restoreToken();
+        if (restored) {
+          isSignedIn.value = true;
+        }
+      }
       return Promise.resolve();
     }
 
