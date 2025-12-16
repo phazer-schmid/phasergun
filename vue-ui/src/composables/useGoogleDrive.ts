@@ -1,12 +1,13 @@
 /**
  * Google Drive Integration Composable
- * Provides Google Drive authentication and file access
+ * Uses Google Identity Services (GIS) for authentication
  */
 
 import { ref, readonly } from 'vue';
 
-// Declare global gapi object from Google API script
+// Declare global objects from Google scripts
 declare const gapi: any;
+declare const google: any;
 
 export interface GoogleDriveFile {
   id: string;
@@ -27,6 +28,8 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 let gapiInitialized = false;
 let gapiInitializing = false;
 let gapiInitPromise: Promise<void> | null = null;
+let tokenClient: any = null;
+let accessToken: string | null = null;
 
 export function useGoogleDrive() {
   const isSignedIn = ref(false);
@@ -35,26 +38,106 @@ export function useGoogleDrive() {
   const initError = ref<string | null>(null);
 
   /**
-   * Load the Google API script
+   * Wait for Google scripts to load
    */
-  const loadGapiScript = (): Promise<void> => {
+  const waitForGoogleScripts = (): Promise<void> => {
     return new Promise((resolve, reject) => {
-      // Check if script already exists
-      if (typeof gapi !== 'undefined') {
-        resolve();
-        return;
-      }
+      const checkInterval = setInterval(() => {
+        if (typeof gapi !== 'undefined' && typeof google !== 'undefined') {
+          clearInterval(checkInterval);
+          resolve();
+        }
+      }, 100);
 
-      const script = document.createElement('script');
-      script.src = 'https://apis.google.com/js/api.js';
-      script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Failed to load Google API script'));
-      document.body.appendChild(script);
+      // Timeout after 10 seconds
+      setTimeout(() => {
+        clearInterval(checkInterval);
+        if (typeof gapi === 'undefined' || typeof google === 'undefined') {
+          reject(new Error('Google scripts failed to load'));
+        }
+      }, 10000);
     });
   };
 
   /**
-   * Initialize the Google API client
+   * Initialize GAPI client (for API calls, not auth)
+   */
+  const initializeGapiClient = async (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      gapi.load('client', async () => {
+        try {
+          await gapi.client.init({
+            apiKey: API_KEY,
+            discoveryDocs: DISCOVERY_DOCS,
+            // No auth configuration - we handle that with GIS token client
+          });
+          console.log('[GoogleDrive] GAPI client initialized');
+          resolve();
+        } catch (error) {
+          console.error('[GoogleDrive] GAPI client init error:', error);
+          reject(error);
+        }
+      });
+    });
+  };
+
+  /**
+   * Initialize Google Identity Services token client
+   */
+  const initializeTokenClient = (): void => {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: (response: any) => {
+        if (response.error) {
+          console.error('[GoogleDrive] Token error:', response);
+          initError.value = response.error_description || 'Authentication failed';
+          isSignedIn.value = false;
+          accessToken = null;
+          return;
+        }
+
+        console.log('[GoogleDrive] Token received successfully');
+        accessToken = response.access_token;
+        
+        // Set token for GAPI client
+        gapi.client.setToken({ access_token: response.access_token });
+        
+        isSignedIn.value = true;
+        initError.value = null;
+        
+        // Fetch user info
+        fetchUserInfo();
+      },
+    });
+    console.log('[GoogleDrive] Token client initialized');
+  };
+
+  /**
+   * Fetch user profile information
+   */
+  const fetchUserInfo = async (): Promise<void> => {
+    if (!accessToken) return;
+
+    try {
+      const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const userInfo = await response.json();
+        userEmail.value = userInfo.email;
+        console.log('[GoogleDrive] User info fetched:', userInfo.email);
+      }
+    } catch (error) {
+      console.error('[GoogleDrive] Error fetching user info:', error);
+    }
+  };
+
+  /**
+   * Initialize the Google Drive integration
    */
   const initializeGapi = async (): Promise<void> => {
     // Return existing promise if already initializing
@@ -64,7 +147,6 @@ export function useGoogleDrive() {
 
     // Return immediately if already initialized
     if (gapiInitialized) {
-      updateSignInStatus();
       return Promise.resolve();
     }
 
@@ -81,32 +163,14 @@ export function useGoogleDrive() {
           throw new Error('Google API credentials not configured. Please see GOOGLE_DRIVE_SETUP.md');
         }
 
-        // Load the Google API script
-        await loadGapiScript();
+        // Wait for Google scripts to load
+        await waitForGoogleScripts();
 
-        // Load the auth2 library and API client library
-        await new Promise<void>((resolve, reject) => {
-          gapi.load('client:auth2', () => resolve(), () => reject(new Error('Failed to load GAPI client')));
-        });
+        // Initialize GAPI client (for API calls)
+        await initializeGapiClient();
 
-        // Initialize the API client
-        await gapi.client.init({
-          apiKey: API_KEY,
-          clientId: CLIENT_ID,
-          discoveryDocs: DISCOVERY_DOCS,
-          scope: SCOPES
-        });
-
-        console.log('[GoogleDrive] Client initialized successfully');
-
-        // Listen for sign-in state changes
-        gapi.auth2.getAuthInstance().isSignedIn.listen((signedIn: boolean) => {
-          isSignedIn.value = signedIn;
-          updateUserEmail();
-        });
-
-        // Update initial sign-in status
-        updateSignInStatus();
+        // Initialize GIS token client (for authentication)
+        initializeTokenClient();
 
         gapiInitialized = true;
         console.log('[GoogleDrive] Initialization complete');
@@ -124,28 +188,6 @@ export function useGoogleDrive() {
   };
 
   /**
-   * Update sign-in status from Google Auth
-   */
-  const updateSignInStatus = () => {
-    if (gapiInitialized && gapi?.auth2) {
-      isSignedIn.value = gapi.auth2.getAuthInstance().isSignedIn.get();
-      updateUserEmail();
-    }
-  };
-
-  /**
-   * Update user email from Google profile
-   */
-  const updateUserEmail = () => {
-    if (isSignedIn.value && gapi?.auth2) {
-      const profile = gapi.auth2.getAuthInstance().currentUser.get().getBasicProfile();
-      userEmail.value = profile ? profile.getEmail() : null;
-    } else {
-      userEmail.value = null;
-    }
-  };
-
-  /**
    * Sign in to Google Drive
    */
   const signIn = async (): Promise<void> => {
@@ -158,9 +200,9 @@ export function useGoogleDrive() {
     }
 
     try {
-      await gapi.auth2.getAuthInstance().signIn();
-      isSignedIn.value = true;
-      updateUserEmail();
+      console.log('[GoogleDrive] Requesting access token...');
+      // Trigger the OAuth2 flow
+      tokenClient.requestAccessToken({ prompt: 'consent' });
     } catch (error: any) {
       console.error('[GoogleDrive] Sign-in error:', error);
       throw new Error('Failed to sign in to Google Drive');
@@ -171,12 +213,21 @@ export function useGoogleDrive() {
    * Sign out from Google Drive
    */
   const signOut = async (): Promise<void> => {
-    if (!gapiInitialized || !isSignedIn.value) {
+    if (!gapiInitialized || !isSignedIn.value || !accessToken) {
       return;
     }
 
     try {
-      await gapi.auth2.getAuthInstance().signOut();
+      // Revoke the access token
+      google.accounts.oauth2.revoke(accessToken, () => {
+        console.log('[GoogleDrive] Token revoked');
+      });
+
+      // Clear token from GAPI client
+      gapi.client.setToken(null);
+
+      // Reset state
+      accessToken = null;
       isSignedIn.value = false;
       userEmail.value = null;
     } catch (error: any) {
@@ -185,12 +236,19 @@ export function useGoogleDrive() {
   };
 
   /**
+   * Ensure we have a valid token before API calls
+   */
+  const ensureToken = (): void => {
+    if (!isSignedIn.value || !accessToken) {
+      throw new Error('Not signed in to Google Drive');
+    }
+  };
+
+  /**
    * List files in a Google Drive folder
    */
   const listFilesInFolder = async (folderId: string = 'root'): Promise<GoogleDriveFile[]> => {
-    if (!isSignedIn.value) {
-      throw new Error('Not signed in to Google Drive');
-    }
+    ensureToken();
 
     try {
       const response = await gapi.client.drive.files.list({
@@ -211,9 +269,7 @@ export function useGoogleDrive() {
    * Get folder metadata
    */
   const getFolderMetadata = async (folderId: string): Promise<GoogleDriveFile> => {
-    if (!isSignedIn.value) {
-      throw new Error('Not signed in to Google Drive');
-    }
+    ensureToken();
 
     try {
       const response = await gapi.client.drive.files.get({
@@ -232,9 +288,7 @@ export function useGoogleDrive() {
    * Download file content
    */
   const downloadFile = async (fileId: string): Promise<string> => {
-    if (!isSignedIn.value) {
-      throw new Error('Not signed in to Google Drive');
-    }
+    ensureToken();
 
     try {
       const response = await gapi.client.drive.files.get({
@@ -253,9 +307,7 @@ export function useGoogleDrive() {
    * Search for folders
    */
   const searchFolders = async (query: string): Promise<GoogleDriveFile[]> => {
-    if (!isSignedIn.value) {
-      throw new Error('Not signed in to Google Drive');
-    }
+    ensureToken();
 
     try {
       const response = await gapi.client.drive.files.list({
@@ -276,15 +328,7 @@ export function useGoogleDrive() {
    * Get current access token for API calls
    */
   const getAccessToken = (): string | null => {
-    if (!isSignedIn.value || !gapiInitialized) {
-      return null;
-    }
-
-    const authInstance = gapi.auth2.getAuthInstance();
-    const currentUser = authInstance.currentUser.get();
-    const authResponse = currentUser.getAuthResponse();
-    
-    return authResponse ? authResponse.access_token : null;
+    return accessToken;
   };
 
   return {
