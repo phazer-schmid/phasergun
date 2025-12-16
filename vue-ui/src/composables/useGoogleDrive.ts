@@ -108,8 +108,9 @@ export function useGoogleDrive() {
 
   /**
    * Restore token from localStorage
+   * NOTE: We don't validate the token here - we'll handle 401s when API calls fail
    */
-  const restoreToken = async (): Promise<boolean> => {
+  const restoreToken = (): boolean => {
     try {
       const storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
       const expiryTime = localStorage.getItem(TOKEN_EXPIRY_KEY);
@@ -118,32 +119,27 @@ export function useGoogleDrive() {
         return false;
       }
 
-      // Check if token is expired
+      // Check if token is expired based on stored expiry time
       if (Date.now() >= parseInt(expiryTime)) {
         console.log('[GoogleDrive] Stored token expired, clearing');
         clearToken();
         return false;
       }
 
-      // Restore token
+      // Restore token (assume valid until proven otherwise by API calls)
       accessToken = storedToken;
       gapi.client.setToken({ access_token: storedToken });
+      isSignedIn.value = true;
       
-      // Validate token by fetching user info
-      try {
-        await fetchUserInfo();
-        isSignedIn.value = true;
-        console.log('[GoogleDrive] Token restored and validated');
-        return true;
-      } catch (error) {
-        // Token is invalid, clear it
-        console.log('[GoogleDrive] Stored token is invalid, clearing');
-        clearToken();
-        accessToken = null;
-        gapi.client.setToken(null);
-        isSignedIn.value = false;
-        return false;
-      }
+      console.log('[GoogleDrive] Token restored from localStorage (will validate on first API call)');
+      
+      // Fetch user info in background (don't block on it)
+      fetchUserInfo().catch(() => {
+        // Token might be invalid - will be handled when user tries to use Drive
+        console.log('[GoogleDrive] Background user info fetch failed (token may be invalid)');
+      });
+      
+      return true;
     } catch (error) {
       console.error('[GoogleDrive] Error restoring token:', error);
       clearToken();
@@ -263,10 +259,8 @@ export function useGoogleDrive() {
         gapiInitialized = true;
         console.log('[GoogleDrive] Initialization complete');
         
-        // Try to restore token from localStorage (async, but don't block initialization)
-        restoreToken().catch(err => {
-          console.log('[GoogleDrive] Token restore failed:', err);
-        });
+        // Try to restore token from localStorage
+        restoreToken();
       } catch (error: any) {
         console.error('[GoogleDrive] Initialization error:', error);
         initError.value = error.message || 'Failed to initialize Google Drive';
@@ -341,22 +335,58 @@ export function useGoogleDrive() {
   };
 
   /**
+   * Handle 401 errors by clearing invalid tokens and prompting re-auth
+   */
+  const handle401Error = (error: any): void => {
+    console.log('[GoogleDrive] 401 error detected - token is invalid, clearing');
+    clearToken();
+    accessToken = null;
+    isSignedIn.value = false;
+    gapi.client.setToken(null);
+  };
+
+  /**
+   * Wrapper for API calls that handles 401 errors gracefully
+   */
+  const withAuthRetry = async <T>(apiCall: () => Promise<T>): Promise<T> => {
+    try {
+      return await apiCall();
+    } catch (error: any) {
+      // Check if this is a 401 error (invalid/expired token)
+      const is401 = 
+        error?.status === 401 || 
+        error?.code === 401 ||
+        error?.result?.error?.code === 401 ||
+        (error?.message && error.message.includes('401'));
+
+      if (is401) {
+        handle401Error(error);
+        throw new Error('Your Google Drive session has expired. Please sign in again.');
+      }
+      
+      throw error;
+    }
+  };
+
+  /**
    * List all Shared Drives accessible to the user
    */
   const listSharedDrives = async (): Promise<SharedDrive[]> => {
     ensureToken();
 
-    try {
-      const response = await gapi.client.drive.drives.list({
-        pageSize: 100,
-        fields: 'drives(id, name)'
-      });
+    return withAuthRetry(async () => {
+      try {
+        const response = await gapi.client.drive.drives.list({
+          pageSize: 100,
+          fields: 'drives(id, name)'
+        });
 
-      return response.result.drives || [];
-    } catch (error: any) {
-      console.error('[GoogleDrive] Error listing shared drives:', error);
-      throw new Error('Failed to list shared drives');
-    }
+        return response.result.drives || [];
+      } catch (error: any) {
+        console.error('[GoogleDrive] Error listing shared drives:', error);
+        throw error;
+      }
+    });
   };
 
   /**
@@ -367,29 +397,31 @@ export function useGoogleDrive() {
   const listFilesInFolder = async (folderId: string = 'root', driveId?: string): Promise<GoogleDriveFile[]> => {
     ensureToken();
 
-    try {
-      const params: any = {
-        q: `'${folderId}' in parents and trashed = false`,
-        fields: 'files(id, name, mimeType, size, modifiedTime, webViewLink)',
-        orderBy: 'folder,name',
-        pageSize: 100,
-        supportsAllDrives: true,
-        includeItemsFromAllDrives: true
-      };
+    return withAuthRetry(async () => {
+      try {
+        const params: any = {
+          q: `'${folderId}' in parents and trashed = false`,
+          fields: 'files(id, name, mimeType, size, modifiedTime, webViewLink)',
+          orderBy: 'folder,name',
+          pageSize: 100,
+          supportsAllDrives: true,
+          includeItemsFromAllDrives: true
+        };
 
-      // If browsing a Shared Drive, specify the drive context
-      if (driveId) {
-        params.corpora = 'drive';
-        params.driveId = driveId;
+        // If browsing a Shared Drive, specify the drive context
+        if (driveId) {
+          params.corpora = 'drive';
+          params.driveId = driveId;
+        }
+
+        const response = await gapi.client.drive.files.list(params);
+
+        return response.result.files || [];
+      } catch (error: any) {
+        console.error('[GoogleDrive] Error listing files:', error);
+        throw error;
       }
-
-      const response = await gapi.client.drive.files.list(params);
-
-      return response.result.files || [];
-    } catch (error: any) {
-      console.error('[GoogleDrive] Error listing files:', error);
-      throw new Error('Failed to list files from Google Drive');
-    }
+    });
   };
 
   /**
@@ -398,18 +430,20 @@ export function useGoogleDrive() {
   const getFolderMetadata = async (folderId: string): Promise<GoogleDriveFile> => {
     ensureToken();
 
-    try {
-      const response = await gapi.client.drive.files.get({
-        fileId: folderId,
-        fields: 'id, name, mimeType, modifiedTime',
-        supportsAllDrives: true
-      });
+    return withAuthRetry(async () => {
+      try {
+        const response = await gapi.client.drive.files.get({
+          fileId: folderId,
+          fields: 'id, name, mimeType, modifiedTime',
+          supportsAllDrives: true
+        });
 
-      return response.result;
-    } catch (error: any) {
-      console.error('[GoogleDrive] Error getting folder metadata:', error);
-      throw new Error('Failed to get folder information');
-    }
+        return response.result;
+      } catch (error: any) {
+        console.error('[GoogleDrive] Error getting folder metadata:', error);
+        throw error;
+      }
+    });
   };
 
   /**

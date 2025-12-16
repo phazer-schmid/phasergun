@@ -229,18 +229,10 @@ onMounted(async () => {
   const projectId = route.params.id as string;
   project.value = projectService.getProject(projectId);
   
-  // Initialize Google Drive if project uses it
+  // Don't auto-initialize Google Drive - let user trigger it when needed
+  // This prevents forced login prompts on every page load
   if (project.value?.sourceType === 'google-drive') {
-    try {
-      await googleDrive.initializeGapi();
-      if (!googleDrive.isSignedIn.value) {
-        await googleDrive.signIn();
-      }
-      console.log('[Dashboard] Google Drive initialized and signed in');
-    } catch (error) {
-      console.error('[Dashboard] Google Drive initialization failed:', error);
-      scanError.value = 'Failed to connect to Google Drive. Please check your credentials.';
-    }
+    console.log('[Dashboard] Project uses Google Drive - will initialize on demand');
   }
   
   // Load folder structure from API
@@ -278,7 +270,25 @@ async function loadPhaseFiles(phaseId: number) {
 
   // Check if using Google Drive
   if (project.value.sourceType === 'google-drive') {
-    // Google Drive mode
+    // Initialize Google Drive if needed
+    try {
+      await googleDrive.initializeGapi();
+      
+      // Check if signed in
+      if (!googleDrive.isSignedIn.value) {
+        console.log('[Dashboard] Not signed in to Google Drive - prompting user');
+        await googleDrive.signIn();
+        // The sign-in is async and happens via OAuth callback
+        // Files will need to be loaded after sign-in completes
+        return;
+      }
+    } catch (error) {
+      console.error('[Dashboard] Failed to initialize Google Drive:', error);
+      scanError.value = 'Please sign in to Google Drive to view files';
+      return;
+    }
+    
+    // Google Drive mode - load files
     for (const category of phase.categories) {
       // folderPath is actually a Google Drive folder ID
       const folderId = `${project.value.folderPath}/${category.folder_path}`;
@@ -286,7 +296,7 @@ async function loadPhaseFiles(phaseId: number) {
       try {
         const accessToken = googleDrive.getAccessToken();
         if (!accessToken) {
-          console.error('[Dashboard] No Google Drive access token');
+          console.log('[Dashboard] No access token available');
           categoryFiles.value.set(category.category_id, []);
           continue;
         }
@@ -299,6 +309,14 @@ async function loadPhaseFiles(phaseId: number) {
             accessToken: accessToken
           })
         });
+        
+        // Handle 401 errors from backend
+        if (response.status === 401) {
+          console.log('[Dashboard] 401 error - session expired');
+          scanError.value = 'Your Google Drive session has expired. Please expand the phase again to sign in.';
+          categoryFiles.value.set(category.category_id, []);
+          continue;
+        }
         
         const result = await response.json();
         
@@ -313,8 +331,14 @@ async function loadPhaseFiles(phaseId: number) {
         
         categoryFiles.value.set(category.category_id, files);
         
-      } catch (error) {
+      } catch (error: any) {
         console.error(`[Dashboard] Failed to load Google Drive files for ${category.category_id}:`, error);
+        
+        // Check if this is a session expiry error
+        if (error.message && error.message.includes('session')) {
+          scanError.value = 'Your Google Drive session has expired. Please expand the phase again to sign in.';
+        }
+        
         categoryFiles.value.set(category.category_id, []);
       }
     }
