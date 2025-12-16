@@ -234,9 +234,14 @@ async function loadSharedDrives() {
     loadingDrives.value = true;
     sharedDrives.value = await googleDrive.listSharedDrives();
     console.log('[GoogleDriveFolderPicker] Loaded', sharedDrives.value.length, 'shared drives');
+    if (sharedDrives.value.length === 0) {
+      console.log('[GoogleDriveFolderPicker] No shared drives found - user may not have access to any');
+    }
   } catch (err: any) {
     console.error('[GoogleDriveFolderPicker] Error loading shared drives:', err);
-    // Don't show error to user - just means they don't have shared drives
+    console.error('[GoogleDriveFolderPicker] Full error details:', err.message, err.stack);
+    // Show error temporarily for debugging
+    error.value = `Shared Drives error: ${err.message}`;
     sharedDrives.value = [];
   } finally {
     loadingDrives.value = false;
