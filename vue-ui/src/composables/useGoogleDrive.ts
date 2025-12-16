@@ -302,7 +302,7 @@ export function useGoogleDrive() {
   };
 
   /**
-   * Get folder metadata
+   * Get folder metadata (supports both My Drive and Shared Drives)
    */
   const getFolderMetadata = async (folderId: string): Promise<GoogleDriveFile> => {
     ensureToken();
@@ -310,7 +310,8 @@ export function useGoogleDrive() {
     try {
       const response = await gapi.client.drive.files.get({
         fileId: folderId,
-        fields: 'id, name, mimeType, modifiedTime'
+        fields: 'id, name, mimeType, modifiedTime',
+        supportsAllDrives: true
       });
 
       return response.result;
