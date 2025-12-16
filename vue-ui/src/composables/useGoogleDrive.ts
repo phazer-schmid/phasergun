@@ -204,23 +204,23 @@ export function useGoogleDrive() {
    * Fetch user profile information
    */
   const fetchUserInfo = async (): Promise<void> => {
-    if (!accessToken) return;
-
-    try {
-      const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      if (response.ok) {
-        const userInfo = await response.json();
-        userEmail.value = userInfo.email;
-        console.log('[GoogleDrive] User info fetched:', userInfo.email);
-      }
-    } catch (error) {
-      console.error('[GoogleDrive] Error fetching user info:', error);
+    if (!accessToken) {
+      throw new Error('No access token available');
     }
+
+    const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch user info: ${response.status} ${response.statusText}`);
+    }
+
+    const userInfo = await response.json();
+    userEmail.value = userInfo.email;
+    console.log('[GoogleDrive] User info fetched:', userInfo.email);
   };
 
   /**
