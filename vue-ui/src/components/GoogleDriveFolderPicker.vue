@@ -215,14 +215,22 @@ watch(() => props.isOpen, async (isOpen) => {
   }
 });
 
+// Watch for sign-in status changes - load Shared Drives when authenticated
+watch(() => googleDrive.isSignedIn.value, async (isSignedIn) => {
+  if (isSignedIn && props.isOpen) {
+    console.log('[GoogleDriveFolderPicker] User signed in, loading Shared Drives...');
+    await loadSharedDrives();
+    resetToRoot();
+  }
+});
+
 // Sign in to Google Drive
 async function handleSignIn() {
   try {
     error.value = null;
     await googleDrive.initializeGapi();
     await googleDrive.signIn();
-    await loadSharedDrives();
-    resetToRoot();
+    // Don't call loadSharedDrives here - the watcher will do it after auth completes
   } catch (err: any) {
     error.value = err.message || 'Failed to sign in to Google Drive';
   }
