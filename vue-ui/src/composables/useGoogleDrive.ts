@@ -18,6 +18,11 @@ export interface GoogleDriveFile {
   webViewLink?: string;
 }
 
+export interface SharedDrive {
+  id: string;
+  name: string;
+}
+
 // Google Drive API configuration
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
 const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY || 'YOUR_API_KEY';
@@ -245,18 +250,49 @@ export function useGoogleDrive() {
   };
 
   /**
-   * List files in a Google Drive folder
+   * List all Shared Drives accessible to the user
    */
-  const listFilesInFolder = async (folderId: string = 'root'): Promise<GoogleDriveFile[]> => {
+  const listSharedDrives = async (): Promise<SharedDrive[]> => {
     ensureToken();
 
     try {
-      const response = await gapi.client.drive.files.list({
+      const response = await gapi.client.drive.drives.list({
+        pageSize: 100,
+        fields: 'drives(id, name)'
+      });
+
+      return response.result.drives || [];
+    } catch (error: any) {
+      console.error('[GoogleDrive] Error listing shared drives:', error);
+      throw new Error('Failed to list shared drives');
+    }
+  };
+
+  /**
+   * List files in a Google Drive folder (supports both My Drive and Shared Drives)
+   * @param folderId - The folder ID to list files from
+   * @param driveId - Optional: The Shared Drive ID if browsing a Shared Drive
+   */
+  const listFilesInFolder = async (folderId: string = 'root', driveId?: string): Promise<GoogleDriveFile[]> => {
+    ensureToken();
+
+    try {
+      const params: any = {
         q: `'${folderId}' in parents and trashed = false`,
         fields: 'files(id, name, mimeType, size, modifiedTime, webViewLink)',
         orderBy: 'folder,name',
-        pageSize: 100
-      });
+        pageSize: 100,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true
+      };
+
+      // If browsing a Shared Drive, specify the drive context
+      if (driveId) {
+        params.corpora = 'drive';
+        params.driveId = driveId;
+      }
+
+      const response = await gapi.client.drive.files.list(params);
 
       return response.result.files || [];
     } catch (error: any) {
@@ -342,6 +378,7 @@ export function useGoogleDrive() {
     initializeGapi,
     signIn,
     signOut,
+    listSharedDrives,
     listFilesInFolder,
     getFolderMetadata,
     downloadFile,
