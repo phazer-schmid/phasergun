@@ -22,11 +22,7 @@ Located in the project root:
 - [GETTING_STARTED.md](./guides/GETTING_STARTED.md) - Initial setup and getting started
 - [QUICKSTART.md](./guides/QUICKSTART.md) - Quick start guide
 - [DEPLOYMENT_GUIDE.md](./guides/DEPLOYMENT_GUIDE.md) - Deployment instructions
-- [GOOGLE_DRIVE_SETUP.md](./guides/GOOGLE_DRIVE_SETUP.md) - Google Drive integration setup
 - [VERIFICATION_CHECKLIST.md](./guides/VERIFICATION_CHECKLIST.md) - Testing and verification checklist
-
-### Implementation
-- [GOOGLE_DRIVE_INTEGRATION.md](./implementation/GOOGLE_DRIVE_INTEGRATION.md) - Google Drive integration details
 
 ## 🎯 Module-Specific Documentation
 

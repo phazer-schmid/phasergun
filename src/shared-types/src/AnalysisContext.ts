@@ -15,11 +15,6 @@ export interface AnalysisContext {
  */
 export interface SourceFolderInputWithContext {
   folderPath: string;
-  sourceType?: 'local' | 'google-drive' | 'dropbox' | 'onedrive' | 's3';
-  credentials?: {
-    apiKey?: string;
-    accessToken?: string;
-    refreshToken?: string;
-  };
+  sourceType?: 'local';
   analysisContext?: AnalysisContext;
 }

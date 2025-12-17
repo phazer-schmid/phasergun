@@ -3,11 +3,7 @@
  */
 
 export enum FileSourceType {
-  LOCAL_FILESYSTEM = 'local',
-  GOOGLE_DRIVE = 'google-drive',
-  DROPBOX = 'dropbox',
-  ONEDRIVE = 'onedrive',
-  S3 = 's3'
+  LOCAL_FILESYSTEM = 'local'
 }
 
 export interface FileSourceConfig {
@@ -175,163 +171,12 @@ class LocalFileSource implements FileSource {
 }
 
 /**
- * Google Drive Implementation (Mock)
- */
-class GoogleDriveFileSource implements FileSource {
-  private accessToken: string = '';
-
-  async initialize(config: FileSourceConfig): Promise<void> {
-    console.log('[GoogleDriveFileSource] Initializing Google Drive connection');
-    this.accessToken = config.credentials?.accessToken || '';
-    console.log('[GoogleDriveFileSource] Ready - OAuth authentication would happen here');
-  }
-
-  async listFolder(folderId: string): Promise<FolderContents> {
-    console.log(`[GoogleDriveFileSource] Listing Google Drive folder: ${folderId}`);
-    
-    // Mock implementation
-    const mockContents: FolderContents = {
-      folders: [
-        {
-          id: 'gdrive-folder-1',
-          name: 'DHF Documents',
-          path: folderId,
-          mimeType: 'application/vnd.google-apps.folder',
-          size: 0,
-          modifiedTime: new Date(),
-          isFolder: true,
-          parentId: folderId
-        }
-      ],
-      files: [
-        {
-          id: 'gdrive-file-1',
-          name: 'Design History File.pdf',
-          path: `${folderId}/dhf.pdf`,
-          mimeType: 'application/pdf',
-          size: 512000,
-          modifiedTime: new Date(),
-          isFolder: false,
-          parentId: folderId
-        }
-      ]
-    };
-
-    return mockContents;
-  }
-
-  async readFile(fileId: string): Promise<string> {
-    console.log(`[GoogleDriveFileSource] Reading Google Drive file: ${fileId}`);
-    return `Mock content from Google Drive file: ${fileId}`;
-  }
-
-  async downloadFile(fileId: string): Promise<Buffer> {
-    console.log(`[GoogleDriveFileSource] Downloading from Google Drive: ${fileId}`);
-    return Buffer.from(`Mock Google Drive content for ${fileId}`);
-  }
-
-  async getFileMetadata(fileId: string): Promise<FileMetadata> {
-    console.log(`[GoogleDriveFileSource] Getting Google Drive metadata: ${fileId}`);
-    return {
-      id: fileId,
-      name: 'Google Drive File',
-      path: fileId,
-      mimeType: 'application/pdf',
-      size: 2048,
-      modifiedTime: new Date(),
-      isFolder: false
-    };
-  }
-
-  async searchFiles(query: string, folderId?: string): Promise<FileMetadata[]> {
-    console.log(`[GoogleDriveFileSource] Searching Google Drive: ${query}`);
-    return [];
-  }
-}
-
-/**
- * Dropbox Implementation (Mock)
- */
-class DropboxFileSource implements FileSource {
-  private accessToken: string = '';
-
-  async initialize(config: FileSourceConfig): Promise<void> {
-    console.log('[DropboxFileSource] Initializing Dropbox connection');
-    this.accessToken = config.credentials?.accessToken || '';
-    console.log('[DropboxFileSource] Ready - OAuth authentication would happen here');
-  }
-
-  async listFolder(folderPath: string): Promise<FolderContents> {
-    console.log(`[DropboxFileSource] Listing Dropbox folder: ${folderPath}`);
-    
-    const mockContents: FolderContents = {
-      folders: [
-        {
-          id: 'dropbox-folder-1',
-          name: 'Medical Device DHF',
-          path: `${folderPath}/dhf`,
-          mimeType: 'folder',
-          size: 0,
-          modifiedTime: new Date(),
-          isFolder: true
-        }
-      ],
-      files: [
-        {
-          id: 'dropbox-file-1',
-          name: 'Requirements.docx',
-          path: `${folderPath}/requirements.docx`,
-          mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          size: 156000,
-          modifiedTime: new Date(),
-          isFolder: false
-        }
-      ]
-    };
-
-    return mockContents;
-  }
-
-  async readFile(filePath: string): Promise<string> {
-    console.log(`[DropboxFileSource] Reading Dropbox file: ${filePath}`);
-    return `Mock content from Dropbox file: ${filePath}`;
-  }
-
-  async downloadFile(filePath: string): Promise<Buffer> {
-    console.log(`[DropboxFileSource] Downloading from Dropbox: ${filePath}`);
-    return Buffer.from(`Mock Dropbox content for ${filePath}`);
-  }
-
-  async getFileMetadata(filePath: string): Promise<FileMetadata> {
-    console.log(`[DropboxFileSource] Getting Dropbox metadata: ${filePath}`);
-    return {
-      id: filePath,
-      name: filePath.split('/').pop() || filePath,
-      path: filePath,
-      mimeType: 'application/octet-stream',
-      size: 3072,
-      modifiedTime: new Date(),
-      isFolder: false
-    };
-  }
-
-  async searchFiles(query: string, folderId?: string): Promise<FileMetadata[]> {
-    console.log(`[DropboxFileSource] Searching Dropbox: ${query}`);
-    return [];
-  }
-}
-
-/**
  * Factory function to create appropriate file source
  */
 export function createFileSource(type: FileSourceType): FileSource {
   switch (type) {
     case FileSourceType.LOCAL_FILESYSTEM:
       return new LocalFileSource();
-    case FileSourceType.GOOGLE_DRIVE:
-      return new GoogleDriveFileSource();
-    case FileSourceType.DROPBOX:
-      return new DropboxFileSource();
     default:
       throw new Error(`Unsupported file source type: ${type}`);
   }
@@ -339,7 +184,5 @@ export function createFileSource(type: FileSourceType): FileSource {
 
 // Export classes
 export {
-  LocalFileSource,
-  GoogleDriveFileSource,
-  DropboxFileSource
+  LocalFileSource
 };

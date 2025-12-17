@@ -159,7 +159,7 @@ const hasTargetDates = (project: Project): boolean => {
 };
 
 const getSourceIcon = (sourceType: string): string => {
-  return sourceType === 'google-drive' ? '📁' : '💻';
+  return '💻'; // Local filesystem only
 };
 
 const getStatusColor = (status?: string): string => {

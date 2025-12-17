@@ -47,61 +47,21 @@
             ></textarea>
           </div>
 
-          <!-- Source Type -->
-          <div class="mb-6">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Source Type <span class="text-red-500">*</span>
-            </label>
-            <div class="space-y-2">
-              <label class="flex items-center">
-                <input
-                  v-model="formData.sourceType"
-                  type="radio"
-                  value="local"
-                  class="mr-2"
-                />
-                <span>Local Folder</span>
-              </label>
-              <label class="flex items-center">
-                <input
-                  v-model="formData.sourceType"
-                  type="radio"
-                  value="google-drive"
-                  class="mr-2"
-                />
-                <span>Google Drive</span>
-              </label>
-            </div>
-          </div>
-
           <!-- Folder Path -->
           <div class="mb-6">
             <label for="folderPath" class="block text-sm font-medium text-gray-700 mb-2">
               Folder Path <span class="text-red-500">*</span>
             </label>
-            <div class="flex gap-2">
-              <input
-                id="folderPath"
-                v-model="formData.folderPath"
-                type="text"
-                required
-                class="flex-1 px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                :placeholder="formData.sourceType === 'local' ? '/path/to/dhf/folder' : 'Google Drive folder ID'"
-              />
-              <button
-                v-if="formData.sourceType === 'google-drive'"
-                type="button"
-                @click="showFolderPicker = true"
-                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap"
-              >
-                Browse
-              </button>
-            </div>
+            <input
+              id="folderPath"
+              v-model="formData.folderPath"
+              type="text"
+              required
+              class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              placeholder="/path/to/dhf/folder"
+            />
             <p class="mt-1 text-sm text-gray-500">
-              {{ formData.sourceType === 'local' ? 'Enter the absolute path to your DHF folder' : 'Click Browse to select your Google Drive folder' }}
-            </p>
-            <p v-if="selectedFolderName" class="mt-1 text-sm text-blue-600">
-              Selected: {{ selectedFolderName }}
+              Enter the absolute path to your DHF folder
             </p>
           </div>
 
@@ -175,12 +135,6 @@
       </div>
     </div>
 
-    <!-- Google Drive Folder Picker Modal -->
-    <GoogleDriveFolderPicker
-      :is-open="showFolderPicker"
-      @close="showFolderPicker = false"
-      @select="handleFolderSelect"
-    />
   </div>
 </template>
 
@@ -189,24 +143,18 @@ import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useProjectService } from '../composables/useProjectService';
 import { Project } from '../models/project.model';
-import GoogleDriveFolderPicker from '../components/GoogleDriveFolderPicker.vue';
 
 const router = useRouter();
 const route = useRoute();
 const projectService = useProjectService();
 
 const project = ref<Project | null>(null);
-const showFolderPicker = ref(false);
-const selectedFolderName = ref<string>('');
 
 const formData = ref({
   name: '',
   description: '',
-  sourceType: 'local' as 'local' | 'google-drive',
+  sourceType: 'local' as const,
   folderPath: '',
-  folderName: '',
-  driveId: undefined as string | undefined,
-  driveType: 'my-drive' as 'my-drive' | 'shared-drive',
   targetDates: {
     phase1: '',
     phase2: '',
@@ -223,11 +171,8 @@ onMounted(() => {
     formData.value = {
       name: project.value.name,
       description: project.value.description || '',
-      sourceType: project.value.sourceType,
+      sourceType: 'local',
       folderPath: project.value.folderPath,
-      folderName: project.value.folderName || '',
-      driveId: project.value.driveId,
-      driveType: project.value.driveType || 'my-drive',
       targetDates: {
         phase1: project.value.targetDates?.phase1 || '',
         phase2: project.value.targetDates?.phase2 || '',
@@ -235,26 +180,8 @@ onMounted(() => {
         phase4: project.value.targetDates?.phase4 || ''
       }
     };
-    
-    // Load saved folder name if it exists
-    if (project.value.folderName) {
-      selectedFolderName.value = project.value.folderName;
-    }
   }
 });
-
-const handleFolderSelect = (data: { 
-  folderId: string; 
-  folderName: string; 
-  driveId?: string; 
-  driveType: 'my-drive' | 'shared-drive';
-}) => {
-  formData.value.folderPath = data.folderId;
-  formData.value.folderName = data.folderName;
-  formData.value.driveId = data.driveId;
-  formData.value.driveType = data.driveType;
-  showFolderPicker.value = false;
-};
 
 const handleSubmit = () => {
   if (!project.value) return;
@@ -264,7 +191,6 @@ const handleSubmit = () => {
     description: formData.value.description,
     sourceType: formData.value.sourceType,
     folderPath: formData.value.folderPath,
-    folderName: selectedFolderName.value || undefined,
     targetDates: {
       phase1: formData.value.targetDates.phase1 || undefined,
       phase2: formData.value.targetDates.phase2 || undefined,

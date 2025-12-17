@@ -20,15 +20,7 @@ export interface Project {
   name: string;
   description?: string;
   folderPath: string;
-  folderName?: string; // Human-readable folder name for Google Drive
-  sourceType: 'local' | 'google-drive';
-  driveId?: string; // Google Shared Drive ID (if using Shared Drive)
-  driveType?: 'my-drive' | 'shared-drive'; // Type of Google Drive
-  credentials?: {
-    apiKey?: string;
-    accessToken?: string;
-    refreshToken?: string;
-  };
+  sourceType: 'local';
   createdAt: string;
   updatedAt: string;
   lastAnalysis?: {
