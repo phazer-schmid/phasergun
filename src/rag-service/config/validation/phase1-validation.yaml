@@ -1,280 +1,160 @@
-planning_and_scope:
-  display_name: Planning and Scope
-  folder_category_id: planning_and_scope
-  check_count: 4
+market_analysis_project_charter:
+  display_name: Market Analysis Project Charter
+  folder_category_id: market_analysis_project_charter
+  check_count: 1
   validation_checks:
-  - check_id: P1-PLAN-001
-    check_name: 'Verify project plan includes: device description, intended use, indications for use, technological c'
+  - check_id: P1-MARKET-001
+    check_name: Phase 1 Market Analysis Summarization
     severity: high
+    function_category: Planning & Scope
     regulatory_source: 21 CFR 820.30(b)
     source_section: Design and development planning
     estar_section: Section 3.2 (Device Description)
-    design_vv_reference: V&V Planning
+    design_vv_reference: ''
     testing_ref: ''
     llm_validation:
-      question: 'Verify project plan includes: device description, intended use, indications for use, technological characteristics,
-        and comparison to predicate'
+      question: 'Ensure the following categories are addressed: unmet need identified, competitive devices identified, intended use, clinical application'
       validation_criteria:
-        must_include: []
-    failure_message: Validation check P1-PLAN-001 failed
+        must_include:
+          - unmet need
+          - competitive devices
+          - intended use
+          - clinical application
+    failure_message: Market Analysis must address unmet need, competitive devices, intended use, and clinical application
     remediation:
-    - Review regulatory requirements
-    - Update documentation per guidance
+    - Identify and document the unmet clinical need
+    - Research and document competitive/predicate devices
+    - Clearly define intended use and clinical application
     priority: ''
     automation_feasibility: ''
     notes: ''
-  - check_id: P1-PLAN-002
-    check_name: Confirm design plan identifies key milestones, deliverables, roles/responsibilities, approval gates,
+
+preliminary_user_requirements:
+  display_name: Preliminary User Requirements
+  folder_category_id: preliminary_user_requirements
+  check_count: 1
+  validation_checks:
+  - check_id: P1-USER-001
+    check_name: Phase 1 Preliminary User Requirements Check
     severity: high
+    function_category: Planning & Scope
     regulatory_source: 21 CFR 820.30(b)
-    source_section: Design planning
-    estar_section: Section 5 (510(k) Summary)
-    design_vv_reference: V&V Planning
+    source_section: ''
+    estar_section: ''
+    design_vv_reference: ''
     testing_ref: ''
     llm_validation:
-      question: Confirm design plan identifies key milestones, deliverables, roles/responsibilities, approval gates, and planned
-        verification/validation activities
+      question: 'Ensure the following: user needs are not ambiguous, requirements are verifiable (measurable and testible), each requirement is called out seperately for traceability'
       validation_criteria:
-        must_include: []
-    failure_message: Validation check P1-PLAN-002 failed
+        must_include:
+          - unambiguous user needs
+          - measurable requirements
+          - testable requirements
+          - separate requirements for traceability
+    failure_message: User requirements must be unambiguous, verifiable, measurable, testable, and separately documented for traceability
     remediation:
-    - Review regulatory requirements
-    - Update documentation per guidance
+    - Clarify any ambiguous user needs
+    - Ensure each requirement is measurable and testable
+    - Document each requirement separately for traceability
     priority: ''
     automation_feasibility: ''
     notes: ''
-  - check_id: P1-PLAN-003
-    check_name: Check that planning documents define scope boundaries (patient population, environments of use, devi
+
+preliminary_risk_analysis:
+  display_name: Preliminary Risk Analysis
+  folder_category_id: preliminary_risk_analysis
+  check_count: 1
+  validation_checks:
+  - check_id: P1-RISK-001
+    check_name: Phase 1 Preliminary Risk Analysis Quality Check
     severity: high
+    function_category: Regulatory
     regulatory_source: ISO 13485:2016
     source_section: Clause 7.3.2
     estar_section: Section 3.2
-    design_vv_reference: V&V Planning
+    design_vv_reference: ''
     testing_ref: ''
     llm_validation:
-      question: Check that planning documents define scope boundaries (patient population, environments of use, device configurations)
-        and V&V approach
+      question: 'Verify the Risk Management Plan (RMP) is approved, defining the scope, hazard identification methods, risk acceptability criteria (e.g., risk matrix/thresholds), and plan for periodic reviews'
       validation_criteria:
-        must_include: []
-    failure_message: Validation check P1-PLAN-003 failed
+        must_include:
+          - RMP approval
+          - scope definition
+          - hazard identification methods
+          - risk acceptability criteria
+          - periodic review plan
+    failure_message: Risk Management Plan must be approved and define scope, hazard identification methods, risk acceptability criteria, and review plan
     remediation:
-    - Review regulatory requirements
-    - Update documentation per guidance
+    - Obtain approval for Risk Management Plan
+    - Define scope of risk management activities
+    - Document hazard identification methods
+    - Establish risk acceptability criteria (risk matrix/thresholds)
+    - Plan for periodic risk reviews
     priority: ''
     automation_feasibility: ''
     notes: ''
-  - check_id: P1-PLAN-004
-    check_name: 'Verify V&V strategy is documented early including: test methods to be used, acceptance criteria appr'
-    severity: high
-    regulatory_source: 21 CFR 820.30(f)(g)
-    source_section: Design verification and validation
-    estar_section: Section 4.2, 4.3
-    design_vv_reference: V&V Planning
-    testing_ref: ''
-    llm_validation:
-      question: 'Verify V&V strategy is documented early including: test methods to be used, acceptance criteria approach,
-        statistical methods for sample sizing, and planned validation conditions'
-      validation_criteria:
-        must_include: []
-    failure_message: Validation check P1-PLAN-004 failed
-    remediation:
-    - Review regulatory requirements
-    - Update documentation per guidance
-    priority: ''
-    automation_feasibility: ''
-    notes: Early planning reduces downstream deficiencies
-predicate_selection:
-  display_name: Predicate Selection
-  folder_category_id: predicate_selection
-  check_count: 3
+
+preliminary_regulatory_strategy:
+  display_name: Preliminary Regulatory Strategy
+  folder_category_id: preliminary_regulatory_strategy
+  check_count: 1
   validation_checks:
-  - check_id: P1-PRED-001
-    check_name: 'Verify predicate device identification includes: 510(k) number, trade name, manufacturer, clearance '
+  - check_id: P1-REG-001
+    check_name: Phase 1 Regulatory Strategy Check
     severity: high
-    regulatory_source: 21 CFR 807.92
-    source_section: Substantial equivalence
-    estar_section: Section 4 (Comparison), 5.3
-    design_vv_reference: ''
-    testing_ref: ''
-    llm_validation:
-      question: 'Verify predicate device identification includes: 510(k) number, trade name, manufacturer, clearance date,
-        and technological characteristics'
-      validation_criteria:
-        must_include: []
-    failure_message: Validation check P1-PRED-001 failed
-    remediation:
-    - Review regulatory requirements
-    - Update documentation per guidance
-    priority: ''
-    automation_feasibility: ''
-    notes: ''
-  - check_id: P1-PRED-002
-    check_name: 'Confirm comparison table addresses: intended use, technological characteristics, and performance dat'
-    severity: high
-    regulatory_source: 21 CFR 807.87(f)
-    source_section: Comparison with similar devices
-    estar_section: Section 4.1-4.3
-    design_vv_reference: ''
-    testing_ref: ''
-    llm_validation:
-      question: 'Confirm comparison table addresses: intended use, technological characteristics, and performance data side-by-side
-        with objective evidence'
-      validation_criteria:
-        must_include: []
-    failure_message: Validation check P1-PRED-002 failed
-    remediation:
-    - Review regulatory requirements
-    - Update documentation per guidance
-    priority: ''
-    automation_feasibility: ''
-    notes: ''
-  - check_id: P1-PRED-003
-    check_name: Check for documented rationale if predicates have different technological characteristics but same i
-    severity: high
-    regulatory_source: 21 CFR 807 Subpart E
-    source_section: Substantial equivalence
-    estar_section: Section 4
-    design_vv_reference: ''
-    testing_ref: ''
-    llm_validation:
-      question: Check for documented rationale if predicates have different technological characteristics but same intended
-        use; verify differences do not affect safety/effectiveness
-      validation_criteria:
-        must_include: []
-    failure_message: Validation check P1-PRED-003 failed
-    remediation:
-    - Review regulatory requirements
-    - Update documentation per guidance
-    priority: ''
-    automation_feasibility: ''
-    notes: ''
-regulatory:
-  display_name: Regulatory
-  folder_category_id: regulatory
-  check_count: 3
-  validation_checks:
-  - check_id: P1-REGU-001
-    check_name: 'Verify presence of: device classification, product code, regulation number, submission type (Traditi'
-    severity: high
-    regulatory_source: 21 CFR 807.87 / eSTAR Guidance
-    source_section: Premarket notification content
-    estar_section: Section 1 (Cover Letter), Section 2 (Admin)
-    design_vv_reference: ''
-    testing_ref: ''
-    llm_validation:
-      question: 'Verify presence of: device classification, product code, regulation number, submission type (Traditional/Special/Abbreviated),
-        and FDA Form 3514 info'
-      validation_criteria:
-        must_include: []
-    failure_message: Validation check P1-REGU-001 failed
-    remediation:
-    - Review regulatory requirements
-    - Update documentation per guidance
-    priority: ''
-    automation_feasibility: ''
-    notes: eSTAR automates Form 3514 population
-  - check_id: P1-REGU-002
-    check_name: Confirm indications for use statement (FDA Form 3881) is clearly defined, matches intended use in pl
-    severity: high
+    function_category: Regulatory
     regulatory_source: 21 CFR 807.92 / eSTAR
     source_section: Substantial equivalence determination
     estar_section: Section 5.1 (Indications for Use)
     design_vv_reference: ''
     testing_ref: ''
     llm_validation:
-      question: Confirm indications for use statement (FDA Form 3881) is clearly defined, matches intended use in planning
-        documents, and uses proper IFU definition per 21 CFR 814.20(b)(3)(i)
+      question: 'Check the document for completeness including submission type, device classification, indication for use'
       validation_criteria:
-        must_include: []
-    failure_message: Validation check P1-REGU-002 failed
+        must_include:
+          - submission type
+          - device classification
+          - indication for use
+    failure_message: Regulatory Strategy must include submission type, device classification, and indication for use
     remediation:
-    - Review regulatory requirements
-    - Update documentation per guidance
+    - Define submission type (Traditional/Special/Abbreviated 510(k))
+    - Document device classification and product code
+    - Clearly state indication for use
     priority: ''
     automation_feasibility: ''
     notes: ''
-  - check_id: P1-REGU-003
-    check_name: Check that regulatory strategy addresses labeling requirements per device classification and plans f
-    severity: high
-    regulatory_source: 21 CFR 801 / eSTAR
-    source_section: Labeling requirements
-    estar_section: Section 6 (Labeling)
-    design_vv_reference: ''
-    testing_ref: ''
-    llm_validation:
-      question: Check that regulatory strategy addresses labeling requirements per device classification and plans for draft/final
-        labeling submissions
-      validation_criteria:
-        must_include: []
-    failure_message: Validation check P1-REGU-003 failed
-    remediation:
-    - Review regulatory requirements
-    - Update documentation per guidance
-    priority: ''
-    automation_feasibility: ''
-    notes: ''
-user_needs_and_claims:
-  display_name: User Needs and Claims
-  folder_category_id: user_needs_and_claims
-  check_count: 3
+
+preliminary_design_development_plan:
+  display_name: Preliminary Design and Development Plan
+  folder_category_id: preliminary_design_development_plan
+  check_count: 1
   validation_checks:
-  - check_id: P1-USER-001
-    check_name: 'Verify user needs are documented with: source (users, clinical literature, complaints), priority, ac'
+  - check_id: P1-PLAN-001
+    check_name: Phase 1 Design and Development Plan Check
     severity: high
-    regulatory_source: ISO 13485:2016
-    source_section: Clause 7.3.2 (Design inputs)
-    estar_section: Section 3.2, 4.2
-    design_vv_reference: Design Validation Basis
-    testing_ref: ''
-    llm_validation:
-      question: 'Verify user needs are documented with: source (users, clinical literature, complaints), priority, acceptance
-        criteria, and traceability to validation plans'
-      validation_criteria:
-        must_include: []
-    failure_message: Validation check P1-USER-001 failed
-    remediation:
-    - Review regulatory requirements
-    - Update documentation per guidance
-    priority: ''
-    automation_feasibility: ''
-    notes: User needs drive validation testing
-  - check_id: P1-USER-002
-    check_name: 'Confirm user needs are traceable to: intended use, patient population, clinical benefits, use enviro'
-    severity: high
-    regulatory_source: 21 CFR 820.30(c)
-    source_section: Design input
-    estar_section: Section 3.2
-    design_vv_reference: Design Validation
-    testing_ref: ''
-    llm_validation:
-      question: 'Confirm user needs are traceable to: intended use, patient population, clinical benefits, use environment,
-        and can be validated in actual/simulated use'
-      validation_criteria:
-        must_include: []
-    failure_message: Validation check P1-USER-002 failed
-    remediation:
-    - Review regulatory requirements
-    - Update documentation per guidance
-    priority: ''
-    automation_feasibility: ''
-    notes: ''
-  - check_id: P1-USER-003
-    check_name: Check that performance claims are derived from user needs and supported by objective evidence or ref
-    severity: high
-    regulatory_source: 21 CFR 820.30(c)
-    source_section: Design input
-    estar_section: Section 4.2, 5.2
+    function_category: Planning & Scope
+    regulatory_source: 21 CFR 820.30(b)
+    source_section: Design planning
+    estar_section: Section 5 (510(k) Summary)
     design_vv_reference: ''
     testing_ref: ''
     llm_validation:
-      question: Check that performance claims are derived from user needs and supported by objective evidence or references;
-        verify all claims can be tested
+      question: 'Verify the plan describes or references the design and development activities and defines responsibility for implementation. Confirm the plan identifies key milestones, deliverables, resources, and approval gates for the upcoming Feasibility Phase.'
       validation_criteria:
-        must_include: []
-    failure_message: Validation check P1-USER-003 failed
+        must_include:
+          - design and development activities
+          - implementation responsibilities
+          - key milestones
+          - deliverables
+          - resources
+          - approval gates
+    failure_message: Design and Development Plan must describe activities, define responsibilities, and identify milestones, deliverables, resources, and approval gates
     remediation:
-    - Review regulatory requirements
-    - Update documentation per guidance
+    - Document design and development activities
+    - Define implementation responsibilities
+    - Identify key milestones and deliverables
+    - Allocate resources
+    - Establish approval gates for phase transitions
     priority: ''
     automation_feasibility: ''
     notes: ''
