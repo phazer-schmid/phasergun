@@ -61,31 +61,14 @@ rsync -avz --progress \
 echo -e "${GREEN}✓ Files uploaded${NC}"
 
 # Create environment files
-echo -e "\n${BLUE}[3/12] Creating environment files...${NC}"
-
-# Check for required environment variables
-if [ -z "$VITE_GOOGLE_CLIENT_ID" ] || [ -z "$VITE_GOOGLE_API_KEY" ]; then
-    echo -e "${RED}✗ Missing required environment variables${NC}"
-    echo ""
-    echo "Please set the following environment variables before deploying:"
-    echo "  ${YELLOW}export VITE_GOOGLE_CLIENT_ID='your-client-id'${NC}"
-    echo "  ${YELLOW}export VITE_GOOGLE_API_KEY='your-api-key'${NC}"
-    echo ""
-    echo "Or add them to your ~/.zshrc or ~/.bashrc for persistent storage"
-    exit 1
-fi
-
-ssh $DROPLET_USER@$DROPLET_IP "cat > $PROJECT_PATH/vue-ui/.env << EOF
-VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
-VITE_GOOGLE_API_KEY=$VITE_GOOGLE_API_KEY
-EOF"
+echo -e "\n${BLUE}[3/12] Creating API environment file...${NC}"
 
 ssh $DROPLET_USER@$DROPLET_IP "cat > $PROJECT_PATH/src/api-server/.env << 'EOF'
 NODE_ENV=production
 PORT=3001
 EOF"
 
-echo -e "${GREEN}✓ Environment files created${NC}"
+echo -e "${GREEN}✓ API environment file created${NC}"
 
 # Build in correct dependency order
 echo -e "\n${BLUE}[4/12] Building shared-types (required by other packages)...${NC}"

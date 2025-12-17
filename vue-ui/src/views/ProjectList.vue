@@ -46,7 +46,7 @@
             
             <!-- Source Info -->
             <div class="flex items-center text-sm text-gray-500 mb-2">
-              <span class="mr-2">{{ getSourceIcon(project.sourceType) }}</span>
+              <span class="mr-2">{{ getSourceIcon() }}</span>
               <span class="truncate">{{ project.folderPath }}</span>
             </div>
 
@@ -158,7 +158,7 @@ const hasTargetDates = (project: Project): boolean => {
             project.targetDates?.phase3 || project.targetDates?.phase4);
 };
 
-const getSourceIcon = (sourceType: string): string => {
+const getSourceIcon = (): string => {
   return '💻'; // Local filesystem only
 };
 
