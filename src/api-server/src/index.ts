@@ -20,6 +20,24 @@ app.use(express.json());
 // Global DHF mapping cache
 let dhfMapping: PhaseDHFMapping[] = [];
 
+// Global folder structure cache
+let folderStructure: any = null;
+
+/**
+ * Load folder structure from YAML file
+ */
+async function loadFolderStructure(): Promise<void> {
+  try {
+    const yamlPath = path.join(__dirname, '../../rag-service/config/folder-structure.yaml');
+    const fileContents = await fs.readFile(yamlPath, 'utf8');
+    folderStructure = yaml.load(fileContents) as any;
+    console.log(`[API] Loaded folder structure with ${Object.keys(folderStructure.folder_structure).length} phases`);
+  } catch (error) {
+    console.error('[API] Error loading folder structure:', error);
+    throw error;
+  }
+}
+
 /**
  * Load DHF phase mapping from YAML file
  */
@@ -224,48 +242,102 @@ app.post('/api/list-files', async (req: Request, res: Response) => {
 });
 
 /**
- * Parse phase and category from file path
+ * Parse phase and category from file path using folder structure
  */
 function parsePhaseAndCategory(filePath: string): {
   phaseId: number | null;
   phaseName: string | null;
   category: string | null;
   categoryPath: string | null;
+  categoryId: string | null;
 } {
-  // Extract "Phase 1", "Phase 2", etc.
-  const phaseMatch = filePath.match(/Phase\s+(\d+)/i);
-  // Extract category folder (text between "Phase X/" and the next "/")
-  const categoryMatch = filePath.match(/Phase\s+\d+\/([^/]+)/i);
+  if (!folderStructure) {
+    return { phaseId: null, phaseName: null, category: null, categoryPath: null, categoryId: null };
+  }
+
+  // Normalize file path for comparison
+  const normalizedPath = filePath.replace(/\\/g, '/');
+
+  // Try to match against all phase categories in folder-structure.yaml
+  for (const [phaseKey, phaseData] of Object.entries(folderStructure.folder_structure)) {
+    const phase = phaseData as any;
+    
+    if (phase.categories && Array.isArray(phase.categories)) {
+      for (const category of phase.categories) {
+        const folderPath = category.folder_path;
+        
+        // Check if file path contains this category folder
+        // Handle both "Category Name/" and just "Category Name"
+        const folderPattern = folderPath.replace(/\//g, '\\/');
+        const regex = new RegExp(`[/\\\\]${folderPattern}[/\\\\]`, 'i');
+        
+        if (regex.test(normalizedPath) || normalizedPath.includes(`/${folderPath}/`) || normalizedPath.includes(`\\${folderPath}\\`)) {
+          return {
+            phaseId: phase.phase_id,
+            phaseName: phase.phase_name,
+            category: category.category_name,
+            categoryPath: folderPath,
+            categoryId: category.category_id
+          };
+        }
+      }
+    }
+  }
+
+  // Fallback: try old pattern matching for backwards compatibility
+  const phaseMatch = normalizedPath.match(/Phase\s+(\d+)/i);
+  const categoryMatch = normalizedPath.match(/Phase\s+\d+[/\\]([^/\\]+)/i);
   
-  const phaseId = phaseMatch ? parseInt(phaseMatch[1]) : null;
-  const category = categoryMatch ? categoryMatch[1].trim() : null;
-  
-  return {
-    phaseId,
-    phaseName: phaseId ? `Phase ${phaseId}` : null,
-    category,
-    categoryPath: phaseId && category ? `Phase ${phaseId}/${category}` : null
-  };
+  if (phaseMatch) {
+    const phaseId = parseInt(phaseMatch[1]);
+    const category = categoryMatch ? categoryMatch[1].trim() : null;
+    
+    return {
+      phaseId,
+      phaseName: `Phase ${phaseId}`,
+      category,
+      categoryPath: category ? `Phase ${phaseId}/${category}` : null,
+      categoryId: null
+    };
+  }
+
+  return { phaseId: null, phaseName: null, category: null, categoryPath: null, categoryId: null };
 }
 
 /**
  * Load validation criteria for specific phase and category
  */
-async function loadValidationCriteria(phaseId: number, categoryPath: string): Promise<any> {
+async function loadValidationCriteria(phaseId: number, categoryPath: string, categoryId: string | null): Promise<any> {
   try {
     const validationPath = path.join(__dirname, `../../rag-service/config/validation/phase${phaseId}-validation.yaml`);
     const fileContents = await fs.readFile(validationPath, 'utf8');
     const data = yaml.load(fileContents) as any;
     
-    // Find matching category by folder_path
-    for (const [key, value] of Object.entries(data)) {
-      if (typeof value === 'object' && value !== null) {
-        const category = value as any;
-        if (category.folder_path === categoryPath) {
+    // First try to match by category_id (more reliable)
+    if (categoryId) {
+      for (const [key, value] of Object.entries(data)) {
+        if (key === categoryId && typeof value === 'object' && value !== null) {
+          const category = value as any;
           return {
             categoryKey: key,
             displayName: category.display_name,
-            folderPath: category.folder_path,
+            folderPath: category.folder_path || categoryPath,
+            checkCount: category.check_count,
+            validationChecks: category.validation_checks || []
+          };
+        }
+      }
+    }
+    
+    // Fallback: match by folder_path or folder_category_id
+    for (const [key, value] of Object.entries(data)) {
+      if (typeof value === 'object' && value !== null) {
+        const category = value as any;
+        if (category.folder_path === categoryPath || category.folder_category_id === categoryId) {
+          return {
+            categoryKey: key,
+            displayName: category.display_name,
+            folderPath: category.folder_path || categoryPath,
             checkCount: category.check_count,
             validationChecks: category.validation_checks || []
           };
@@ -323,7 +395,7 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
     // Load category-specific validation criteria
     let validationCriteria: any = null;
     if (pathInfo.phaseId && pathInfo.categoryPath) {
-      validationCriteria = await loadValidationCriteria(pathInfo.phaseId, pathInfo.categoryPath);
+      validationCriteria = await loadValidationCriteria(pathInfo.phaseId, pathInfo.categoryPath, pathInfo.categoryId);
       if (validationCriteria) {
         console.log(`[API] Loaded ${validationCriteria.checkCount} validation checks for ${validationCriteria.displayName}\n`);
       } else {
@@ -415,28 +487,51 @@ Analyze this document against the validation criteria above and provide:
 
 Keep it concise but informative. Focus on actionable findings.`;
       } else {
-        // Generic analysis with balanced detail
+        // Generic analysis with improved specificity
         prompt += `
 DOCUMENT CONTENT:
 ${fileContent}
 
-Analyze this document for FDA 510(k) compliance and provide:
+IMPORTANT: Read the document carefully and look for EXACT field names and sections. Do not hallucinate missing information.
 
-1. DOCUMENT ASSESSMENT (2-3 sentences)
-   What type of document is this and its purpose?
+Perform a detailed analysis checking for standard regulatory document elements:
 
-2. KEY FINDINGS
-   - ✅ Strengths: What is well-documented
-   - ❌ Gaps: Critical missing elements
-   - ⚠️ Areas for improvement
+STANDARD DOCUMENT FIELDS TO LOOK FOR:
+- Product Name / Device Name
+- Intended Use / Indications for Use
+- FDA Classification (Class I, II, III)
+- Device Classification / Product Code
+- Submission Type (510(k), De Novo, PMA, etc.)
+- Regulatory Requirements / Standards
+- User Requirements / User Needs
+- Risk Management Plan / Risk Analysis
+- Design Requirements / Specifications
+- Test Results / Verification Data
+- Approval Signatures / Review Status
 
-3. RECOMMENDATIONS (5-10 items max)
-   Specific actions to improve compliance:
-   - What needs to be added/improved
-   - Reference to FDA/ISO requirements
-   - Priority level if applicable
+Provide analysis in this format:
 
-Keep it concise but informative.`;
+1. DOCUMENT TYPE & PURPOSE (2-3 sentences)
+   What type of document is this and its regulatory purpose?
+
+2. FIELD-BY-FIELD FINDINGS
+   For each standard field:
+   - ✅ FOUND: "[Field Name]" - Quote the exact content found in the document
+   - ❌ MISSING: "[Field Name]" - State clearly that this field is not present
+   - ⚠️ INCOMPLETE: "[Field Name]" - What is present but needs enhancement
+
+3. REGULATORY COMPLIANCE ASSESSMENT
+   - Overall completeness level
+   - Critical gaps that must be addressed
+   - Compliance with FDA/ISO standards
+
+4. SPECIFIC RECOMMENDATIONS (5-10 items)
+   Actionable steps to improve document:
+   - What to add/improve
+   - Where to add it
+   - Why it's required (cite regulation if possible)
+
+CRITICAL: Base findings ONLY on what is actually written in the document. Quote exact text when confirming fields are present.`;
       }
 
       // Call LLM API for analysis
@@ -509,7 +604,8 @@ To enable REAL AI analysis:
  */
 async function startServer() {
   try {
-    // Load DHF mapping on startup
+    // Load folder structure and DHF mapping on startup
+    await loadFolderStructure();
     await loadDHFMapping();
 
     app.listen(PORT, () => {
