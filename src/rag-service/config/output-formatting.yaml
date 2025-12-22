@@ -1,0 +1,118 @@
+# GLOBAL OUTPUT FORMATTING CONFIGURATION
+# Controls how AI analysis results are structured and presented
+# This applies to all validation checks across all phases
+
+output_format:
+  name: "Structured Analysis Output"
+  version: "1.0"
+  description: "Global formatting rules for AI-generated document analysis"
+
+document_identification:
+  priority:
+    - "Extract document name from document content (title, header, metadata)"
+    - "Fallback to filename if document name not found in content"
+  display_location: "Top of AI Analysis output"
+  format: "Document Analyzed: [Document Name]"
+
+issue_identification:
+  requirement: "Flag specific areas of the document with issues"
+  approach:
+    - "Identify exact location of issue (section, paragraph, requirement number)"
+    - "Quote the specific text related to the issue"
+    - "Provide context around the quoted text"
+  output_format:
+    - "Issue Location: [Section/Area]"
+    - "Problematic Text: '[Direct quote from document]'"
+    - "Issue Description: [What's wrong]"
+
+change_recommendations:
+  requirement: "Provide specific, actionable recommendations for each issue"
+  approach:
+    - "Recommend concrete changes to fix the issue"
+    - "Provide example text or structure when applicable"
+    - "Reference regulatory requirements that justify the recommendation"
+  output_format:
+    - "Recommendation: [Specific action to take]"
+    - "Suggested Text: '[Proposed replacement or addition]' (when applicable)"
+    - "Regulatory Justification: [Reference to regulation/standard]"
+
+risk_severity:
+  requirement: "Categorize each issue by risk severity"
+  levels:
+    high:
+      name: "High Severity"
+      definition: "Binary pass/fail compliance issues"
+      criteria:
+        - "Lack of compliance to regulatory standard or requirement"
+        - "Missing required information for submission"
+        - "Verifiability issues (requirement not measurable/testable)"
+        - "Traceability gaps (missing linkages in design chain)"
+        - "Safety or risk management deficiencies"
+      examples:
+        - "Requirements are not verifiable in nature"
+        - "Risk Management Plan missing required elements"
+        - "Device classification not documented"
+        - "Missing regulatory submission type"
+    moderate:
+      name: "Moderate Severity"
+      definition: "Opinionated improvements, formatting, or clarity issues"
+      criteria:
+        - "Document clarity or writing quality issues"
+        - "Formatting inconsistencies"
+        - "Organization or structure improvements"
+        - "Minor completeness gaps (recommended but not required)"
+        - "Best practice suggestions"
+      examples:
+        - "Text is not clearly written or ambiguous"
+        - "Document formatting inconsistent"
+        - "Section could benefit from better organization"
+        - "Additional context would improve understanding"
+  
+  output_format:
+    - "Risk Severity: [HIGH or MODERATE]"
+    - "Rationale: [Why this severity level]"
+
+structured_response_format:
+  description: "Instruct LLM to return structured, parseable responses"
+  format_type: "JSON"
+  schema:
+    document_name: "string - Name of document analyzed"
+    overall_compliance: "string - compliant|partially-compliant|non-compliant"
+    summary: "string - Brief overall assessment"
+    issues:
+      - issue_id: "string - Unique identifier"
+        location: "string - Section/area in document"
+        quoted_text: "string - Exact text from document"
+        description: "string - What the issue is"
+        severity: "string - high|moderate"
+        severity_rationale: "string - Why this severity level"
+        recommendation: "string - Specific action to fix"
+        suggested_text: "string - Proposed replacement (optional)"
+        regulatory_reference: "string - Related regulation/standard"
+    strengths:
+      - "string - Positive aspects of the document"
+
+prompt_instructions:
+  description: "Instructions to include in every LLM prompt"
+  directives:
+    - "CRITICAL: Extract the document name from the document content itself (look for title, header, document name at top). Never use 'Unknown' or 'filename' - always find the actual document name in the content"
+    - "ONLY report issues/failures - DO NOT include passed checks or compliant items in your output"
+    - "If a check passes completely, omit it entirely from the results"
+    - "For each issue identified, quote the specific problematic text from the document"
+    - "Assign a risk severity (HIGH or MODERATE) to each issue based on the definitions provided"
+    - "Provide a concrete, actionable recommendation for every issue found"
+    - "Be specific about document locations (section numbers, paragraph, requirement ID)"
+    - "Use exact quotes - do not paraphrase the problematic text"
+    - "Format your response as valid JSON following the structured_response_format schema"
+    - "Organize issues by severity in your output (HIGH first, then MODERATE)"
+    - "Use clear, descriptive issue descriptions - not check IDs or technical jargon"
+    - "Do NOT use 'KEY FINDINGS' or 'KEY RECOMMENDATIONS' section headers"
+    - "Do NOT use words like PASS, FAIL, COMPLIANT, NON-COMPLIANT in issue descriptions"
+    - "Be conservative and evidence-based in your assessments"
+
+quality_standards:
+  quote_accuracy: "Quotes must match document text exactly"
+  specificity: "Avoid vague statements - be precise about locations and issues"
+  actionability: "Recommendations must be specific enough to implement"
+  traceability: "Every finding must be traceable to specific document content"
+  completeness: "Cover all aspects defined in the validation check"

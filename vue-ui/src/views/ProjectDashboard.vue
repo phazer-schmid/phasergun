@@ -174,9 +174,75 @@
             </div>
 
             <div v-if="analysisResult?.status === 'complete'" class="analysis-narrative">
-              <h3 class="narrative-title">Document Analysis Results</h3>
+              <!-- Document Name Header -->
+              <div v-if="getDocumentName()" class="document-header">
+                <h3 class="document-name">📄 {{ getDocumentName() }}</h3>
+              </div>
               
-              <div class="narrative-text">
+              <!-- Compliance Summary -->
+              <div class="compliance-summary">
+                <div class="summary-badge" :class="getComplianceBadgeClass()">
+                  {{ getOverallCompliance() }}
+                </div>
+                <p class="summary-text">{{ getSummaryText() }}</p>
+              </div>
+
+              <!-- Issues Section -->
+              <div v-if="hasIssues()" class="issues-section">
+                <h4 class="section-heading">⚠️ Issues Identified</h4>
+                
+                <div v-for="(issue, idx) in getIssues()" :key="idx" class="issue-card">
+                  <div class="issue-header">
+                    <span class="issue-number">#{{ idx + 1 }}</span>
+                    <span class="severity-badge" :class="getSeverityClass(issue.severity)">
+                      {{ issue.severity?.toUpperCase() }}
+                    </span>
+                  </div>
+                  
+                  <div class="issue-body">
+                    <div v-if="issue.location" class="issue-location">
+                      <strong>Location:</strong> {{ issue.location }}
+                    </div>
+                    
+                    <div v-if="issue.description" class="issue-description">
+                      <strong>Issue:</strong> {{ issue.description }}
+                    </div>
+                    
+                    <div v-if="issue.quoted_text" class="issue-quote">
+                      <strong>Problematic Text:</strong>
+                      <blockquote>"{{ issue.quoted_text }}"</blockquote>
+                    </div>
+                    
+                    <div v-if="issue.severity_rationale" class="issue-rationale">
+                      <strong>Why {{ issue.severity }}:</strong> {{ issue.severity_rationale }}
+                    </div>
+                    
+                    <div v-if="issue.recommendation" class="issue-recommendation">
+                      <strong>💡 Recommendation:</strong> {{ issue.recommendation }}
+                    </div>
+                    
+                    <div v-if="issue.suggested_text" class="issue-suggested">
+                      <strong>Suggested Text:</strong>
+                      <blockquote class="suggested-quote">"{{ issue.suggested_text }}"</blockquote>
+                    </div>
+                    
+                    <div v-if="issue.regulatory_reference" class="issue-reference">
+                      <strong>Regulatory Reference:</strong> {{ issue.regulatory_reference }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Strengths Section -->
+              <div v-if="hasStrengths()" class="strengths-section">
+                <h4 class="section-heading">✅ Strengths</h4>
+                <ul class="strengths-list">
+                  <li v-for="(strength, idx) in getStrengths()" :key="idx">{{ strength }}</li>
+                </ul>
+              </div>
+
+              <!-- Fallback to raw report if structured data not available -->
+              <div v-if="!hasStructuredData()" class="narrative-text">
                 <pre>{{ analysisResult.detailedReport }}</pre>
               </div>
             </div>
@@ -364,6 +430,78 @@ function editProject() {
   if (project.value) {
     router.push(`/projects/${project.value.id}/edit`);
   }
+}
+
+// Helper functions for structured analysis display
+function hasStructuredData(): boolean {
+  if (!analysisResult.value?.detailedReport) return false;
+  try {
+    const parsed = JSON.parse(analysisResult.value.detailedReport);
+    return !!(parsed.document_name || parsed.issues || parsed.strengths);
+  } catch {
+    return false;
+  }
+}
+
+function getStructuredData(): any {
+  if (!analysisResult.value?.detailedReport) return null;
+  try {
+    return JSON.parse(analysisResult.value.detailedReport);
+  } catch {
+    return null;
+  }
+}
+
+function getDocumentName(): string {
+  const data = getStructuredData();
+  return data?.document_name || '';
+}
+
+function getOverallCompliance(): string {
+  const data = getStructuredData();
+  const compliance = data?.overall_compliance || 'unknown';
+  return compliance.toUpperCase().replace(/-/g, ' ');
+}
+
+function getComplianceBadgeClass(): string {
+  const data = getStructuredData();
+  const compliance = data?.overall_compliance || '';
+  
+  if (compliance === 'compliant') return 'badge-compliant';
+  if (compliance === 'partially-compliant') return 'badge-partial';
+  if (compliance === 'non-compliant') return 'badge-non-compliant';
+  return '';
+}
+
+function getSummaryText(): string {
+  const data = getStructuredData();
+  return data?.summary || '';
+}
+
+function hasIssues(): boolean {
+  const data = getStructuredData();
+  return Array.isArray(data?.issues) && data.issues.length > 0;
+}
+
+function getIssues(): any[] {
+  const data = getStructuredData();
+  return data?.issues || [];
+}
+
+function getSeverityClass(severity: string): string {
+  if (severity === 'high') return 'severity-high';
+  if (severity === 'moderate') return 'severity-moderate';
+  return '';
+}
+
+function hasStrengths(): boolean {
+  const data = getStructuredData();
+  return Array.isArray(data?.strengths) && data.strengths.length > 0;
+}
+
+function getStrengths(): string[] {
+  const data = getStructuredData();
+  return data?.strengths || [];
 }
 </script>
 
@@ -879,6 +1017,189 @@ function editProject() {
   font-size: var(--font-size-sm);
   color: var(--text-gray);
   font-family: monospace;
+}
+
+/* Structured Analysis Output Styles */
+.document-header {
+  padding: var(--spacing-md) 0;
+  border-bottom: 2px solid var(--border-light);
+  margin-bottom: var(--spacing-lg);
+}
+
+.document-name {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--primary-purple);
+  margin: 0;
+}
+
+.compliance-summary {
+  padding: var(--spacing-lg);
+  background: var(--light-bg);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-xl);
+}
+
+.summary-badge {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: var(--spacing-md);
+}
+
+.badge-compliant {
+  background: #D4EDDA;
+  color: #155724;
+}
+
+.badge-partial {
+  background: #FFF3CD;
+  color: #856404;
+}
+
+.badge-non-compliant {
+  background: #F8D7DA;
+  color: #721C24;
+}
+
+.summary-text {
+  font-size: var(--font-size-base);
+  color: var(--text-dark);
+  line-height: var(--line-height-relaxed);
+  margin: 0;
+}
+
+.section-heading {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-dark);
+  margin: 0 0 var(--spacing-lg) 0;
+}
+
+/* Issues Section */
+.issues-section {
+  margin-bottom: var(--spacing-2xl);
+}
+
+.issue-card {
+  background: white;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.issue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.issue-number {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-gray);
+}
+
+.severity-badge {
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.severity-high {
+  background: #F8D7DA;
+  color: #721C24;
+}
+
+.severity-moderate {
+  background: #FFF3CD;
+  color: #856404;
+}
+
+.issue-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.issue-body > div {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+}
+
+.issue-body strong {
+  color: var(--text-dark);
+  font-weight: var(--font-weight-semibold);
+}
+
+.issue-location {
+  color: var(--text-gray);
+  font-style: italic;
+}
+
+.issue-description {
+  color: var(--text-dark);
+}
+
+.issue-quote blockquote {
+  margin: var(--spacing-sm) 0;
+  padding: var(--spacing-md);
+  background: #FFF5F0;
+  border-left: 4px solid var(--orange-alert);
+  font-style: italic;
+  color: var(--text-dark);
+}
+
+.issue-rationale {
+  color: var(--text-gray);
+}
+
+.issue-recommendation {
+  padding: var(--spacing-md);
+  background: #E8F5E9;
+  border-left: 4px solid #4CAF50;
+  border-radius: var(--radius-sm);
+  color: var(--text-dark);
+}
+
+.issue-suggested blockquote {
+  margin: var(--spacing-sm) 0;
+  padding: var(--spacing-md);
+  background: #E3F2FD;
+  border-left: 4px solid #2196F3;
+  font-style: normal;
+  color: var(--text-dark);
+}
+
+.issue-reference {
+  color: var(--primary-purple);
+  font-size: var(--font-size-xs);
+}
+
+/* Strengths Section */
+.strengths-section {
+  padding: var(--spacing-lg);
+  background: #F1F8F4;
+  border-radius: var(--radius-md);
+  border-left: 4px solid #4CAF50;
+}
+
+.strengths-list {
+  margin: 0;
+  padding-left: var(--spacing-xl);
+  color: var(--text-dark);
+}
+
+.strengths-list li {
+  margin-bottom: var(--spacing-sm);
+  line-height: var(--line-height-relaxed);
 }
 
 /* Responsive */

@@ -135,6 +135,19 @@ analysis_scope:
     - "Completeness Status"
     - "RTA Readiness"
 
+output_formatting:
+  reference: "config/output-formatting.yaml"
+  description: "Global output formatting configuration for all analysis results"
+  requirements:
+    - "Identify and display document name at top of analysis"
+    - "Quote specific problematic text when flagging issues"
+    - "Provide concrete, actionable recommendations for each issue"
+    - "Assign risk severity (HIGH or MODERATE) to each issue"
+    - "Return structured JSON format for programmatic parsing"
+  severity_definitions:
+    high: "Binary pass/fail compliance issues (regulatory requirements, verifiability, traceability gaps)"
+    moderate: "Opinionated improvements (clarity, formatting, organization, best practices)"
+
 contextual_intelligence:
   principle: |
     Analysis of the same document changes based on which phase context it is being viewed from.
@@ -143,3 +156,17 @@ contextual_intelligence:
   example: |
     A Risk Management Workbook analyzed in Phase 1 focuses on risk planning strategy.
     The same document in Phase 4 focuses on final risk acceptability and residual risk documentation.
+
+response_formatting_mandate:
+  description: "All analysis outputs must follow structured formatting requirements"
+  json_structure_required: true
+  mandatory_elements:
+    - "Document name (extracted from content or filename)"
+    - "Specific issue locations and quoted text"
+    - "Risk severity with clear rationale"
+    - "Actionable recommendations with regulatory justification"
+  quality_requirements:
+    - "Use exact quotes - never paraphrase problematic text"
+    - "Be specific about document locations (section, paragraph, requirement ID)"
+    - "Provide concrete, implementable recommendations"
+    - "Maintain full traceability to document content"
