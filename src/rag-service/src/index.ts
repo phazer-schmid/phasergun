@@ -129,25 +129,41 @@ export class InMemoryRAGService implements RAGService {
       score: this.calculateRelevanceScore(queryTokens, chunk.chunk)
     }));
     
-    // Combine and sort by relevance
+    // Combine and sort by relevance with stable tie-breaking
     const allResults = [
-      ...scoredReferences.map(sr => ({
+      ...scoredReferences.map((sr, idx) => ({
         content: sr.doc.content,
         source: sr.doc.source,
         path: sr.doc.category,
-        score: sr.score
+        score: sr.score,
+        originalIndex: idx,
+        type: 'reference' as const
       })),
-      ...scoredChunks.map(sc => ({
+      ...scoredChunks.map((sc, idx) => ({
         content: sc.chunk.chunk,
         source: (sc.chunk.metadata?.fileName as string) || 'Unknown',
         path: (sc.chunk.metadata?.sourcePath as string) || 'indexed-document',
-        score: sc.score
+        score: sc.score,
+        originalIndex: idx,
+        type: 'chunk' as const
       }))
     ];
     
-    // Sort by score and take top K
+    // Sort by score (descending), then by type (references first), then by original index
+    // This ensures deterministic ordering even with tied scores
     const topResults = allResults
-      .sort((a, b) => b.score - a.score)
+      .sort((a, b) => {
+        // Primary: score (descending)
+        if (b.score !== a.score) {
+          return b.score - a.score;
+        }
+        // Secondary: type (references before chunks)
+        if (a.type !== b.type) {
+          return a.type === 'reference' ? -1 : 1;
+        }
+        // Tertiary: original index (stable ordering)
+        return a.originalIndex - b.originalIndex;
+      })
       .slice(0, topK);
     
     console.log(`[RAGService] Retrieved ${topResults.length} relevant contexts (scores: ${topResults.map(r => r.score.toFixed(2)).join(', ')})`);
@@ -203,8 +219,6 @@ export class InMemoryRAGService implements RAGService {
  * Returns static thinking document and regulatory context
  */
 export class MockRAGService implements RAGService {
-  private initialized = false;
-  
   async initializeKnowledgeBase(): Promise<void> {
     console.log('[MockRAGService] Initializing knowledge base...');
     
@@ -216,8 +230,6 @@ export class MockRAGService implements RAGService {
     console.log('  - FDA 510(k) Guidelines');
     console.log('  - ISO 13485 Standards');
     console.log('  - ISO 14971 Risk Management');
-    
-    this.initialized = true;
   }
   
   async indexDocuments(_chunks: ChunkedDocumentPart[]): Promise<void> {

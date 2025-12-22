@@ -66,10 +66,11 @@ export class OllamaLLMService {
   constructor(model: string = 'llama3.1:70b', config: OllamaConfig = {}) {
     this.baseUrl = config.baseUrl || 'http://localhost:11434';
     this.model = model;
-    this.temperature = config.temperature || 0.7;
+    this.temperature = config.temperature !== undefined ? config.temperature : 0; // Deterministic by default
 
     console.log(`[OllamaLLMService] Initialized with model: ${this.model}`);
     console.log(`[OllamaLLMService] Ollama endpoint: ${this.baseUrl}`);
+    console.log(`[OllamaLLMService] Temperature: ${this.temperature} (deterministic mode)`);
   }
 
   /**

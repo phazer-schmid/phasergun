@@ -27,12 +27,12 @@ export class AnthropicLLMService implements LLMService {
       // Construct the enhanced prompt with context
       const enhancedPrompt = this.constructPromptWithContext(prompt, context);
 
-      // Call Anthropic API
+      // Call Anthropic API with deterministic settings
       const startTime = Date.now();
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 1500, // Balanced: enough for findings + recommendations while staying cost-effective
-        temperature: 0.3, // Lower temperature for more focused, technical responses
+        max_tokens: 1500, // Fixed for deterministic output
+        temperature: 0, // Deterministic: same input = same output
         messages: [{
           role: 'user',
           content: enhancedPrompt

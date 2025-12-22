@@ -6,6 +6,8 @@ import * as yaml from 'js-yaml';
 import { config } from 'dotenv';
 import { DHFScanner } from '@fda-compliance/dhf-scanner';
 import { PhaseDHFMapping } from '@fda-compliance/shared-types';
+// We'll add caching later after fixing module structure
+// For now, the LLMs are deterministic (temperature=0) which is the key requirement
 
 // Load environment variables
 config();

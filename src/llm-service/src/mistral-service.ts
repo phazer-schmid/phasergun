@@ -27,7 +27,7 @@ export class MistralLLMService implements LLMService {
       // Construct the enhanced prompt with context
       const enhancedPrompt = this.constructPromptWithContext(prompt, context);
 
-      // Call Mistral API
+      // Call Mistral API with deterministic settings
       const startTime = Date.now();
       const response = await this.client.chat.complete({
         model: this.model,
@@ -35,8 +35,8 @@ export class MistralLLMService implements LLMService {
           role: 'user',
           content: enhancedPrompt
         }],
-        maxTokens: 1500, // Balanced: enough for findings + recommendations
-        temperature: 0.3, // Lower temperature for more focused, technical responses
+        maxTokens: 1500, // Fixed for deterministic output
+        temperature: 0, // Deterministic: same input = same output
       });
 
       const duration = Date.now() - startTime;
