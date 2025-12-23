@@ -6,6 +6,7 @@ import * as yaml from 'js-yaml';
 import { config } from 'dotenv';
 import { DHFScanner } from '@fda-compliance/dhf-scanner';
 import { PhaseDHFMapping } from '@fda-compliance/shared-types';
+import pdf from 'pdf-parse';
 // We'll add caching later after fixing module structure
 // For now, the LLMs are deterministic (temperature=0) which is the key requirement
 
@@ -405,8 +406,30 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
       }
     }
     
-    // Read file content
-    const fileContent = await fs.readFile(filePath, 'utf-8');
+    // Read file content based on type
+    let fileContent: string;
+    const fileExtension = path.extname(filePath).toLowerCase();
+    
+    if (fileExtension === '.pdf') {
+      // Parse PDF properly
+      console.log(`[API] Parsing PDF file...`);
+      const dataBuffer = await fs.readFile(filePath);
+      const pdfData = await pdf(dataBuffer);
+      fileContent = pdfData.text;
+      console.log(`[API] PDF parsed: ${pdfData.numpages} pages, ${fileContent.length} characters`);
+    } else {
+      // Read as text file
+      fileContent = await fs.readFile(filePath, 'utf-8');
+    }
+    
+    // Check content size and truncate if needed (Anthropic has 200k token limit = ~150k chars safe limit)
+    const MAX_CONTENT_CHARS = 150000; // Conservative limit to avoid rate limits
+    const contentTruncated = fileContent.length > MAX_CONTENT_CHARS;
+    
+    if (contentTruncated) {
+      console.log(`[API] ⚠️  File content too large (${fileContent.length} chars), truncating to ${MAX_CONTENT_CHARS} chars`);
+      fileContent = fileContent.substring(0, MAX_CONTENT_CHARS) + '\n\n[... Content truncated due to size. Consider using document chunking for large files ...]';
+    }
 
     // Check LLM mode from environment
     const llmMode = process.env.LLM_MODE || 'mock';

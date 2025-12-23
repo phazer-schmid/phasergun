@@ -8,21 +8,46 @@ Updated `ecosystem.config.js` to explicitly load environment variables from `.en
 
 ## Deployment Steps
 
-### 1. Deploy Updated Files to Droplet
+### 1. Rebuild Services Locally
+
+**IMPORTANT:** Both llm-service and api-server need to be rebuilt:
+
+```bash
+# Rebuild llm-service (has temperature=0 changes)
+cd src/llm-service
+npm run build
+
+# Rebuild api-server
+cd ../api-server
+npm run build
+
+# Return to project root
+cd ../..
+```
+
+### 2. Deploy to Droplet
 
 From your local machine:
 
 ```bash
-# Copy updated ecosystem.config.js to droplet
-scp ecosystem.config.js root@your-droplet:/workspace/phasergun/
+# Option A: Use git (recommended)
+git add .
+git commit -m "Fix: PM2 env loading and deterministic LLM"
+git push
 
-# Or use git if you've committed the changes
+# Then on droplet
 ssh root@your-droplet
 cd /workspace/phasergun
 git pull
+npm install  # Make sure dotenv is installed
+
+# Option B: Manual copy (if not using git)
+scp -r src/llm-service/dist root@your-droplet:/workspace/phasergun/src/llm-service/
+scp -r src/api-server/dist root@your-droplet:/workspace/phasergun/src/api-server/
+scp ecosystem.config.js root@your-droplet:/workspace/phasergun/
 ```
 
-### 2. Restart PM2 on Droplet
+### 3. Restart PM2 on Droplet
 
 ```bash
 # SSH to droplet
