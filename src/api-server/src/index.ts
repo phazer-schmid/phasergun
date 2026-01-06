@@ -7,7 +7,7 @@ import { config } from 'dotenv';
 import { DHFScanner } from '@fda-compliance/dhf-scanner';
 import { PhaseDHFMapping } from '@fda-compliance/shared-types';
 import pdf from 'pdf-parse';
-import { parseCheckDocument, listCheckFiles, getCheckFilePath } from '../../rag-service/src/check-parser.js';
+// Dynamic import for check-parser to avoid TypeScript rootDir issues
 // We'll add caching later after fixing module structure
 // For now, the LLMs are deterministic (temperature=0) which is the key requirement
 
@@ -381,6 +381,8 @@ app.get('/api/checks/:phaseId', async (req: Request, res: Response) => {
       });
     }
 
+    // Dynamic import to avoid TypeScript rootDir issues
+    const { listCheckFiles } = await import('../../rag-service/src/check-parser.js');
     const checkFiles = await listCheckFiles(ragChecksPath, phase);
     
     // Format check files for UI (remove .docx extension)
@@ -465,6 +467,9 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
         timestamp: new Date().toISOString()
       });
     }
+    
+    // Dynamic import to avoid TypeScript rootDir issues
+    const { parseCheckDocument, getCheckFilePath } = await import('../../rag-service/src/check-parser.js');
     
     const checkFilePath = getCheckFilePath(ragChecksPath, pathInfo.phaseId, selectedCheck);
     console.log(`[API] Parsing check: ${selectedCheck}`);
