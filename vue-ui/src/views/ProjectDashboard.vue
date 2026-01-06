@@ -27,66 +27,50 @@
 
           <!-- Dynamic Phase Items -->
           <div 
-            v-for="(phase, phaseKey) in folderStructure?.folder_structure" 
-            :key="phaseKey"
+            v-for="phaseId in [1, 2, 3, 4]" 
+            :key="phaseId"
             class="phase-container">
             
             <!-- Phase Header -->
             <div class="nav-item-container">
               <div 
                 class="nav-item phase-item"
-                @click="togglePhase(phase.phase_id)">
-                <span class="expand-icon">{{ expandedPhases.has(phase.phase_id) ? '▼' : '▶' }}</span>
-                <span class="nav-icon-number">{{ phase.phase_id }}</span>
-                <span class="nav-label">{{ phase.phase_name }}</span>
+                @click="togglePhase(phaseId)">
+                <span class="expand-icon">{{ expandedPhases.has(phaseId) ? '▼' : '▶' }}</span>
+                <span class="nav-icon-number">{{ phaseId }}</span>
+                <span class="nav-label">Phase {{ phaseId }}</span>
               </div>
               
               <!-- Deadline -->
-              <div v-if="getPhaseDeadline(phase.phase_id)" class="phase-deadline">
-                Deadline: {{ getPhaseDeadline(phase.phase_id) }}
+              <div v-if="getPhaseDeadline(phaseId)" class="phase-deadline">
+                Deadline: {{ getPhaseDeadline(phaseId) }}
               </div>
             </div>
 
-            <!-- Categories (shown when expanded) -->
-            <div v-if="expandedPhases.has(phase.phase_id)" class="categories-container">
+            <!-- Files (shown when expanded) -->
+            <div v-if="expandedPhases.has(phaseId)" class="files-container">
+              <!-- Files List -->
               <div 
-                v-for="category in phase.categories" 
-                :key="category.category_id"
-                class="category-item">
-                
-                <!-- Category with disabled checkbox -->
-                <div class="category-header">
-                  <input 
-                    type="checkbox" 
-                    disabled 
-                    class="category-checkbox">
-                  <span class="category-name">{{ category.category_name }}</span>
-                  <span v-if="category.required" class="required-badge">Required</span>
-                </div>
-
-                <!-- Files under category -->
+                v-if="getPhaseFiles(phaseId).length > 0"
+                class="files-list">
                 <div 
-                  v-if="getCategoryFiles(category.category_id).length > 0"
-                  class="files-list">
-                  <div 
-                    v-for="file in getCategoryFiles(category.category_id)" 
-                    :key="file.path"
-                    class="file-item"
-                    @click="selectFile(phase.phase_id, category.category_id, file)">
-                    
-                    <input 
-                      type="radio"
-                      :name="`file-selection`"
-                      :checked="isFileSelected(file.path)"
-                      class="file-radio">
-                    <span class="file-name">{{ file.name }}</span>
-                  </div>
+                  v-for="file in getPhaseFiles(phaseId)" 
+                  :key="file.path"
+                  class="file-item"
+                  @click="selectFile(phaseId, file)">
+                  
+                  <input 
+                    type="radio"
+                    :name="`file-selection`"
+                    :checked="isFileSelected(file.path)"
+                    class="file-radio">
+                  <span class="file-name">{{ file.name }}</span>
                 </div>
+              </div>
 
-                <!-- No files message -->
-                <div v-else class="no-files-message">
-                  No files found
-                </div>
+              <!-- No files message -->
+              <div v-else class="no-files-message">
+                No files found in Phase {{ phaseId }} base folder
               </div>
             </div>
           </div>
@@ -277,36 +261,20 @@ const isScanning = ref(false);
 const scanError = ref<string | null>(null);
 const analysisResult = ref<AppStatusOutput | null>(null);
 
-// Folder structure state
-const folderStructure = ref<any>(null);
+// Phase files state
 const expandedPhases = ref<Set<number>>(new Set());
-const categoryFiles = ref<Map<string, any[]>>(new Map());
+const phaseFiles = ref<Map<number, any[]>>(new Map());
 
 // Selected file state
 const selectedFile = ref<{
   phaseId: number;
-  categoryId: string;
   file: any;
 } | null>(null);
 
 onMounted(async () => {
   const projectId = route.params.id as string;
   project.value = projectService.getProject(projectId);
-  
-  // Load folder structure from API
-  await loadFolderStructure();
 });
-
-// Load folder structure from API
-async function loadFolderStructure() {
-  try {
-    const response = await fetch(getApiEndpoint('/folder-structure'));
-    folderStructure.value = await response.json();
-    console.log('[Dashboard] Loaded folder structure:', folderStructure.value);
-  } catch (error) {
-    console.error('[Dashboard] Failed to load folder structure:', error);
-  }
-}
 
 // Toggle phase expand/collapse
 async function togglePhase(phaseId: number) {
@@ -314,47 +282,43 @@ async function togglePhase(phaseId: number) {
     expandedPhases.value.delete(phaseId);
   } else {
     expandedPhases.value.add(phaseId);
-    // Load files for this phase's categories
+    // Load files for this phase base folder
     await loadPhaseFiles(phaseId);
   }
 }
 
-// Load files for all categories in a phase
+// Load files from phase base folder only
 async function loadPhaseFiles(phaseId: number) {
-  if (!project.value?.folderPath || !folderStructure.value) return;
+  if (!project.value?.folderPath) return;
 
-  const phase = folderStructure.value.folder_structure[`phase_${phaseId}`];
-  if (!phase) return;
-
-  // Local file system mode
-  for (const category of phase.categories) {
-    const fullPath = `${project.value.folderPath}/${category.folder_path}`;
+  // Construct path to phase base folder
+  const phaseFolderPath = `${project.value.folderPath}/Phase ${phaseId}`;
+  
+  try {
+    const response = await fetch(getApiEndpoint('/list-files'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: phaseFolderPath })
+    });
     
-    try {
-      const response = await fetch(getApiEndpoint('/list-files'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: fullPath })
-      });
-      
-      const result = await response.json();
-      categoryFiles.value.set(category.category_id, result.files || []);
-      
-    } catch (error) {
-      console.error(`[Dashboard] Failed to load files for ${category.category_id}:`, error);
-      categoryFiles.value.set(category.category_id, []);
-    }
+    const result = await response.json();
+    phaseFiles.value.set(phaseId, result.files || []);
+    console.log(`[Dashboard] Loaded ${result.files?.length || 0} files from Phase ${phaseId} base folder`);
+    
+  } catch (error) {
+    console.error(`[Dashboard] Failed to load files for Phase ${phaseId}:`, error);
+    phaseFiles.value.set(phaseId, []);
   }
 }
 
-// Get files for a category
-function getCategoryFiles(categoryId: string): any[] {
-  return categoryFiles.value.get(categoryId) || [];
+// Get files for a phase
+function getPhaseFiles(phaseId: number): any[] {
+  return phaseFiles.value.get(phaseId) || [];
 }
 
 // Select a file
-function selectFile(phaseId: number, categoryId: string, file: any) {
-  selectedFile.value = { phaseId, categoryId, file };
+function selectFile(phaseId: number, file: any) {
+  selectedFile.value = { phaseId, file };
   console.log('[Dashboard] Selected file:', file.path);
 }
 

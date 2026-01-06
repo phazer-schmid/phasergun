@@ -124,15 +124,22 @@ export class DHFScanner {
   }
 
   /**
-   * Scan all documents in a phase folder
+   * Scan all documents in a phase folder (BASE FOLDER ONLY - no subdirectories)
    */
   private async scanPhaseFolder(folderPath: string, phase: number): Promise<ScannedDocument[]> {
     const documents: ScannedDocument[] = [];
     
     try {
-      const files = await this.getAllFiles(folderPath);
+      // Read only the immediate directory contents (no recursion)
+      const entries = await fs.readdir(folderPath, { withFileTypes: true });
       
-      for (const filePath of files) {
+      for (const entry of entries) {
+        // Skip subdirectories - only process files in the base folder
+        if (entry.isDirectory()) {
+          continue;
+        }
+        
+        const filePath = path.join(folderPath, entry.name);
         const ext = path.extname(filePath).toLowerCase();
         
         if (this.config.supportedExtensions.includes(ext)) {
@@ -164,32 +171,6 @@ export class DHFScanner {
     }
     
     return documents;
-  }
-
-  /**
-   * Recursively get all files in a directory
-   */
-  private async getAllFiles(dirPath: string): Promise<string[]> {
-    const files: string[] = [];
-    
-    try {
-      const entries = await fs.readdir(dirPath, { withFileTypes: true });
-      
-      for (const entry of entries) {
-        const fullPath = path.join(dirPath, entry.name);
-        
-        if (entry.isDirectory()) {
-          const subFiles = await this.getAllFiles(fullPath);
-          files.push(...subFiles);
-        } else {
-          files.push(fullPath);
-        }
-      }
-    } catch (error) {
-      console.error(`[DHFScanner] Error reading directory ${dirPath}:`, error);
-    }
-    
-    return files;
   }
 
   /**
