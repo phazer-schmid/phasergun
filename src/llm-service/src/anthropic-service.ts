@@ -23,16 +23,26 @@ export class AnthropicLLMService implements LLMService {
       console.log(`[AnthropicLLMService] Using ${context.contextSnippets.length} context snippets`);
     }
 
-    try {
-      // Construct the enhanced prompt with context
-      const enhancedPrompt = this.constructPromptWithContext(prompt, context);
+    // Construct the enhanced prompt with context
+    const enhancedPrompt = this.constructPromptWithContext(prompt, context);
 
-      // Call Anthropic API with deterministic settings
+    // Call with retry logic for rate limiting
+    return this.generateTextWithRetry(enhancedPrompt);
+  }
+
+  private async generateTextWithRetry(
+    enhancedPrompt: string,
+    retryCount: number = 0,
+    maxRetries: number = 5
+  ): Promise<LLMResponse> {
+    try {
+      // Call Anthropic API with MAXIMUM deterministic settings
       const startTime = Date.now();
       const response = await this.client.messages.create({
         model: this.model,
-        max_tokens: 1500, // Fixed for deterministic output
+        max_tokens: 4000, // Increased to ensure complete responses
         temperature: 0, // Deterministic: same input = same output
+        top_k: 1, // Maximum determinism: only consider top choice
         messages: [{
           role: 'user',
           content: enhancedPrompt
@@ -72,7 +82,33 @@ export class AnthropicLLMService implements LLMService {
         }
       };
 
-    } catch (error) {
+    } catch (error: any) {
+      // Check if this is a rate limit error (429)
+      const isRateLimitError = 
+        error?.status === 429 || 
+        error?.error?.type === 'rate_limit_error' ||
+        (error?.message && error.message.includes('rate_limit'));
+
+      if (isRateLimitError && retryCount < maxRetries) {
+        // Calculate exponential backoff: 2^retryCount seconds (2, 4, 8, 16, 32)
+        const delaySeconds = Math.pow(2, retryCount + 1);
+        
+        console.warn(`[AnthropicLLMService] ⚠️  Rate limit hit. Retry ${retryCount + 1}/${maxRetries} after ${delaySeconds}s`);
+        console.warn(`[AnthropicLLMService] Rate limit details: ${error?.error?.message || error?.message}`);
+        
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
+        
+        // Retry with incremented count
+        return this.generateTextWithRetry(enhancedPrompt, retryCount + 1, maxRetries);
+      }
+
+      // If not a rate limit error, or max retries exceeded, throw the error
+      if (isRateLimitError) {
+        console.error(`[AnthropicLLMService] ❌ Rate limit exceeded after ${maxRetries} retries`);
+        throw new Error(`Rate limit exceeded. Please wait a moment and try again. Your organization's limit is 100,000 input tokens per minute.`);
+      }
+
       console.error('[AnthropicLLMService] Error calling Anthropic API:', error);
       throw new Error(`Anthropic API error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
