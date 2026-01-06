@@ -263,7 +263,7 @@ function parsePhaseAndCategory(filePath: string): {
   const normalizedPath = filePath.replace(/\\/g, '/');
 
   // Try to match against all phase categories in folder-structure.yaml
-  for (const [phaseKey, phaseData] of Object.entries(folderStructure.folder_structure)) {
+  for (const [, phaseData] of Object.entries(folderStructure.folder_structure)) {
     const phase = phaseData as any;
     
     if (phase.categories && Array.isArray(phase.categories)) {
