@@ -95,13 +95,27 @@
         </div>
         <div class="header-title-row">
           <h1 class="page-title">{{ currentViewTitle }}</h1>
-          <button 
-            class="btn-refresh"
-            :disabled="!selectedFile || isScanning"
-            @click="analyzeSelectedDocument()">
-            <span v-if="!isScanning">🔍 Analyze Document</span>
-            <span v-if="isScanning">⏳ Analyzing...</span>
-          </button>
+          <div class="analysis-controls">
+            <select 
+              v-model="selectedCheck"
+              class="check-dropdown"
+              :disabled="!selectedFile || availableChecks.length === 0">
+              <option value="">-- Select a Check --</option>
+              <option 
+                v-for="check in availableChecks" 
+                :key="check.filename"
+                :value="check.filename">
+                {{ check.displayName }}
+              </option>
+            </select>
+            <button 
+              class="btn-refresh"
+              :disabled="!selectedFile || isScanning"
+              @click="analyzeSelectedDocument()">
+              <span v-if="!isScanning">🔍 Analyze Document</span>
+              <span v-if="isScanning">⏳ Analyzing...</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -265,11 +279,14 @@ const analysisResult = ref<AppStatusOutput | null>(null);
 const expandedPhases = ref<Set<number>>(new Set());
 const phaseFiles = ref<Map<number, any[]>>(new Map());
 
-// Selected file state
+// Selected file and check state
 const selectedFile = ref<{
   phaseId: number;
   file: any;
 } | null>(null);
+
+const selectedCheck = ref<string>('');
+const availableChecks = ref<Array<{ filename: string; displayName: string }>>([]);
 
 onMounted(async () => {
   const projectId = route.params.id as string;
@@ -317,9 +334,27 @@ function getPhaseFiles(phaseId: number): any[] {
 }
 
 // Select a file
-function selectFile(phaseId: number, file: any) {
+async function selectFile(phaseId: number, file: any) {
   selectedFile.value = { phaseId, file };
+  selectedCheck.value = ''; // Reset check selection
   console.log('[Dashboard] Selected file:', file.path);
+  
+  // Load available checks for this phase
+  await loadAvailableChecks(phaseId);
+}
+
+// Load available checks for a phase
+async function loadAvailableChecks(phaseId: number) {
+  try {
+    const response = await fetch(getApiEndpoint(`/checks/${phaseId}`));
+    const result = await response.json();
+    
+    availableChecks.value = result.checks || [];
+    console.log(`[Dashboard] Loaded ${availableChecks.value.length} checks for Phase ${phaseId}`);
+  } catch (error) {
+    console.error(`[Dashboard] Failed to load checks for Phase ${phaseId}:`, error);
+    availableChecks.value = [];
+  }
 }
 
 // Check if file is selected
@@ -350,17 +385,24 @@ function formatDate(dateString: string): string {
 async function analyzeSelectedDocument() {
   if (!selectedFile.value || !project.value) return;
 
+  // Validate that a check is selected
+  if (!selectedCheck.value) {
+    scanError.value = 'Please select a validation check before analyzing';
+    return;
+  }
+
   isScanning.value = true;
   scanError.value = null;
   analysisResult.value = null;
   
   try {
-    // Local file analysis
+    // Local file analysis with selected check
     const response = await fetch(getApiEndpoint('/analyze'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        filePath: selectedFile.value.file.path
+        filePath: selectedFile.value.file.path,
+        selectedCheck: selectedCheck.value
       })
     });
     
@@ -797,6 +839,42 @@ function getStrengths(): string[] {
 .header-title-row .btn-refresh:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Analysis Controls */
+.analysis-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.check-dropdown {
+  padding: 10px 14px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-dark);
+  background: white;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-width: 250px;
+}
+
+.check-dropdown:hover:not(:disabled) {
+  border-color: var(--primary-purple);
+}
+
+.check-dropdown:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--light-bg);
+}
+
+.check-dropdown:focus {
+  outline: none;
+  border-color: var(--primary-purple);
+  box-shadow: 0 0 0 3px rgba(74, 59, 140, 0.1);
 }
 
 /* Stats Row */

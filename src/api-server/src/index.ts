@@ -7,6 +7,7 @@ import { config } from 'dotenv';
 import { DHFScanner } from '@fda-compliance/dhf-scanner';
 import { PhaseDHFMapping } from '@fda-compliance/shared-types';
 import pdf from 'pdf-parse';
+import { parseCheckDocument, listCheckFiles, getCheckFilePath } from '../../rag-service/src/check-parser.js';
 // We'll add caching later after fixing module structure
 // For now, the LLMs are deterministic (temperature=0) which is the key requirement
 
@@ -356,16 +357,68 @@ async function loadValidationCriteria(phaseId: number, categoryPath: string, cat
 }
 
 /**
+ * GET /api/checks/:phaseId
+ * List available check documents for a specific phase
+ */
+app.get('/api/checks/:phaseId', async (req: Request, res: Response) => {
+  const { phaseId } = req.params;
+  const phase = parseInt(phaseId, 10);
+
+  if (isNaN(phase) || phase < 1 || phase > 4) {
+    return res.status(400).json({
+      error: 'Invalid phase ID',
+      message: 'Phase ID must be a number between 1 and 4'
+    });
+  }
+
+  try {
+    const ragChecksPath = process.env.RAG_CHECKS;
+    
+    if (!ragChecksPath) {
+      return res.status(500).json({
+        error: 'RAG_CHECKS path not configured',
+        message: 'RAG_CHECKS environment variable must be set in .env file'
+      });
+    }
+
+    const checkFiles = await listCheckFiles(ragChecksPath, phase);
+    
+    // Format check files for UI (remove .docx extension)
+    const checks = checkFiles.map(filename => ({
+      filename,
+      displayName: filename.replace(/\.docx$/i, '')
+    }));
+
+    res.json({ checks });
+    
+  } catch (error) {
+    console.error(`[API] Error listing checks for Phase ${phase}:`, error);
+    res.status(500).json({
+      error: 'Failed to list checks',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
  * POST /api/analyze
- * Analyze a single file with REAL or MOCK LLM
+ * Analyze a single file with REAL or MOCK LLM using a selected check document
  */
 app.post('/api/analyze', async (req: Request, res: Response) => {
-  const { filePath } = req.body;
+  const { filePath, selectedCheck } = req.body;
 
   if (!filePath) {
     return res.status(400).json({
       status: 'error',
       message: 'File path is required',
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  if (!selectedCheck) {
+    return res.status(400).json({
+      status: 'error',
+      message: 'Please select a validation check before analyzing',
       timestamp: new Date().toISOString()
     });
   }
@@ -390,21 +443,44 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
       });
     }
     
-    // Parse phase and category from file path
+    // Parse phase from file path
     const pathInfo = parsePhaseAndCategory(filePath);
     console.log(`[API] Detected Phase: ${pathInfo.phaseName || 'Unknown'}`);
-    console.log(`[API] Detected Category: ${pathInfo.category || 'Unknown'}`);
     
-    // Load category-specific validation criteria
-    let validationCriteria: any = null;
-    if (pathInfo.phaseId && pathInfo.categoryPath) {
-      validationCriteria = await loadValidationCriteria(pathInfo.phaseId, pathInfo.categoryPath, pathInfo.categoryId);
-      if (validationCriteria) {
-        console.log(`[API] Loaded ${validationCriteria.checkCount} validation checks for ${validationCriteria.displayName}\n`);
-      } else {
-        console.log(`[API] No validation criteria found for ${pathInfo.categoryPath}\n`);
-      }
+    // Get RAG checks path
+    const ragChecksPath = process.env.RAG_CHECKS;
+    if (!ragChecksPath) {
+      return res.status(500).json({
+        status: 'error',
+        message: 'RAG_CHECKS path not configured - check server .env file',
+        timestamp: new Date().toISOString()
+      });
     }
+    
+    // Parse the selected check document
+    if (!pathInfo.phaseId) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Unable to determine phase from file path',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    const checkFilePath = getCheckFilePath(ragChecksPath, pathInfo.phaseId, selectedCheck);
+    console.log(`[API] Parsing check: ${selectedCheck}`);
+    
+    const parsedCheck = await parseCheckDocument(checkFilePath, selectedCheck, pathInfo.phaseId);
+    
+    if (!parsedCheck.success) {
+      return res.status(400).json({
+        status: 'error',
+        message: parsedCheck.error,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    console.log(`[API] Check parsed successfully: ${parsedCheck.checkName}`);
+    console.log(`[API] Found ${parsedCheck.criteria.length} criteria\n`);
     
     // Read file content based on type
     let fileContent: string;
@@ -470,94 +546,45 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
 
     // Generate analysis with selected LLM service
     if (llmService) {
-      // Create phase and category-specific prompt
-      let prompt = `You are an FDA regulatory compliance expert analyzing medical device documentation for 510(k) submission readiness.
+      // Build prompt using parsed check criteria
+      const prompt = `You are a language processing tool analyzing a medical device document against specific criteria.
+
+Your role is to:
+1. Compare the document content against each criterion
+2. Identify where criteria are met or not met  
+3. Provide location-specific findings with exact quotes
+
+You are NOT using your own FDA/ISO knowledge. Only evaluate against the provided criteria.
 
 DOCUMENT TO ANALYZE:
 File: ${path.basename(filePath)}
 Size: ${(fileStats.size / 1024).toFixed(2)} KB
-`;
 
-      if (validationCriteria) {
-        // Category-specific analysis with balanced detail
-        prompt += `Phase: ${pathInfo.phaseName}
-Category: ${validationCriteria.displayName}
+CHECK: ${parsedCheck.checkName}
 
-VALIDATION CRITERIA:
-`;
-        validationCriteria.validationChecks.forEach((check: any, index: number) => {
-          prompt += `${index + 1}. [${check.check_id}] ${check.llm_validation.question} (${check.severity})\n`;
-        });
+CRITERIA FROM CHECK DOCUMENT:
+${parsedCheck.criteria.map((criterion, idx) => `${idx + 1}. ${criterion}`).join('\n')}
 
-        prompt += `
 DOCUMENT CONTENT:
 ${fileContent}
 
-Analyze this document against the validation criteria above and provide:
+For EACH criterion, provide:
+- Criterion: [restate exactly]
+- Status: PASS | FAIL | PARTIAL
+- Findings: [detailed explanation with specific locations]
+- Locations: [section names, page numbers, paragraph numbers]
+- Quotes: [exact text from document]
 
-1. DOCUMENT ASSESSMENT (2-3 sentences)
-   What type of document is this and its overall quality?
+CRITICAL REQUIREMENTS:
+- Reference specific document locations (e.g., "Section 2.1", "Page 3, paragraph 2")
+- Quote exact text when identifying issues
+- Do not use external regulatory knowledge
+- Base analysis ONLY on the criteria provided
+- For FAIL status, clearly state what is missing and where it should be located
 
-2. KEY FINDINGS
-   For each validation check, briefly state:
-   - ✅ PASS: What was found and where
-   - ❌ FAIL: What is missing or inadequate
-   - ⚠️ PARTIAL: What needs improvement
+Provide your analysis in a clear, structured format that addresses each criterion individually.
 
-3. CRITICAL RECOMMENDATIONS (5-10 items max)
-   Specific actions to address gaps, with:
-   - Brief context of the issue
-   - Regulatory reference (check ID or standard)
-   - Concrete action needed
-
-Keep it concise but informative. Focus on actionable findings.`;
-      } else {
-        // Generic analysis with improved specificity
-        prompt += `
-DOCUMENT CONTENT:
-${fileContent}
-
-IMPORTANT: Read the document carefully and look for EXACT field names and sections. Do not hallucinate missing information.
-
-Perform a detailed analysis checking for standard regulatory document elements:
-
-STANDARD DOCUMENT FIELDS TO LOOK FOR:
-- Product Name / Device Name
-- Intended Use / Indications for Use
-- FDA Classification (Class I, II, III)
-- Device Classification / Product Code
-- Submission Type (510(k), De Novo, PMA, etc.)
-- Regulatory Requirements / Standards
-- User Requirements / User Needs
-- Risk Management Plan / Risk Analysis
-- Design Requirements / Specifications
-- Test Results / Verification Data
-- Approval Signatures / Review Status
-
-Provide analysis in this format:
-
-1. DOCUMENT TYPE & PURPOSE (2-3 sentences)
-   What type of document is this and its regulatory purpose?
-
-2. FIELD-BY-FIELD FINDINGS
-   For each standard field:
-   - ✅ FOUND: "[Field Name]" - Quote the exact content found in the document
-   - ❌ MISSING: "[Field Name]" - State clearly that this field is not present
-   - ⚠️ INCOMPLETE: "[Field Name]" - What is present but needs enhancement
-
-3. REGULATORY COMPLIANCE ASSESSMENT
-   - Overall completeness level
-   - Critical gaps that must be addressed
-   - Compliance with FDA/ISO standards
-
-4. SPECIFIC RECOMMENDATIONS (5-10 items)
-   Actionable steps to improve document:
-   - What to add/improve
-   - Where to add it
-   - Why it's required (cite regulation if possible)
-
-CRITICAL: Base findings ONLY on what is actually written in the document. Quote exact text when confirming fields are present.`;
-      }
+Temperature: 0 (deterministic output required)`;
 
       // Call LLM API for analysis
       console.log('[API] Calling LLM API...');
