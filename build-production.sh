@@ -38,11 +38,17 @@ cd src/api-server
 # Try to build, ignore exit code
 npx tsc --skipLibCheck 2>&1 || true
 
-# Check if required file exists
-if [ -f "src/index.js" ]; then
-  echo "✅ index.js generated successfully"
+# Check if required file exists (could be in dist/ or dist/src/)
+if [ -f "dist/index.js" ]; then
+  echo "✅ index.js generated at dist/index.js"
+elif [ -f "dist/src/index.js" ]; then
+  echo "✅ index.js generated at dist/src/index.js"
+elif [ -f "src/index.js" ]; then
+  echo "✅ index.js generated at src/index.js"  
 else
   echo "❌ FATAL: index.js was not generated"
+  echo "   Checked: dist/index.js, dist/src/index.js, src/index.js"
+  ls -la dist/ 2>/dev/null || echo "   dist/ directory doesn't exist"
   exit 1
 fi
 
