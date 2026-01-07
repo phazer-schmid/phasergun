@@ -24,24 +24,6 @@ app.use(express.json());
 // Global DHF mapping cache
 let dhfMapping: PhaseDHFMapping[] = [];
 
-// Global folder structure cache
-let folderStructure: any = null;
-
-/**
- * Load folder structure from YAML file
- */
-async function loadFolderStructure(): Promise<void> {
-  try {
-    const yamlPath = path.join(__dirname, '../../rag-service/config/folder-structure.yaml');
-    const fileContents = await fs.readFile(yamlPath, 'utf8');
-    folderStructure = yaml.load(fileContents) as any;
-    console.log(`[API] Loaded folder structure with ${Object.keys(folderStructure.folder_structure).length} phases`);
-  } catch (error) {
-    console.error('[API] Error loading folder structure:', error);
-    throw error;
-  }
-}
-
 /**
  * Load DHF phase mapping from YAML file
  */
@@ -180,26 +162,6 @@ app.get('/api/dhf-mapping', (_req: Request, res: Response) => {
 });
 
 /**
- * GET /api/folder-structure
- * Get the folder structure from folder-structure.yaml
- */
-app.get('/api/folder-structure', async (_req: Request, res: Response) => {
-  try {
-    const yamlPath = path.join(__dirname, '../../rag-service/config/folder-structure.yaml');
-    const fileContents = await fs.readFile(yamlPath, 'utf8');
-    const folderStructure = yaml.load(fileContents) as any;
-    
-    res.json(folderStructure);
-  } catch (error) {
-    console.error('[API] Error loading folder structure:', error);
-    res.status(500).json({
-      error: 'Failed to load folder structure',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-/**
  * POST /api/list-files
  * List files in a specific directory
  */
@@ -246,114 +208,18 @@ app.post('/api/list-files', async (req: Request, res: Response) => {
 });
 
 /**
- * Parse phase and category from file path using folder structure
+ * Parse phase from file path
+ * Simple regex-based parsing for Phase ID detection
  */
-function parsePhaseAndCategory(filePath: string): {
-  phaseId: number | null;
-  phaseName: string | null;
-  category: string | null;
-  categoryPath: string | null;
-  categoryId: string | null;
-} {
-  if (!folderStructure) {
-    return { phaseId: null, phaseName: null, category: null, categoryPath: null, categoryId: null };
-  }
-
-  // Normalize file path for comparison
+function parsePhaseFromPath(filePath: string): number | null {
   const normalizedPath = filePath.replace(/\\/g, '/');
-
-  // Try to match against all phase categories in folder-structure.yaml
-  for (const [, phaseData] of Object.entries(folderStructure.folder_structure)) {
-    const phase = phaseData as any;
-    
-    if (phase.categories && Array.isArray(phase.categories)) {
-      for (const category of phase.categories) {
-        const folderPath = category.folder_path;
-        
-        // Check if file path contains this category folder
-        // Handle both "Category Name/" and just "Category Name"
-        const folderPattern = folderPath.replace(/\//g, '\\/');
-        const regex = new RegExp(`[/\\\\]${folderPattern}[/\\\\]`, 'i');
-        
-        if (regex.test(normalizedPath) || normalizedPath.includes(`/${folderPath}/`) || normalizedPath.includes(`\\${folderPath}\\`)) {
-          return {
-            phaseId: phase.phase_id,
-            phaseName: phase.phase_name,
-            category: category.category_name,
-            categoryPath: folderPath,
-            categoryId: category.category_id
-          };
-        }
-      }
-    }
-  }
-
-  // Fallback: try old pattern matching for backwards compatibility
   const phaseMatch = normalizedPath.match(/Phase\s+(\d+)/i);
-  const categoryMatch = normalizedPath.match(/Phase\s+\d+[/\\]([^/\\]+)/i);
   
   if (phaseMatch) {
-    const phaseId = parseInt(phaseMatch[1]);
-    const category = categoryMatch ? categoryMatch[1].trim() : null;
-    
-    return {
-      phaseId,
-      phaseName: `Phase ${phaseId}`,
-      category,
-      categoryPath: category ? `Phase ${phaseId}/${category}` : null,
-      categoryId: null
-    };
+    return parseInt(phaseMatch[1]);
   }
-
-  return { phaseId: null, phaseName: null, category: null, categoryPath: null, categoryId: null };
-}
-
-/**
- * Load validation criteria for specific phase and category
- */
-async function loadValidationCriteria(phaseId: number, categoryPath: string, categoryId: string | null): Promise<any> {
-  try {
-    const validationPath = path.join(__dirname, `../../rag-service/config/validation/phase${phaseId}-validation.yaml`);
-    const fileContents = await fs.readFile(validationPath, 'utf8');
-    const data = yaml.load(fileContents) as any;
-    
-    // First try to match by category_id (more reliable)
-    if (categoryId) {
-      for (const [key, value] of Object.entries(data)) {
-        if (key === categoryId && typeof value === 'object' && value !== null) {
-          const category = value as any;
-          return {
-            categoryKey: key,
-            displayName: category.display_name,
-            folderPath: category.folder_path || categoryPath,
-            checkCount: category.check_count,
-            validationChecks: category.validation_checks || []
-          };
-        }
-      }
-    }
-    
-    // Fallback: match by folder_path or folder_category_id
-    for (const [key, value] of Object.entries(data)) {
-      if (typeof value === 'object' && value !== null) {
-        const category = value as any;
-        if (category.folder_path === categoryPath || category.folder_category_id === categoryId) {
-          return {
-            categoryKey: key,
-            displayName: category.display_name,
-            folderPath: category.folder_path || categoryPath,
-            checkCount: category.check_count,
-            validationChecks: category.validation_checks || []
-          };
-        }
-      }
-    }
-    
-    return null;
-  } catch (error) {
-    console.error(`[API] Error loading validation criteria:`, error);
-    return null;
-  }
+  
+  return null;
 }
 
 /**
@@ -446,8 +312,8 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
     }
     
     // Parse phase from file path
-    const pathInfo = parsePhaseAndCategory(filePath);
-    console.log(`[API] Detected Phase: ${pathInfo.phaseName || 'Unknown'}`);
+    const phaseId = parsePhaseFromPath(filePath);
+    console.log(`[API] Detected Phase: ${phaseId ? `Phase ${phaseId}` : 'Unknown'}`);
     
     // Get RAG checks path
     const ragChecksPath = process.env.RAG_CHECKS;
@@ -460,7 +326,7 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
     }
     
     // Parse the selected check document
-    if (!pathInfo.phaseId) {
+    if (!phaseId) {
       return res.status(400).json({
         status: 'error',
         message: 'Unable to determine phase from file path',
@@ -471,10 +337,10 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
     // Dynamic import to avoid TypeScript rootDir issues
     const { parseCheckDocument, getCheckFilePath } = await import('../../rag-service/src/check-parser.js');
     
-    const checkFilePath = getCheckFilePath(ragChecksPath, pathInfo.phaseId, selectedCheck);
+    const checkFilePath = getCheckFilePath(ragChecksPath, phaseId, selectedCheck);
     console.log(`[API] Parsing check: ${selectedCheck}`);
     
-    const parsedCheck = await parseCheckDocument(checkFilePath, selectedCheck, pathInfo.phaseId);
+    const parsedCheck = await parseCheckDocument(checkFilePath, selectedCheck, phaseId);
     
     if (!parsedCheck.success) {
       return res.status(400).json({
@@ -661,8 +527,7 @@ To enable REAL AI analysis:
  */
 async function startServer() {
   try {
-    // Load folder structure and DHF mapping on startup
-    await loadFolderStructure();
+    // Load DHF mapping on startup
     await loadDHFMapping();
 
     app.listen(PORT, () => {
