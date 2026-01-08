@@ -21,7 +21,7 @@ export interface ChunkingStrategy {
   name: string;
   maxTokens: number;
   overlapTokens: number;
-  splitters: string[];
+  splitters: (string | RegExp)[];
   preserveStructure: boolean;
   reason?: string;
 }
