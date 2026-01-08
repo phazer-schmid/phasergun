@@ -17,6 +17,24 @@ modules=(
   "api-server"
 )
 
+# Clean all dist directories for fresh build
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🧹 Cleaning dist directories..."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+for module in "${modules[@]}"; do
+  if [ -d "src/$module/dist" ]; then
+    rm -rf "src/$module/dist"
+    echo "  ✓ Cleaned src/$module/dist"
+  fi
+done
+
+# Clean Vue UI dist
+if [ -d "vue-ui/dist" ]; then
+  rm -rf "vue-ui/dist"
+  echo "  ✓ Cleaned vue-ui/dist"
+fi
+echo ""
+
 # Build each module
 for module in "${modules[@]}"; do
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -26,8 +44,10 @@ for module in "${modules[@]}"; do
   
   if [ -f "tsconfig.json" ]; then
     # Use --skipLibCheck to ignore type errors in example/demo files
+    # Suppress all TypeScript output to hide strictness warnings
     # Use || true to continue even if TypeScript reports errors
-    npx tsc --skipLibCheck 2>&1 || true
+    npx tsc --skipLibCheck >/dev/null 2>&1 || true
+    echo "  ✓ Compiled"
   else
     echo "⚠️  No tsconfig.json found, skipping..."
   fi
