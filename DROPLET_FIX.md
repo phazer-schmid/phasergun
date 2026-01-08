@@ -1,18 +1,33 @@
 # 🔧 Droplet Fix Guide - API Server 502 Error
 
 ## Problem Summary
-The API server was crashing because PM2 couldn't find the compiled JavaScript file. The TypeScript compiler creates a nested directory structure, but PM2 was looking in the wrong place.
+The API server was crashing because the TypeScript build was creating a nested directory structure without `rootDir` configured. This caused PM2 to look for the compiled file in the wrong location.
 
-## ✅ What Was Fixed Locally
-- **ecosystem.config.js**: Updated script path from `dist/index.js` to `dist/api-server/src/index.js`
+## ✅ What Was Fixed
+- **src/api-server/tsconfig.json**: Added `"rootDir": "./src"` to create flat output structure
+- **Result**: TypeScript now compiles to `dist/index.js` instead of `dist/api-server/src/index.js`
+
+## Why This Happened
+
+When `build-all.sh` runs, it changes into each module directory and runs `tsc`:
+```bash
+cd "src/api-server"
+npx tsc
+```
+
+Without `rootDir` specified in `tsconfig.json`, TypeScript infers the root from the source file paths and preserves the directory structure, creating:
+- ❌ `src/api-server/dist/api-server/src/index.js` (nested, PM2 can't find it)
+
+With `rootDir: "./src"`, TypeScript knows to strip the `src/` prefix from output paths, creating:
+- ✅ `src/api-server/dist/index.js` (flat, PM2 finds it)
 
 ## 📋 Deployment Steps for Droplet
 
 ### Step 1: Push the fix to GitHub
 ```bash
 # On your local machine:
-git add ecosystem.config.js
-git commit -m "Fix PM2 script path for nested TypeScript build output"
+git add src/api-server/tsconfig.json DROPLET_FIX.md
+git commit -m "Fix TypeScript build structure with rootDir config"
 git push origin main
 ```
 
@@ -26,6 +41,9 @@ cd /workspace/phasergun
 
 # Pull the latest changes:
 git pull origin main
+
+# Rebuild with the new tsconfig:
+./build-all.sh
 
 # Update the RAG_CHECKS path in .env (IMPORTANT!)
 nano src/api-server/.env
@@ -46,7 +64,7 @@ pm2 stop meddev-api
 # Delete it:
 pm2 delete meddev-api
 
-# Start fresh with the updated config:
+# Start fresh with the correct build:
 pm2 start ecosystem.config.js
 
 # Check status:
@@ -83,11 +101,11 @@ Then open your browser to https://phasergun.app and try loading DHF documents.
 
 If it still doesn't work after following the steps above:
 
-1. **Verify the compiled file exists:**
+1. **Verify the compiled file exists at the correct location:**
    ```bash
-   ls -la /workspace/phasergun/src/api-server/dist/api-server/src/index.js
+   ls -la /workspace/phasergun/src/api-server/dist/index.js
    ```
-   If this file doesn't exist, run `./build-all.sh` again.
+   If this file doesn't exist, run `./build-all.sh` again and check for errors.
 
 2. **Check for .env errors:**
    ```bash
@@ -107,20 +125,19 @@ If it still doesn't work after following the steps above:
    sudo systemctl status nginx
    ```
 
-## 📝 Why This Happened
+## 📝 Technical Details
 
-The TypeScript compiler uses the project references feature, which creates a nested output structure to keep compiled modules organized. When building from the project root, it compiles to:
-```
-dist/
-  api-server/
-    src/
-      index.js  ← Actual location
-```
+### The Root Cause
+TypeScript's compiler infers directory structure when `rootDir` is not specified. Since we're building from `src/api-server/` directory and the source files are in `src/api-server/src/`, TypeScript preserved this structure in the output.
 
-But the old PM2 config was expecting:
-```
-dist/
-  index.js  ← PM2 was looking here
-```
+### The Solution
+Adding `"rootDir": "./src"` tells TypeScript:
+- All source files are under the `src/` directory
+- Strip the `src/` prefix when creating output files
+- Result: `src/index.ts` → `dist/index.js` (not `dist/api-server/src/index.js`)
 
-This fix updates PM2 to look in the correct location.
+### Why This Works Everywhere
+- **Local dev (`npm run dev`)**: Uses `ts-node`, runs TypeScript directly, no compilation needed
+- **Production build (`build-all.sh`)**: TypeScript compiles with proper `rootDir`, creates flat structure
+- **PM2**: Looks for `dist/index.js`, finds it at the correct location
+- **No code changes needed**: The same source code works in both environments

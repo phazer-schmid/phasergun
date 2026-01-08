@@ -6,7 +6,7 @@ module.exports = {
     {
       name: 'meddev-api',
       cwd: './src/api-server',
-      script: 'dist/api-server/src/index.js',
+      script: 'dist/index.js',
       instances: 1,
       autorestart: true,
       watch: false,
