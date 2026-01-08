@@ -26,6 +26,7 @@ export interface LLMService {
 export { AnthropicLLMService } from './anthropic-service';
 export { MistralLLMService } from './mistral-service';
 export { OllamaLLMService } from './ollama-service';
+export { GroqLLMService } from './groq-service';
 
 /**
  * Mock Implementation of LLM Service

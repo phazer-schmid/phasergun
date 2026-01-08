@@ -518,6 +518,8 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
     const anthropicModel = process.env.ANTHROPIC_MODEL || 'claude-3-haiku-20240307';
     const mistralApiKey = process.env.MISTRAL_API_KEY;
     const mistralModel = process.env.MISTRAL_MODEL || 'mistral-small-latest';
+    const groqApiKey = process.env.GROQ_API_KEY;
+    const groqModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
     const ollamaModel = process.env.OLLAMA_MODEL || 'llama3.1:70b';
     const ollamaBaseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 
@@ -540,6 +542,13 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
       
       const { MistralLLMService } = await import('../../llm-service/dist/mistral-service.js');
       llmService = new MistralLLMService(mistralApiKey, mistralModel);
+      
+    } else if (llmMode === 'groq' && groqApiKey) {
+      // Use Groq (ultra-fast LPU inference)
+      console.log(`[API] Using Groq LPU with model: ${groqModel}\n`);
+      
+      const { GroqLLMService } = await import('../../llm-service/dist/groq-service.js');
+      llmService = new GroqLLMService(groqApiKey, groqModel);
       
     } else if (llmMode === 'anthropic' && anthropicApiKey) {
       // Use REAL Anthropic Claude
