@@ -44,7 +44,7 @@ export class GroqLLMService implements LLMService {
           role: 'user',
           content: enhancedPrompt
         }],
-        max_tokens: 4000, // Adequate for most check documents
+        max_tokens: 8000, // Increased for comprehensive compliance analysis
         temperature: 0, // Deterministic: same input = same output
         top_p: 1, // Maximum determinism
       });
