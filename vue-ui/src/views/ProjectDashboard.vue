@@ -57,60 +57,32 @@
     <main class="dashboard-main">
       <!-- Header -->
       <div class="dashboard-header">
-        <div class="header-actions">
-          <button class="btn-text" @click="backToProjects()">← Back to Projects</button>
-          <button class="btn-text" @click="editProject()">✎ Edit Project</button>
-        </div>
-        <div class="header-title-row">
-          <select 
-            v-model="selectedCheck"
-            class="check-dropdown"
-            :disabled="!selectedFile || availableChecks.length === 0">
-            <option value="">-- Select Prompt --</option>
-            <option 
-              v-for="check in availableChecks" 
-              :key="check.filename"
-              :value="check.filename">
-              {{ check.displayName }}
-            </option>
-          </select>
-          <button 
-            class="btn-refresh"
-            :disabled="!selectedFile || isScanning"
-            @click="analyzeSelectedDocument()">
-            <span v-if="!isScanning">🔍 Generate Text</span>
-            <span v-if="isScanning">⏳ Generating...</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Stats Cards Row -->
-      <div class="stats-row">
-        <!-- Project Completeness Card -->
-        <div class="card stats-card">
-          <div class="stats-header">
-            <div class="stats-label">Project Completeness</div>
-            <div class="stats-value-large">57%</div>
+        <div class="header-row">
+          <div class="header-actions">
+            <button class="btn-text" @click="backToProjects()">← Back to Projects</button>
+            <button class="btn-text" @click="editProject()">✎ Edit Project</button>
           </div>
-          <div class="progress-bar">
-            <div class="progress-fill progress-gradient" style="width: 57%"></div>
+          <div class="header-controls">
+            <select 
+              v-model="selectedCheck"
+              class="check-dropdown"
+              :disabled="!selectedFile || availableChecks.length === 0">
+              <option value="">-- Select Prompt --</option>
+              <option 
+                v-for="check in availableChecks" 
+                :key="check.filename"
+                :value="check.filename">
+                {{ check.displayName }}
+              </option>
+            </select>
+            <button 
+              class="btn-refresh"
+              :disabled="!selectedFile || isScanning"
+              @click="analyzeSelectedDocument()">
+              <span v-if="!isScanning">🔍 Generate Text</span>
+              <span v-if="isScanning">⏳ Generating...</span>
+            </button>
           </div>
-          <div class="stats-meta">24 of 42 documents submitted</div>
-        </div>
-
-        <!-- Document Quality Risk Card -->
-        <div class="card stats-card stats-card-risk">
-          <div class="stats-header">
-            <div class="stats-label-row">
-              <span class="stats-label">Document Quality Risk</span>
-              <span class="badge badge-medium">MEDIUM</span>
-            </div>
-          </div>
-          <div class="stats-value-row">
-            <span class="stats-value-large">68</span>
-            <span class="stats-suffix">/100 quality score</span>
-          </div>
-          <div class="stats-meta">3 issues detected in submitted documents</div>
         </div>
       </div>
 
@@ -509,7 +481,7 @@ function getStrengths(): string[] {
 .sidebar-card {
   background: white;
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -517,7 +489,7 @@ function getStrengths(): string[] {
 }
 
 .sidebar-card-header {
-  padding: var(--spacing-md) var(--spacing-lg);
+  padding: var(--spacing-xl) var(--spacing-lg) var(--spacing-md);
   border-bottom: 1px solid var(--border-light);
 }
 
@@ -746,13 +718,25 @@ function getStrengths(): string[] {
 }
 
 .dashboard-header {
+  margin-bottom: 0;
+}
+
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: var(--spacing-2xl);
 }
 
 .header-actions {
   display: flex;
   gap: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
 }
 
 .btn-text {
@@ -776,9 +760,8 @@ function getStrengths(): string[] {
 
 .header-title-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
 }
 
 .page-title {
@@ -949,12 +932,13 @@ function getStrengths(): string[] {
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-md);
   padding-bottom: var(--spacing-md);
   border-bottom: 1px solid var(--border-light);
 }
 
 .section-title {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
   color: var(--text-dark);
   margin: 0;
@@ -962,22 +946,24 @@ function getStrengths(): string[] {
 
 /* Analysis Panel */
 .analysis-card {
-  padding: var(--spacing-xl);
+  border-radius: 12px;
+  padding: 0;
 }
 
 .analysis-content {
   line-height: var(--line-height-relaxed);
+  padding: var(--spacing-md) var(--spacing-lg);
 }
 
 .analysis-empty {
-  padding: var(--spacing-xl);
+  padding: var(--spacing-xl) 0;
   text-align: center;
   color: var(--text-gray);
   font-size: var(--font-size-sm);
 }
 
 .analysis-loading {
-  padding: var(--spacing-xl);
+  padding: var(--spacing-xl) 0;
   text-align: center;
   color: var(--primary-purple);
   font-size: var(--font-size-sm);
