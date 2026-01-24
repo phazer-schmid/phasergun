@@ -229,6 +229,9 @@ onMounted(async () => {
   // Load sidebar files
   await loadProceduresFiles();
   await loadContextFiles();
+  
+  // Load prompts for dropdown
+  await loadPromptsFiles();
 });
 
 // Load files from Procedures folder
@@ -274,6 +277,36 @@ async function loadContextFiles() {
   } catch (error) {
     console.error('[Dashboard] Failed to load Context files:', error);
     contextFiles.value = [];
+  }
+}
+
+// Load files from Prompts folder for dropdown
+async function loadPromptsFiles() {
+  if (!project.value?.folderPath) return;
+
+  const promptsFolderPath = `${project.value.folderPath}/Prompts`;
+  
+  try {
+    const response = await fetch(getApiEndpoint('/list-files'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: promptsFolderPath })
+    });
+    
+    const result = await response.json();
+    const files = result.files || [];
+    
+    // Transform files to dropdown options with displayName
+    availableChecks.value = files.map((file: any) => ({
+      filename: file.path,
+      displayName: file.name.replace(/\.[^/.]+$/, '') // Remove file extension for display
+    }));
+    
+    console.log(`[Dashboard] Loaded ${availableChecks.value.length} prompts from Prompts folder`);
+    
+  } catch (error) {
+    console.error('[Dashboard] Failed to load Prompts files:', error);
+    availableChecks.value = [];
   }
 }
 
