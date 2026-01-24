@@ -99,7 +99,7 @@
             </div>
 
             <div v-if="!analysisResult && !isScanning && !scanError" class="analysis-empty">
-              <p>No document analyzed yet. Select a file from the left navigation and click "Analyze Document".</p>
+              <p>Select a Prompt and click Generate Text.</p>
             </div>
 
             <div v-if="isScanning" class="analysis-loading">
