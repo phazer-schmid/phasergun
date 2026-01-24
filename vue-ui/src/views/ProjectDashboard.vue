@@ -103,8 +103,8 @@
             </div>
 
             <div v-if="isScanning" class="analysis-loading">
-              <p>🤖 Analyzing document using AI...</p>
-              <p class="scan-details">This may take a moment depending on document size.</p>
+              <p>🤖 Generating content using AI...</p>
+              <p class="scan-details">This may take a moment.</p>
             </div>
 
             <div v-if="analysisResult?.status === 'complete'" class="analysis-narrative">
