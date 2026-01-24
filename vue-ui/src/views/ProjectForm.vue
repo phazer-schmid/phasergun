@@ -65,51 +65,6 @@
             </p>
           </div>
 
-          <!-- Target Dates -->
-          <div class="mb-6">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              Target Dates (Optional)
-            </label>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label for="phase1" class="block text-xs text-gray-600 mb-1">Phase 1</label>
-                <input
-                  id="phase1"
-                  v-model="formData.targetDates.phase1"
-                  type="date"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label for="phase2" class="block text-xs text-gray-600 mb-1">Phase 2</label>
-                <input
-                  id="phase2"
-                  v-model="formData.targetDates.phase2"
-                  type="date"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label for="phase3" class="block text-xs text-gray-600 mb-1">Phase 3</label>
-                <input
-                  id="phase3"
-                  v-model="formData.targetDates.phase3"
-                  type="date"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label for="phase4" class="block text-xs text-gray-600 mb-1">Phase 4</label>
-                <input
-                  id="phase4"
-                  v-model="formData.targetDates.phase4"
-                  type="date"
-                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            </div>
-          </div>
-
           <!-- Action Buttons -->
           <div class="flex justify-end space-x-4">
             <button
