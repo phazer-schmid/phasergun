@@ -91,7 +91,7 @@
         <!-- AI Analysis Panel -->
         <div class="card analysis-card">
           <div class="section-header">
-            <h2 class="section-title">AI Analysis & Narrative</h2>
+            <h2 class="section-title">Generated Text</h2>
           </div>
 
           <div class="analysis-content">
