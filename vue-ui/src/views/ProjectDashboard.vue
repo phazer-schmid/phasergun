@@ -5,10 +5,10 @@
       <!-- Logo/Branding -->
       <div class="sidebar-header">
         <div class="app-logo">
-          <div class="logo-icon">M</div>
+          <div class="logo-icon">PG</div>
           <div class="logo-content">
-            <span class="logo-text">MedDev Pro</span>
-            <span class="logo-subtitle">Regulatory Control</span>
+            <span class="logo-text">Phaser Gun</span>
+            <span class="logo-subtitle">Quality Regulatory Generation</span>
           </div>
         </div>
       </div>
@@ -16,15 +16,6 @@
       <!-- Navigation -->
       <nav class="sidebar-nav">
         <div class="nav-section">
-          <!-- Entire Project -->
-          <div 
-            class="nav-item"
-            :class="{ 'nav-item-active': currentView === 'project' }"
-            @click="onEntireProjectClick()">
-            <span class="nav-icon">📁</span>
-            <span class="nav-label">Entire Project</span>
-          </div>
-
           <!-- Dynamic Phase Items -->
           <div 
             v-for="phaseId in [1, 2, 3, 4]" 
@@ -94,28 +85,25 @@
           <button class="btn-text" @click="editProject()">✎ Edit Project</button>
         </div>
         <div class="header-title-row">
-          <h1 class="page-title">{{ currentViewTitle }}</h1>
-          <div class="analysis-controls">
-            <select 
-              v-model="selectedCheck"
-              class="check-dropdown"
-              :disabled="!selectedFile || availableChecks.length === 0">
-              <option value="">-- Select a Check --</option>
-              <option 
-                v-for="check in availableChecks" 
-                :key="check.filename"
-                :value="check.filename">
-                {{ check.displayName }}
-              </option>
-            </select>
-            <button 
-              class="btn-refresh"
-              :disabled="!selectedFile || isScanning"
-              @click="analyzeSelectedDocument()">
-              <span v-if="!isScanning">🔍 Analyze Document</span>
-              <span v-if="isScanning">⏳ Analyzing...</span>
-            </button>
-          </div>
+          <select 
+            v-model="selectedCheck"
+            class="check-dropdown"
+            :disabled="!selectedFile || availableChecks.length === 0">
+            <option value="">-- Select Prompt --</option>
+            <option 
+              v-for="check in availableChecks" 
+              :key="check.filename"
+              :value="check.filename">
+              {{ check.displayName }}
+            </option>
+          </select>
+          <button 
+            class="btn-refresh"
+            :disabled="!selectedFile || isScanning"
+            @click="analyzeSelectedDocument()">
+            <span v-if="!isScanning">🔍 Generate Text</span>
+            <span v-if="isScanning">⏳ Generating...</span>
+          </button>
         </div>
       </div>
 
@@ -269,8 +257,6 @@ const route = useRoute();
 const projectService = useProjectService();
 
 const project = ref<Project | null>(null);
-const currentView = ref<'project' | 'phase'>('project');
-const currentViewTitle = ref('Entire Project');
 const isScanning = ref(false);
 const scanError = ref<string | null>(null);
 const analysisResult = ref<AppStatusOutput | null>(null);
@@ -423,11 +409,6 @@ async function analyzeSelectedDocument() {
 }
 
 // Navigation
-function onEntireProjectClick() {
-  currentView.value = 'project';
-  currentViewTitle.value = 'Entire Project';
-}
-
 function backToProjects() {
   router.push('/');
 }
