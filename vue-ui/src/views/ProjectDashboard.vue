@@ -310,13 +310,13 @@ async function loadPromptsFiles() {
   }
 }
 
-// Analyze selected document
+// Generate content from prompt
 async function analyzeSelectedDocument() {
-  if (!selectedFile.value || !project.value) return;
+  if (!project.value) return;
 
-  // Validate that a check is selected
+  // Validate that a prompt is selected
   if (!selectedCheck.value) {
-    scanError.value = 'Please select a validation check before analyzing';
+    scanError.value = 'Please select a prompt before generating';
     return;
   }
 
@@ -325,27 +325,34 @@ async function analyzeSelectedDocument() {
   analysisResult.value = null;
   
   try {
-    // Local file analysis with selected check
-    const response = await fetch(getApiEndpoint('/analyze'), {
+    // Generate content using the new /api/generate endpoint
+    const response = await fetch(getApiEndpoint('/generate'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        filePath: selectedFile.value.file.path,
-        selectedCheck: selectedCheck.value
+        projectPath: project.value.folderPath,
+        promptFilePath: selectedCheck.value
       })
     });
     
     const result = await response.json();
     
     if (result.status === 'complete') {
-      analysisResult.value = result;
+      // Map the response to match the expected structure
+      analysisResult.value = {
+        status: 'complete',
+        message: result.message,
+        detailedReport: result.generatedContent,
+        timestamp: result.timestamp,
+        metadata: result.metadata
+      };
     } else {
-      scanError.value = result.message || 'Analysis failed';
+      scanError.value = result.message || 'Content generation failed';
     }
     
   } catch (error: any) {
-    console.error('[Dashboard] Analysis failed:', error);
-    scanError.value = error.message || 'Failed to analyze document';
+    console.error('[Dashboard] Generation failed:', error);
+    scanError.value = error.message || 'Failed to generate content';
   } finally {
     isScanning.value = false;
   }
