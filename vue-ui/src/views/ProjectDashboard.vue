@@ -486,10 +486,11 @@ function getStrengths(): string[] {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  padding: 0 !important;
 }
 
 .sidebar-card-header {
-  padding: var(--spacing-xl) var(--spacing-lg) var(--spacing-md);
+  padding: 16px 20px 16px !important;
   border-bottom: 1px solid var(--border-light);
 }
 
@@ -497,7 +498,9 @@ function getStrengths(): string[] {
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
   color: var(--text-dark);
-  margin: 0;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
 }
 
 .sidebar-card-content {
@@ -932,8 +935,7 @@ function getStrengths(): string[] {
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--spacing-lg);
-  padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-md);
-  padding-bottom: var(--spacing-md);
+  padding: 16px 20px 16px !important;
   border-bottom: 1px solid var(--border-light);
 }
 
@@ -941,13 +943,15 @@ function getStrengths(): string[] {
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
   color: var(--text-dark);
-  margin: 0;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
 }
 
 /* Analysis Panel */
 .analysis-card {
   border-radius: 12px;
-  padding: 0;
+  padding: 0 !important;
 }
 
 .analysis-content {
