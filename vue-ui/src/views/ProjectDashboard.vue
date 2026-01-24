@@ -7,7 +7,7 @@
         <div class="app-logo">
           <div class="logo-icon">PG</div>
           <div class="logo-content">
-            <span class="logo-text">Phaser Gun</span>
+            <span class="logo-text">PhaserGun</span>
             <span class="logo-subtitle">Quality Regulatory Generation</span>
           </div>
         </div>
@@ -71,8 +71,8 @@
 
       <!-- Sidebar Footer -->
       <div class="sidebar-footer">
-        <div class="footer-text">© 2025 MedDev Pro</div>
-        <div class="footer-version">v1.0.0 - HIPAA Compliant</div>
+        <div class="footer-text">© 2026 PhaserGun</div>
+        <div class="footer-version">v2.0.0</div>
       </div>
     </aside>
 
