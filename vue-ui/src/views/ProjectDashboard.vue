@@ -501,7 +501,8 @@ function getStrengths(): string[] {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
-  overflow-y: auto;
+  overflow: hidden;
+  min-height: 0;
 }
 
 /* Sidebar Cards */
@@ -512,6 +513,7 @@ function getStrengths(): string[] {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .sidebar-card-header {
@@ -529,6 +531,8 @@ function getStrengths(): string[] {
 .sidebar-card-content {
   padding: var(--spacing-md) var(--spacing-lg);
   flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .file-bullet-list {
