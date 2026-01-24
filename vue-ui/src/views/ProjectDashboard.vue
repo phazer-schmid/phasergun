@@ -65,8 +65,7 @@
           <div class="header-controls">
             <select 
               v-model="selectedCheck"
-              class="check-dropdown"
-              :disabled="!selectedFile || availableChecks.length === 0">
+              class="check-dropdown">
               <option value="">-- Select Prompt --</option>
               <option 
                 v-for="check in availableChecks" 
@@ -77,7 +76,7 @@
             </select>
             <button 
               class="btn-refresh"
-              :disabled="!selectedFile || isScanning"
+              :disabled="!selectedCheck || isScanning"
               @click="analyzeSelectedDocument()">
               <span v-if="!isScanning">🔍 Generate Text</span>
               <span v-if="isScanning">⏳ Generating...</span>
@@ -772,6 +771,31 @@ function getStrengths(): string[] {
   font-weight: var(--font-weight-bold);
   color: var(--text-dark);
   margin: 0;
+}
+
+.btn-refresh {
+  padding: 10px 18px;
+  background: var(--primary-purple);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-refresh:hover:not(:disabled) {
+  background: #5A4A99;
+}
+
+.btn-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--primary-purple);
 }
 
 .header-title-row .btn-refresh {
