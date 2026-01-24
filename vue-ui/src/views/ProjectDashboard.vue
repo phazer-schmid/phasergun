@@ -13,61 +13,38 @@
         </div>
       </div>
 
-      <!-- Navigation -->
-      <nav class="sidebar-nav">
-        <div class="nav-section">
-          <!-- Dynamic Phase Items -->
-          <div 
-            v-for="phaseId in [1, 2, 3, 4]" 
-            :key="phaseId"
-            class="phase-container">
-            
-            <!-- Phase Header -->
-            <div class="nav-item-container">
-              <div 
-                class="nav-item phase-item"
-                @click="togglePhase(phaseId)">
-                <span class="expand-icon">{{ expandedPhases.has(phaseId) ? '▼' : '▶' }}</span>
-                <span class="nav-icon-number">{{ phaseId }}</span>
-                <span class="nav-label">Phase {{ phaseId }}</span>
-              </div>
-              
-              <!-- Deadline -->
-              <div v-if="getPhaseDeadline(phaseId)" class="phase-deadline">
-                Deadline: {{ getPhaseDeadline(phaseId) }}
-              </div>
-            </div>
-
-            <!-- Files (shown when expanded) -->
-            <div v-if="expandedPhases.has(phaseId)" class="files-container">
-              <!-- Files List -->
-              <div 
-                v-if="getPhaseFiles(phaseId).length > 0"
-                class="files-list">
-                <div 
-                  v-for="file in getPhaseFiles(phaseId)" 
-                  :key="file.path"
-                  class="file-item"
-                  @click="selectFile(phaseId, file)">
-                  
-                  <input 
-                    type="radio"
-                    :name="`file-selection`"
-                    :checked="isFileSelected(file.path)"
-                    class="file-radio">
-                  <span class="file-name">{{ file.name }}</span>
-                </div>
-              </div>
-
-              <!-- No files message -->
-              <div v-else class="no-files-message">
-                No files found in Phase {{ phaseId }} base folder
-              </div>
-            </div>
+      <!-- File Lists -->
+      <div class="sidebar-content">
+        <!-- Procedures Section -->
+        <div class="card sidebar-card">
+          <div class="sidebar-card-header">
+            <h3 class="sidebar-card-title">Procedures</h3>
           </div>
-
+          <div class="sidebar-card-content">
+            <ul v-if="proceduresFiles.length > 0" class="file-bullet-list">
+              <li v-for="file in proceduresFiles" :key="file.path">
+                {{ file.name }}
+              </li>
+            </ul>
+            <p v-else class="no-files-text">No files found</p>
+          </div>
         </div>
-      </nav>
+
+        <!-- Context Section -->
+        <div class="card sidebar-card">
+          <div class="sidebar-card-header">
+            <h3 class="sidebar-card-title">Context</h3>
+          </div>
+          <div class="sidebar-card-content">
+            <ul v-if="contextFiles.length > 0" class="file-bullet-list">
+              <li v-for="file in contextFiles" :key="file.path">
+                {{ file.name }}
+              </li>
+            </ul>
+            <p v-else class="no-files-text">No files found</p>
+          </div>
+        </div>
+      </div>
 
       <!-- Sidebar Footer -->
       <div class="sidebar-footer">
@@ -261,9 +238,9 @@ const isScanning = ref(false);
 const scanError = ref<string | null>(null);
 const analysisResult = ref<AppStatusOutput | null>(null);
 
-// Phase files state
-const expandedPhases = ref<Set<number>>(new Set());
-const phaseFiles = ref<Map<number, any[]>>(new Map());
+// Sidebar files state
+const proceduresFiles = ref<any[]>([]);
+const contextFiles = ref<any[]>([]);
 
 // Selected file and check state
 const selectedFile = ref<{
@@ -277,94 +254,56 @@ const availableChecks = ref<Array<{ filename: string; displayName: string }>>([]
 onMounted(async () => {
   const projectId = route.params.id as string;
   project.value = projectService.getProject(projectId);
+  
+  // Load sidebar files
+  await loadProceduresFiles();
+  await loadContextFiles();
 });
 
-// Toggle phase expand/collapse
-async function togglePhase(phaseId: number) {
-  if (expandedPhases.value.has(phaseId)) {
-    expandedPhases.value.delete(phaseId);
-  } else {
-    expandedPhases.value.add(phaseId);
-    // Load files for this phase base folder
-    await loadPhaseFiles(phaseId);
-  }
-}
-
-// Load files from phase base folder only
-async function loadPhaseFiles(phaseId: number) {
+// Load files from Procedures folder
+async function loadProceduresFiles() {
   if (!project.value?.folderPath) return;
 
-  // Construct path to phase base folder
-  const phaseFolderPath = `${project.value.folderPath}/Phase ${phaseId}`;
+  const proceduresFolderPath = `${project.value.folderPath}/Procedures`;
   
   try {
     const response = await fetch(getApiEndpoint('/list-files'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: phaseFolderPath })
+      body: JSON.stringify({ path: proceduresFolderPath })
     });
     
     const result = await response.json();
-    phaseFiles.value.set(phaseId, result.files || []);
-    console.log(`[Dashboard] Loaded ${result.files?.length || 0} files from Phase ${phaseId} base folder`);
+    proceduresFiles.value = result.files || [];
+    console.log(`[Dashboard] Loaded ${proceduresFiles.value.length} files from Procedures folder`);
     
   } catch (error) {
-    console.error(`[Dashboard] Failed to load files for Phase ${phaseId}:`, error);
-    phaseFiles.value.set(phaseId, []);
+    console.error('[Dashboard] Failed to load Procedures files:', error);
+    proceduresFiles.value = [];
   }
 }
 
-// Get files for a phase
-function getPhaseFiles(phaseId: number): any[] {
-  return phaseFiles.value.get(phaseId) || [];
-}
+// Load files from Context folder
+async function loadContextFiles() {
+  if (!project.value?.folderPath) return;
 
-// Select a file
-async function selectFile(phaseId: number, file: any) {
-  selectedFile.value = { phaseId, file };
-  selectedCheck.value = ''; // Reset check selection
-  console.log('[Dashboard] Selected file:', file.path);
+  const contextFolderPath = `${project.value.folderPath}/Context`;
   
-  // Load available checks for this phase
-  await loadAvailableChecks(phaseId);
-}
-
-// Load available checks for a phase
-async function loadAvailableChecks(phaseId: number) {
   try {
-    const response = await fetch(getApiEndpoint(`/checks/${phaseId}`));
-    const result = await response.json();
+    const response = await fetch(getApiEndpoint('/list-files'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: contextFolderPath })
+    });
     
-    availableChecks.value = result.checks || [];
-    console.log(`[Dashboard] Loaded ${availableChecks.value.length} checks for Phase ${phaseId}`);
+    const result = await response.json();
+    contextFiles.value = result.files || [];
+    console.log(`[Dashboard] Loaded ${contextFiles.value.length} files from Context folder`);
+    
   } catch (error) {
-    console.error(`[Dashboard] Failed to load checks for Phase ${phaseId}:`, error);
-    availableChecks.value = [];
+    console.error('[Dashboard] Failed to load Context files:', error);
+    contextFiles.value = [];
   }
-}
-
-// Check if file is selected
-function isFileSelected(filePath: string): boolean {
-  return selectedFile.value?.file.path === filePath;
-}
-
-// Get phase deadline
-function getPhaseDeadline(phaseId: number): string | null {
-  if (!project.value?.targetDates) return null;
-  
-  const deadlineKey = `phase${phaseId}` as keyof typeof project.value.targetDates;
-  const deadline = project.value.targetDates[deadlineKey];
-  
-  if (deadline) {
-    return formatDate(deadline);
-  }
-  return null;
-}
-
-// Format date
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 // Analyze selected document
@@ -556,16 +495,60 @@ function getStrengths(): string[] {
   line-height: 1.2;
 }
 
-/* Navigation */
-.sidebar-nav {
+/* Sidebar Content */
+.sidebar-content {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
   overflow-y: auto;
 }
 
-.nav-section {
+/* Sidebar Cards */
+.sidebar-card {
+  background: white;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+}
+
+.sidebar-card-header {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.sidebar-card-title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-dark);
+  margin: 0;
+}
+
+.sidebar-card-content {
+  padding: var(--spacing-md) var(--spacing-lg);
+  flex: 1;
+}
+
+.file-bullet-list {
+  list-style-type: disc;
+  margin: 0;
+  padding-left: var(--spacing-lg);
+  color: var(--text-dark);
+}
+
+.file-bullet-list li {
+  font-size: var(--font-size-sm);
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+.no-files-text {
+  font-size: var(--font-size-sm);
+  color: var(--text-light);
+  font-style: italic;
+  margin: 0;
 }
 
 .nav-item {
