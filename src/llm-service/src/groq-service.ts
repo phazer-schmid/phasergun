@@ -44,7 +44,7 @@ export class GroqLLMService implements LLMService {
           role: 'user',
           content: enhancedPrompt
         }],
-        max_tokens: 8000, // Increased for comprehensive compliance analysis
+        max_tokens: 32000, // Increased to 32K for long-form regulatory documents
         temperature: 0, // Deterministic: same input = same output
         top_p: 1, // Maximum determinism
       });
@@ -54,9 +54,18 @@ export class GroqLLMService implements LLMService {
       // Extract the text content
       const textContent = response.choices[0]?.message?.content || '';
 
+      // Calculate token usage
+      const inputTokens = response.usage?.prompt_tokens || 0;
+      const outputTokens = response.usage?.completion_tokens || 0;
+      
       console.log(`[GroqLLMService] Response received in ${duration}ms (⚡ Groq LPU™)`);
-      console.log(`[GroqLLMService] Input tokens: ${response.usage?.prompt_tokens || 0}`);
-      console.log(`[GroqLLMService] Output tokens: ${response.usage?.completion_tokens || 0}`);
+      console.log(`[GroqLLMService] Input tokens: ${inputTokens}`);
+      console.log(`[GroqLLMService] Output tokens: ${outputTokens}`);
+      
+      // Warn if approaching token limit
+      if (outputTokens >= 30000) {
+        console.warn(`[GroqLLMService] ⚠️  Output approaching 32K token limit (${outputTokens}/32000)`);
+      }
 
       // Calculate approximate cost based on model
       // Groq pricing (as of 2024):
@@ -65,9 +74,6 @@ export class GroqLLMService implements LLMService {
       const is8B = this.model.includes('8b');
       const inputRate = is8B ? 0.05 : 0.59;
       const outputRate = is8B ? 0.08 : 0.79;
-      
-      const inputTokens = response.usage?.prompt_tokens || 0;
-      const outputTokens = response.usage?.completion_tokens || 0;
       
       const inputCost = (inputTokens / 1000000) * inputRate;
       const outputCost = (outputTokens / 1000000) * outputRate;
