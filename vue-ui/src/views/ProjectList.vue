@@ -131,11 +131,6 @@ const formatDate = (dateString: string): string => {
   return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 
-const hasTargetDates = (project: Project): boolean => {
-  return !!(project.targetDates?.phase1 || project.targetDates?.phase2 || 
-            project.targetDates?.phase3 || project.targetDates?.phase4);
-};
-
 const getSourceIcon = (): string => {
   return '💻'; // Local filesystem only
 };
