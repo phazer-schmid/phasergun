@@ -723,10 +723,18 @@ function getStrengths(): string[] {
   flex: 1;
   padding: var(--spacing-3xl);
   background: var(--light-bg);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
 .dashboard-header {
   margin-bottom: 0;
+  position: sticky;
+  top: 0;
+  background: var(--light-bg);
+  z-index: 10;
+  padding-bottom: var(--spacing-lg);
 }
 
 .header-row {
@@ -734,6 +742,8 @@ function getStrengths(): string[] {
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--spacing-2xl);
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
 }
 
 .header-actions {

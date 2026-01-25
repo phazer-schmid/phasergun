@@ -52,7 +52,10 @@ export class GroqLLMService implements LLMService {
       const duration = Date.now() - startTime;
       
       // Extract the text content
-      const textContent = response.choices[0]?.message?.content || '';
+      let textContent = response.choices[0]?.message?.content || '';
+      
+      // Clean Llama special tokens from output
+      textContent = this.cleanLlamaTokens(textContent);
 
       // Calculate token usage
       const inputTokens = response.usage?.prompt_tokens || 0;
@@ -168,5 +171,33 @@ ${context.sourceMetadata.map(meta => `- ${meta}`).join('\n')}
 `;
 
     return contextSection + prompt;
+  }
+
+  /**
+   * Clean Llama model special tokens from generated text
+   * These tokens are used internally by Llama models for chat formatting
+   * but should not appear in the final output
+   */
+  private cleanLlamaTokens(text: string): string {
+    // Remove all Llama special tokens
+    const llamaTokenPatterns = [
+      /<\|start_header_id\|>/g,
+      /<\|end_header_id\|>/g,
+      /<\|eot_id\|>/g,
+      /<\|begin_of_text\|>/g,
+      /<\|end_of_text\|>/g,
+      // Also remove common role indicators that might leak through
+      /^(system|user|assistant)\s*$/gm,
+    ];
+
+    let cleanedText = text;
+    for (const pattern of llamaTokenPatterns) {
+      cleanedText = cleanedText.replace(pattern, '');
+    }
+
+    // Trim any extra whitespace that might result from token removal
+    cleanedText = cleanedText.trim();
+
+    return cleanedText;
   }
 }
