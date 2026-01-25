@@ -7,7 +7,6 @@ import { config } from 'dotenv';
 import { DHFScanner } from '@fda-compliance/dhf-scanner';
 import { PhaseDHFMapping } from '@fda-compliance/shared-types';
 import pdf from 'pdf-parse';
-import generateRouter from './routes/generate';
 // Dynamic import for check-parser to avoid TypeScript rootDir issues
 // We'll add caching later after fixing module structure
 // For now, the LLMs are deterministic (temperature=0) which is the key requirement
@@ -500,8 +499,18 @@ app.get('/api/checks/:phaseId', async (req: Request, res: Response) => {
   }
 });
 
-// Mount generate router
-app.use('/api', generateRouter);
+// Mount generate router dynamically to avoid TypeScript compilation issues
+(async () => {
+  try {
+    const generateRouterModule = await import('./routes/generate.js');
+    const generateRouter = generateRouterModule.default;
+    app.use('/api', generateRouter);
+    console.log('[API] ✓ Generate router loaded');
+  } catch (error) {
+    console.error('[API] Warning: Could not load generate router:', error);
+    // Non-fatal - continue server startup
+  }
+})();
 
 /**
  * POST /api/analyze

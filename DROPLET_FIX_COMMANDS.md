@@ -6,37 +6,66 @@ The `dist/routes/generate.js` file is missing from the compiled build, causing t
 Error: Cannot find module './routes/generate'
 ```
 
-## Solution: Rebuild api-server on Droplet
+**Root Cause:** The api-server package.json was missing required dependencies for the routes/generate.ts file:
+- `@fda-compliance/orchestrator`
+- `@fda-compliance/file-parser`
+- `@fda-compliance/chunker`
+- `@fda-compliance/rag-service`
+- `@fda-compliance/llm-service`
 
-### Step 1: SSH into your droplet
+These have now been added to package.json. You need to sync this file to the droplet and reinstall dependencies.
+
+## Solution: Update and Rebuild api-server on Droplet
+
+### Step 1: Sync the updated package.json to droplet
+**IMPORTANT:** First, you need to sync the updated `src/api-server/package.json` file to your droplet.
+
+Use whatever method you normally use to deploy (git pull, rsync, scp, etc.). For example:
+```bash
+# If using git
+cd /workspace/phasergun
+git pull origin main
+
+# Or if copying manually
+scp /path/to/local/src/api-server/package.json root@droplet:/workspace/phasergun/src/api-server/
+```
+
+### Step 2: SSH into your droplet
 ```bash
 ssh root@your-droplet-ip
 # or however you normally connect
 ```
 
-### Step 2: Navigate to the api-server directory
+### Step 3: Navigate to the api-server directory
 ```bash
 cd /workspace/phasergun/src/api-server
 ```
 
-### Step 3: Stop the PM2 process
+### Step 4: Stop the PM2 process
 ```bash
 pm2 stop meddev-api
 ```
 
-### Step 4: Clean the old build
+### Step 5: Reinstall dependencies with updated package.json
+```bash
+# Remove old dependencies and reinstall
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### Step 6: Clean the old build
 ```bash
 # Remove the old dist folder
 rm -rf dist
 ```
 
-### Step 5: Rebuild TypeScript
+### Step 7: Rebuild TypeScript
 ```bash
 # Run the TypeScript compiler
 npm run build
 ```
 
-### Step 6: Verify the build succeeded
+### Step 8: Verify the build succeeded
 ```bash
 # Check that the routes folder was created in dist
 ls -la dist/routes/
@@ -45,12 +74,12 @@ ls -la dist/routes/
 # If you see it, the build was successful
 ```
 
-### Step 7: Restart the PM2 process
+### Step 9: Restart the PM2 process
 ```bash
 pm2 restart meddev-api
 ```
 
-### Step 8: Check the logs
+### Step 10: Check the logs
 ```bash
 # Watch the logs to see if it starts successfully
 pm2 logs meddev-api --lines 50
