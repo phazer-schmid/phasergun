@@ -213,12 +213,7 @@ const analysisResult = ref<AppStatusOutput | null>(null);
 const proceduresFiles = ref<any[]>([]);
 const contextFiles = ref<any[]>([]);
 
-// Selected file and check state
-const selectedFile = ref<{
-  phaseId: number;
-  file: any;
-} | null>(null);
-
+// Selected check state
 const selectedCheck = ref<string>('');
 const availableChecks = ref<Array<{ filename: string; displayName: string }>>([]);
 

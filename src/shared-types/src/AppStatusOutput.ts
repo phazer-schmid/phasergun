@@ -7,6 +7,7 @@ export interface AppStatusOutput {
   message: string;
   detailedReport?: string;
   timestamp?: string;
+  metadata?: any;
   
   // Analysis-specific outputs
   analysisLevel?: 'project' | 'phase' | 'file';
