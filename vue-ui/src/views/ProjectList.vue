@@ -69,28 +69,6 @@
             Created {{ formatDate(project.createdAt) }}
           </div>
 
-          <!-- Target Dates -->
-          <div v-if="hasTargetDates(project)" class="mt-3 pt-3 border-t border-gray-100">
-            <div class="text-xs text-gray-500 mb-2">Target Dates:</div>
-            <div class="grid grid-cols-2 gap-2 text-xs">
-              <div v-if="project.targetDates?.phase1" class="flex items-center text-gray-600">
-                <span class="font-medium mr-1">P1:</span>
-                <span>{{ formatDate(project.targetDates.phase1) }}</span>
-              </div>
-              <div v-if="project.targetDates?.phase2" class="flex items-center text-gray-600">
-                <span class="font-medium mr-1">P2:</span>
-                <span>{{ formatDate(project.targetDates.phase2) }}</span>
-              </div>
-              <div v-if="project.targetDates?.phase3" class="flex items-center text-gray-600">
-                <span class="font-medium mr-1">P3:</span>
-                <span>{{ formatDate(project.targetDates.phase3) }}</span>
-              </div>
-              <div v-if="project.targetDates?.phase4" class="flex items-center text-gray-600">
-                <span class="font-medium mr-1">P4:</span>
-                <span>{{ formatDate(project.targetDates.phase4) }}</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
