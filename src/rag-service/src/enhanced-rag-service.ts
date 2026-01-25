@@ -842,6 +842,8 @@ Executive Summary:`;
       totalTokensEstimate: number;
       sources: string[];
     };
+    procedureChunks: SearchResult[];
+    contextChunks: SearchResult[];
   }> {
     // 1. Load knowledge (from cache if valid)
     const knowledge = await this.loadKnowledge(projectPath, primaryContextPath);
@@ -921,7 +923,12 @@ Executive Summary:`;
       sources: Array.from(sources)
     };
     
-    return { ragContext, metadata };
+    return { 
+      ragContext, 
+      metadata,
+      procedureChunks: procedureResults,
+      contextChunks: contextResults
+    };
   }
 
   /**

@@ -216,6 +216,8 @@ export class InMemoryRAGService implements RAGService {
 
 // Export EnhancedRAGService for semantic retrieval
 export { EnhancedRAGService } from './enhanced-rag-service';
+export { VectorStore, VectorEntry, SearchResult } from './vector-store';
+export { FootnoteTracker, SourceReference } from './footnote-tracker';
 
 /**
  * Mock Implementation of RAG Service

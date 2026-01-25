@@ -368,6 +368,106 @@ If summary generation fails:
    - A/B testing different summarization approaches
    - User feedback on summary helpfulness
 
+## Footnote Tracking for Source Attribution
+
+### Overview
+
+The RAG service now includes automatic footnote tracking to provide proper source attribution for generated content. This ensures transparency and traceability by documenting which source files and regulatory standards were used during generation.
+
+### Features
+
+✅ **Automatic Source Tracking**: Tracks procedure and context files retrieved during semantic search  
+✅ **Regulatory Standards**: Detects and tracks ISO, FDA CFR references in prompts  
+✅ **Sequential Numbering**: Unique, sequential citation numbers  
+✅ **Multiple Export Formats**: Array for rendering, Map for caching  
+✅ **Markdown Formatting**: Professional footnotes section automatically appended
+
+### Usage
+
+```typescript
+import { FootnoteTracker } from '@fda-compliance/rag-service';
+
+// After retrieval
+const { procedureChunks, contextChunks } = 
+  await ragService.retrieveRelevantContext(projectPath, primaryContextPath, prompt);
+
+// Initialize tracker
+const tracker = new FootnoteTracker();
+tracker.addFromRetrievalResults(procedureChunks, contextChunks);
+
+// Add regulatory standards mentioned in prompt
+tracker.addStandardReference('ISO 13485:2016', 'Quality Management Systems');
+tracker.addStandardReference('21 CFR Part 820', 'FDA Quality System Regulation');
+
+// Generate and append footnotes
+const footnotes = tracker.generateFootnotes();
+const finalText = generatedText + footnotes;
+
+// Get sources for API response
+return {
+  generatedText: finalText,
+  footnotes: tracker.getSourcesArray(),        // For rendering
+  footnotesMap: Object.fromEntries(tracker.getSources())  // For caching
+};
+```
+
+### Footnote Format
+
+```markdown
+---
+## Sources
+
+[1] Procedure: SOP-Design-Control.pdf (Section 3)
+[2] Context: project-requirements.md (Section 1)
+[3] Regulatory Standard: ISO 13485:2016 - Quality Management Systems
+[4] Regulatory Standard: 21 CFR Part 820 - FDA Quality System Regulation
+```
+
+### Integration with Orchestrator
+
+The Orchestrator automatically tracks sources and appends footnotes:
+
+```typescript
+const result = await orchestrator.generateFromPrompt({
+  projectPath: '/path/to/project',
+  primaryContextPath: '/path/to/primary-context.yaml',
+  prompt: 'Generate design verification protocol per ISO 13485'
+});
+
+// result.generatedText includes appended footnotes
+// result.footnotes contains array of SourceReference objects
+// result.footnotesMap contains Map for caching
+```
+
+### API
+
+#### FootnoteTracker Class
+
+**`addSource(source: Omit<SourceReference, 'id'>): number`**
+- Adds a source reference and returns citation number
+- Automatically deduplicates based on category + fileName + chunkIndex
+
+**`addFromRetrievalResults(procedureChunks, contextChunks): void`**
+- Batch adds sources from RAG retrieval results
+
+**`addStandardReference(standardName: string, citationText?: string): number`**
+- Adds regulatory standard reference (ISO, FDA CFR, etc.)
+
+**`generateFootnotes(): string`**
+- Generates formatted Markdown footnotes section
+
+**`getSourcesArray(): SourceReference[]`**
+- Returns sorted array of sources (for API responses)
+
+**`getSources(): Map<string, SourceReference>`**
+- Returns Map of sources (for caching)
+
+**`getSourceCount(): number`**
+- Returns total number of tracked sources
+
+**`clear(): void`**
+- Resets tracker for reuse
+
 ## Future Roadmap
 
 1. **Vector Embeddings**: Semantic search with OpenAI/Cohere embeddings ✅ (Implemented)
@@ -377,6 +477,7 @@ If summary generation fails:
 5. **Caching**: Cache frequently requested contexts ✅ (Implemented)
 6. **Analytics**: Track context relevance and usage patterns
 7. **SOP Summarization**: Executive summaries for long procedures ✅ (Implemented)
+8. **Footnote Tracking**: Automatic source attribution ✅ (Implemented)
 
 ## Dependencies
 

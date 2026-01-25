@@ -1,7 +1,7 @@
 import { SourceFolderInput, AppStatusOutput } from '@fda-compliance/shared-types';
 import { FileParser } from '@fda-compliance/file-parser';
 import { Chunker } from '@fda-compliance/chunker';
-import { EnhancedRAGService } from '@fda-compliance/rag-service';
+import { EnhancedRAGService, FootnoteTracker, SourceReference } from '@fda-compliance/rag-service';
 import { LLMService } from '@fda-compliance/llm-service';
 
 /**
@@ -85,7 +85,7 @@ export class OrchestratorService implements Orchestrator {
   }
 
   /**
-   * Generate text for a specific prompt using semantic RAG
+   * Generate text for a specific prompt using semantic RAG with footnotes
    */
   async generateFromPrompt(input: {
     projectPath: string;
@@ -98,6 +98,8 @@ export class OrchestratorService implements Orchestrator {
   }): Promise<{
     generatedText: string;
     sources: string[];
+    footnotes: SourceReference[];
+    footnotesMap: { [key: string]: SourceReference };
     usageStats: any;
   }> {
     console.log('=== Orchestrator: Generate From Prompt ===');
@@ -106,35 +108,63 @@ export class OrchestratorService implements Orchestrator {
     
     try {
       // Step 1: Retrieve relevant context using semantic search
-      const { ragContext, metadata } = await this.enhancedRAGService.retrieveRelevantContext(
-        input.projectPath,
-        input.primaryContextPath,
-        input.prompt,
-        {
-          procedureChunks: input.options?.topKProcedures || 5,
-          contextChunks: input.options?.topKContext || 5,
-          includeFullPrimary: true
-        }
-      );
+      const { ragContext, metadata, procedureChunks, contextChunks } = 
+        await this.enhancedRAGService.retrieveRelevantContext(
+          input.projectPath,
+          input.primaryContextPath,
+          input.prompt,
+          {
+            procedureChunks: input.options?.topKProcedures || 5,
+            contextChunks: input.options?.topKContext || 5,
+            includeFullPrimary: true
+          }
+        );
+      
+      // Step 2: Initialize footnote tracker and track sources
+      const footnoteTracker = new FootnoteTracker();
+      footnoteTracker.addFromRetrievalResults(procedureChunks, contextChunks);
+      
+      // Add regulatory standards mentioned in the prompt (if any)
+      // These are common standards that might be referenced
+      if (input.prompt.match(/ISO\s*13485/i)) {
+        footnoteTracker.addStandardReference('ISO 13485:2016', 'Quality Management Systems for Medical Devices');
+      }
+      if (input.prompt.match(/ISO\s*14971/i)) {
+        footnoteTracker.addStandardReference('ISO 14971:2019', 'Risk Management for Medical Devices');
+      }
+      if (input.prompt.match(/21\s*CFR\s*820/i)) {
+        footnoteTracker.addStandardReference('21 CFR Part 820', 'FDA Quality System Regulation');
+      }
+      if (input.prompt.match(/510\(k\)/i)) {
+        footnoteTracker.addStandardReference('FDA 510(k) Guidance', 'Premarket Notification Requirements');
+      }
       
       console.log(`[Orchestrator] Context assembled:`);
       console.log(`  - Primary context: included`);
       console.log(`  - Procedures: ${metadata.procedureChunksRetrieved} chunks`);
       console.log(`  - Context files: ${metadata.contextChunksRetrieved} chunks`);
+      console.log(`  - Footnotes tracked: ${footnoteTracker.getSourceCount()} sources`);
       console.log(`  - Estimated tokens: ${metadata.totalTokensEstimate}`);
       
-      // Step 2: Combine RAG context + user prompt
+      // Step 3: Combine RAG context + user prompt
       const fullPrompt = `${ragContext}\n\n=== USER REQUEST ===\n${input.prompt}`;
       
-      // Step 3: Generate using LLM
+      // Step 4: Generate using LLM
       const response = await this.llmService.generateText(fullPrompt);
       
+      // Step 5: Append footnotes to generated text
+      const footnotes = footnoteTracker.generateFootnotes();
+      const finalText = response.generatedText + footnotes;
+      
       console.log(`[Orchestrator] Generated ${response.usageStats.tokensUsed} tokens`);
+      console.log(`[Orchestrator] Appended ${footnoteTracker.getSourceCount()} footnotes`);
       console.log('=== Orchestrator: Complete ===\n');
       
       return {
-        generatedText: response.generatedText,
+        generatedText: finalText,
         sources: metadata.sources,
+        footnotes: footnoteTracker.getSourcesArray(),
+        footnotesMap: Object.fromEntries(footnoteTracker.getSources()),
         usageStats: response.usageStats
       };
       

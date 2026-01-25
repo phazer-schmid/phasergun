@@ -106,14 +106,18 @@ Generates text for a specific prompt using semantic RAG retrieval.
 **Returns:**
 ```typescript
 {
-  generatedText: string,            // Generated content
-  sources: string[],                // Source files used (for footnotes)
+  generatedText: string,            // Generated content with footnotes appended
+  sources: string[],                // Source file names
+  footnotes: SourceReference[],     // Array of footnote objects
+  footnotesMap: { [key: string]: SourceReference }, // Map for caching
   usageStats: {
     tokensUsed: number,
     cost?: number
   }
 }
 ```
+
+**Note:** The `generatedText` includes automatically appended footnotes citing all sources used during generation. The `footnotes` array and `footnotesMap` provide structured source data for rendering or caching.
 
 **Example:**
 ```typescript
