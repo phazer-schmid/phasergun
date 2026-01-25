@@ -113,14 +113,6 @@
                 <h3 class="document-name">📄 {{ getDocumentName() }}</h3>
               </div>
               
-              <!-- Compliance Summary -->
-              <div class="compliance-summary">
-                <div class="summary-badge" :class="getComplianceBadgeClass()">
-                  {{ getOverallCompliance() }}
-                </div>
-                <p class="summary-text">{{ getSummaryText() }}</p>
-              </div>
-
               <!-- Issues Section -->
               <div v-if="hasIssues()" class="issues-section">
                 <h4 class="section-heading">⚠️ Issues Identified</h4>
