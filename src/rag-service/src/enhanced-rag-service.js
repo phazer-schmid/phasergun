@@ -63,7 +63,123 @@ class EnhancedRAGService {
         return primaryContext;
     }
     /**
-     * Load and parse all files from Procedures folder
+     * Chunk a document into semantic segments
+     */
+    chunkDocument(doc) {
+        const chunks = [];
+        const content = doc.content;
+        // Split by double newlines (paragraphs) or by sections
+        const segments = content.split(/\n\n+/);
+        // Combine small segments and split large ones to target ~500-1000 chars per chunk
+        const targetChunkSize = 800;
+        const maxChunkSize = 1500;
+        let currentChunk = '';
+        let chunkIndex = 0;
+        for (const segment of segments) {
+            const trimmed = segment.trim();
+            if (!trimmed)
+                continue;
+            // If current chunk + segment is still reasonable size, combine them
+            if (currentChunk.length > 0 && (currentChunk.length + trimmed.length) < maxChunkSize) {
+                currentChunk += '\n\n' + trimmed;
+            }
+            else {
+                // Save current chunk if it exists
+                if (currentChunk.length > 0) {
+                    chunks.push({
+                        content: currentChunk,
+                        fileName: doc.fileName,
+                        filePath: doc.filePath,
+                        chunkIndex: chunkIndex++,
+                        totalChunks: 0, // Will update after
+                        keywords: this.extractKeywords(currentChunk)
+                    });
+                }
+                // Start new chunk
+                // If segment itself is too large, split it
+                if (trimmed.length > maxChunkSize) {
+                    const subChunks = this.splitLargeText(trimmed, targetChunkSize);
+                    for (const subChunk of subChunks) {
+                        chunks.push({
+                            content: subChunk,
+                            fileName: doc.fileName,
+                            filePath: doc.filePath,
+                            chunkIndex: chunkIndex++,
+                            totalChunks: 0,
+                            keywords: this.extractKeywords(subChunk)
+                        });
+                    }
+                    currentChunk = '';
+                }
+                else {
+                    currentChunk = trimmed;
+                }
+            }
+        }
+        // Don't forget the last chunk
+        if (currentChunk.length > 0) {
+            chunks.push({
+                content: currentChunk,
+                fileName: doc.fileName,
+                filePath: doc.filePath,
+                chunkIndex: chunkIndex++,
+                totalChunks: 0,
+                keywords: this.extractKeywords(currentChunk)
+            });
+        }
+        // Update totalChunks for all chunks
+        chunks.forEach(chunk => chunk.totalChunks = chunks.length);
+        return chunks;
+    }
+    /**
+     * Split large text into smaller chunks
+     */
+    splitLargeText(text, targetSize) {
+        const chunks = [];
+        const sentences = text.split(/\.(?:\s|$)/);
+        let currentChunk = '';
+        for (const sentence of sentences) {
+            if (!sentence.trim())
+                continue;
+            if (currentChunk.length + sentence.length < targetSize * 1.5) {
+                currentChunk += sentence + '. ';
+            }
+            else {
+                if (currentChunk)
+                    chunks.push(currentChunk.trim());
+                currentChunk = sentence + '. ';
+            }
+        }
+        if (currentChunk)
+            chunks.push(currentChunk.trim());
+        return chunks;
+    }
+    /**
+     * Extract keywords from text for relevance matching
+     */
+    extractKeywords(text) {
+        // Convert to lowercase and remove special characters
+        const cleaned = text.toLowerCase().replace(/[^\w\s]/g, ' ');
+        // Common stop words to filter out
+        const stopWords = new Set([
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+            'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'been', 'be',
+            'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should',
+            'could', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those'
+        ]);
+        // Extract words, filter stop words, count frequency
+        const words = cleaned.split(/\s+/).filter(w => w.length > 3 && !stopWords.has(w));
+        // Get unique important keywords (simple frequency-based)
+        const frequency = new Map();
+        words.forEach(word => frequency.set(word, (frequency.get(word) || 0) + 1));
+        // Return top keywords sorted by frequency
+        return Array.from(frequency.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 20)
+            .map(([word]) => word);
+    }
+    /**
+     * Load and chunk all files from Procedures folder
      */
     async loadProceduresFolder(folderPath) {
         console.log('[EnhancedRAG] Loading Procedures folder:', folderPath);
@@ -71,7 +187,14 @@ class EnhancedRAGService {
             await fs.access(folderPath);
             const documents = await this.fileParser.scanAndParseFolder(folderPath);
             console.log(`[EnhancedRAG] Loaded ${documents.length} files from Procedures folder`);
-            return documents;
+            // Chunk all documents
+            const allChunks = [];
+            for (const doc of documents) {
+                const chunks = this.chunkDocument(doc);
+                allChunks.push(...chunks);
+            }
+            console.log(`[EnhancedRAG] Created ${allChunks.length} chunks from Procedures`);
+            return allChunks;
         }
         catch (error) {
             console.warn('[EnhancedRAG] Procedures folder not found or empty:', folderPath);
@@ -79,7 +202,7 @@ class EnhancedRAGService {
         }
     }
     /**
-     * Load and parse all files from Context folder
+     * Load and chunk all files from Context folder
      */
     async loadContextFolder(folderPath) {
         console.log('[EnhancedRAG] Loading Context folder:', folderPath);
@@ -87,7 +210,14 @@ class EnhancedRAGService {
             await fs.access(folderPath);
             const documents = await this.fileParser.scanAndParseFolder(folderPath);
             console.log(`[EnhancedRAG] Loaded ${documents.length} files from Context folder`);
-            return documents;
+            // Chunk all documents
+            const allChunks = [];
+            for (const doc of documents) {
+                const chunks = this.chunkDocument(doc);
+                allChunks.push(...chunks);
+            }
+            console.log(`[EnhancedRAG] Created ${allChunks.length} chunks from Context`);
+            return allChunks;
         }
         catch (error) {
             console.warn('[EnhancedRAG] Context folder not found or empty:', folderPath);
@@ -178,7 +308,7 @@ class EnhancedRAGService {
         }
         console.log('[EnhancedRAG] Cache invalid or missing, loading fresh knowledge...\n');
         // Load all three sources
-        const [primaryContext, proceduresFiles, contextFiles] = await Promise.all([
+        const [primaryContext, proceduresChunks, contextChunks] = await Promise.all([
             this.loadPrimaryContext(primaryContextPath),
             this.loadProceduresFolder(path.join(projectPath, 'Procedures')),
             this.loadContextFolder(path.join(projectPath, 'Context'))
@@ -190,8 +320,8 @@ class EnhancedRAGService {
             projectPath,
             fingerprint,
             primaryContext,
-            proceduresFiles,
-            contextFiles,
+            proceduresChunks,
+            contextChunks,
             indexedAt: new Date().toISOString()
         };
         // Store in cache
@@ -199,54 +329,97 @@ class EnhancedRAGService {
         console.log('[EnhancedRAG] ========================================');
         console.log('[EnhancedRAG] Knowledge Base Loaded Successfully');
         console.log(`[EnhancedRAG] Primary Context: ✓`);
-        console.log(`[EnhancedRAG] Procedures: ${proceduresFiles.length} files`);
-        console.log(`[EnhancedRAG] Context: ${contextFiles.length} files`);
+        console.log(`[EnhancedRAG] Procedures: ${proceduresChunks.length} chunks`);
+        console.log(`[EnhancedRAG] Context: ${contextChunks.length} chunks`);
         console.log(`[EnhancedRAG] Cache Fingerprint: ${fingerprint.substring(0, 16)}...`);
         console.log('[EnhancedRAG] ========================================\n');
         return knowledgeCache;
     }
     /**
-     * Build RAG context for LLM prompt
+     * Calculate relevance score between query and chunk
      */
-    buildRAGContext(knowledge) {
+    calculateRelevance(queryKeywords, chunk) {
+        const chunkKeywords = new Set(chunk.keywords);
+        let matches = 0;
+        // Count how many query keywords appear in chunk keywords
+        for (const keyword of queryKeywords) {
+            if (chunkKeywords.has(keyword)) {
+                matches++;
+            }
+        }
+        // Normalize by query length
+        return queryKeywords.length > 0 ? matches / queryKeywords.length : 0;
+    }
+    /**
+     * Retrieve top-K most relevant chunks based on query
+     */
+    retrieveRelevantChunks(chunks, queryKeywords, topK = 5) {
+        // Score all chunks
+        const scoredChunks = chunks.map(chunk => ({
+            chunk,
+            score: this.calculateRelevance(queryKeywords, chunk)
+        }));
+        // Sort by score and take top K
+        return scoredChunks
+            .sort((a, b) => b.score - a.score)
+            .slice(0, topK)
+            .map(sc => sc.chunk);
+    }
+    /**
+     * Build RAG context for LLM prompt with relevance filtering
+     */
+    buildRAGContext(knowledge, promptText) {
         const sections = [];
-        // Section 1: Primary Context (PhaserGun role and framework)
+        const MAX_CHUNKS_PER_SOURCE = 8; // Limit chunks to avoid token overflow
+        // Extract keywords from prompt for relevance matching
+        const promptKeywords = promptText ? this.extractKeywords(promptText) : [];
+        // Section 1: Primary Context (always include - it's the role definition)
         sections.push('=== PRIMARY CONTEXT: PHASERGUN AI REGULATORY ENGINEER ===\n');
         sections.push(yaml.dump(knowledge.primaryContext));
         sections.push('\n');
-        // Section 2: Procedures (Company SOPs and Guidelines)
-        if (knowledge.proceduresFiles.length > 0) {
-            sections.push('=== COMPANY PROCEDURES AND SOPS ===\n');
-            knowledge.proceduresFiles.forEach((doc, idx) => {
-                sections.push(`\n--- Procedure ${idx + 1}: ${doc.fileName} ---\n`);
-                sections.push(doc.content);
-                sections.push('\n');
-            });
+        // Section 2: Procedures (Company SOPs and Guidelines) - Top relevant chunks
+        if (knowledge.proceduresChunks.length > 0) {
+            const relevantChunks = promptKeywords.length > 0
+                ? this.retrieveRelevantChunks(knowledge.proceduresChunks, promptKeywords, MAX_CHUNKS_PER_SOURCE)
+                : knowledge.proceduresChunks.slice(0, MAX_CHUNKS_PER_SOURCE);
+            if (relevantChunks.length > 0) {
+                sections.push('=== COMPANY PROCEDURES AND SOPS (Relevant Sections) ===\n');
+                relevantChunks.forEach((chunk, idx) => {
+                    sections.push(`\n--- ${chunk.fileName} (Chunk ${chunk.chunkIndex + 1}/${chunk.totalChunks}) ---\n`);
+                    sections.push(chunk.content);
+                    sections.push('\n');
+                });
+            }
         }
-        // Section 3: Context (Project-Specific Information)
-        if (knowledge.contextFiles.length > 0) {
-            sections.push('=== PROJECT-SPECIFIC CONTEXT ===\n');
-            knowledge.contextFiles.forEach((doc, idx) => {
-                sections.push(`\n--- Context Document ${idx + 1}: ${doc.fileName} ---\n`);
-                sections.push(doc.content);
-                sections.push('\n');
-            });
+        // Section 3: Context (Project-Specific Information) - Top relevant chunks
+        if (knowledge.contextChunks.length > 0) {
+            const relevantChunks = promptKeywords.length > 0
+                ? this.retrieveRelevantChunks(knowledge.contextChunks, promptKeywords, MAX_CHUNKS_PER_SOURCE)
+                : knowledge.contextChunks.slice(0, MAX_CHUNKS_PER_SOURCE);
+            if (relevantChunks.length > 0) {
+                sections.push('=== PROJECT-SPECIFIC CONTEXT (Relevant Sections) ===\n');
+                relevantChunks.forEach((chunk, idx) => {
+                    sections.push(`\n--- ${chunk.fileName} (Chunk ${chunk.chunkIndex + 1}/${chunk.totalChunks}) ---\n`);
+                    sections.push(chunk.content);
+                    sections.push('\n');
+                });
+            }
         }
         return sections.join('');
     }
     /**
-     * Retrieve knowledge context for a given prompt query
-     * This can be enhanced with semantic search later
+     * Retrieve knowledge context for a given prompt query with relevance filtering
      */
-    async retrieveKnowledge(projectPath, primaryContextPath, query) {
+    async retrieveKnowledge(projectPath, primaryContextPath, promptText) {
         const knowledge = await this.loadKnowledge(projectPath, primaryContextPath);
-        const ragContext = this.buildRAGContext(knowledge);
+        const ragContext = this.buildRAGContext(knowledge, promptText);
         const metadata = {
             primaryContextLoaded: !!knowledge.primaryContext,
-            proceduresCount: knowledge.proceduresFiles.length,
-            contextFilesCount: knowledge.contextFiles.length,
+            proceduresChunksTotal: knowledge.proceduresChunks.length,
+            contextChunksTotal: knowledge.contextChunks.length,
             cachedAt: knowledge.indexedAt,
-            fingerprint: knowledge.fingerprint.substring(0, 16)
+            fingerprint: knowledge.fingerprint.substring(0, 16),
+            relevanceFiltering: !!promptText
         };
         return { ragContext, metadata };
     }

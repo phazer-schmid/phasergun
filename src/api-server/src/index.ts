@@ -445,9 +445,11 @@ app.post('/api/generate', async (req: Request, res: Response) => {
     
     const primaryContextPath = path.join(__dirname, '../../rag-service/knowledge-base/context/primary-context.yaml');
     
+    // Pass prompt content to RAG service for relevance-based filtering
     const { ragContext, metadata } = await ragService.retrieveKnowledge(
       projectPath,
-      primaryContextPath
+      primaryContextPath,
+      promptContent
     );
     
     console.log(`[API] RAG Context loaded:`);
