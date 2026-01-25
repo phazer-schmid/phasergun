@@ -6,6 +6,7 @@ import * as crypto from 'crypto';
 import { ComprehensiveFileParser } from '@fda-compliance/file-parser';
 import { EmbeddingService } from './embedding-service';
 import { VectorStore, VectorEntry, SearchResult } from './vector-store';
+import { GroqLLMService } from '@fda-compliance/llm-service';
 
 /**
  * Document chunk with metadata
@@ -447,6 +448,129 @@ export class EnhancedRAGService {
   }
 
   /**
+   * Hash content for cache validation
+   */
+  private hashContent(content: string): string {
+    return crypto.createHash('sha256').update(content).digest('hex');
+  }
+
+  /**
+   * Get or create LLM service for summarization
+   */
+  private getLLMService(): GroqLLMService {
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      throw new Error('[EnhancedRAG] GROQ_API_KEY environment variable not set. Required for SOP summarization.');
+    }
+    return new GroqLLMService(apiKey, 'llama-3.1-8b-instant');
+  }
+
+  /**
+   * Generate executive summary for an SOP
+   */
+  private async summarizeSOP(
+    doc: ParsedDocument,
+    llmService: GroqLLMService,
+    summaryWordCount: number = 250
+  ): Promise<string> {
+    const prompt = `You are a regulatory documentation expert. Provide a concise executive summary (${summaryWordCount} words) of the following SOP document. Focus on:
+1. Purpose and scope
+2. Key requirements and steps
+3. Relevant definitions and references
+
+SOP Document:
+${doc.content}
+
+Executive Summary:`;
+
+    try {
+      const response = await llmService.generateText(prompt);
+      return response.generatedText;
+    } catch (error) {
+      console.error(`[EnhancedRAG] Failed to summarize ${doc.fileName}:`, error);
+      // Fallback: return first 500 words
+      return doc.content.split(/\s+/).slice(0, 500).join(' ') + '...';
+    }
+  }
+
+  /**
+   * Generate and cache summaries for all procedures
+   */
+  private async generateSOPSummaries(
+    proceduresFiles: ParsedDocument[],
+    llmService: GroqLLMService,
+    projectPath: string,
+    summaryWordCount: number = 250
+  ): Promise<Map<string, string>> {
+    const summaryCache = new Map<string, string>();
+    
+    if (proceduresFiles.length === 0) {
+      return summaryCache;
+    }
+    
+    console.log('[EnhancedRAG] Generating SOP summaries...');
+    
+    // Load existing cache if available
+    const cachePath = path.join(projectPath, '.phasergun-cache', 'sop-summaries.json');
+    let cached: any = {};
+    
+    try {
+      const cacheData = await fs.readFile(cachePath, 'utf-8');
+      cached = JSON.parse(cacheData);
+      
+      // Check if cached summaries are still valid
+      for (const doc of proceduresFiles) {
+        const hash = this.hashContent(doc.content);
+        if (cached[doc.fileName] && cached[doc.fileName].hash === hash) {
+          summaryCache.set(doc.fileName, cached[doc.fileName].summary);
+          console.log(`[EnhancedRAG] ✓ Using cached summary for ${doc.fileName}`);
+        }
+      }
+    } catch {
+      // No cache exists, will generate fresh
+      console.log('[EnhancedRAG] No existing summary cache found');
+    }
+    
+    // Generate missing summaries
+    for (const doc of proceduresFiles) {
+      if (!summaryCache.has(doc.fileName)) {
+        console.log(`[EnhancedRAG] Summarizing ${doc.fileName}...`);
+        const summary = await this.summarizeSOP(doc, llmService, summaryWordCount);
+        summaryCache.set(doc.fileName, summary);
+        
+        // Rate limit: wait 1 second between API calls
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    // Save cache - preserve original timestamps for cached entries
+    const cacheData: any = {};
+    for (const doc of proceduresFiles) {
+      const summary = summaryCache.get(doc.fileName);
+      if (summary) {
+        const hash = this.hashContent(doc.content);
+        // Preserve original timestamp if entry was cached, otherwise use current time
+        const existingEntry = cached[doc.fileName];
+        const generatedAt = (existingEntry && existingEntry.hash === hash) 
+          ? existingEntry.generatedAt 
+          : new Date().toISOString();
+        
+        cacheData[doc.fileName] = {
+          hash: hash,
+          summary: summary,
+          generatedAt: generatedAt
+        };
+      }
+    }
+    
+    await fs.mkdir(path.dirname(cachePath), { recursive: true });
+    await fs.writeFile(cachePath, JSON.stringify(cacheData, null, 2));
+    
+    console.log('[EnhancedRAG] ✓ SOP summaries complete');
+    return summaryCache;
+  }
+
+  /**
    * Compute fingerprint for a folder (all file paths, sizes, and mtimes)
    */
   private async computeFolderFingerprint(folderPath: string): Promise<string> {
@@ -704,6 +828,9 @@ export class EnhancedRAGService {
       contextChunks?: number;     // How many context file chunks (default: 5)
       includeFullPrimary?: boolean; // Always include full primary context (default: true)
       maxTokens?: number;         // Maximum tokens for context (default: 150000)
+      includeSummaries?: boolean; // Include SOP summaries (default: true)
+      summaryWordCount?: number;  // Summary word count (default: 250)
+      llmService?: GroqLLMService; // Optional LLM service for summarization
     } = {}
   ): Promise<{
     ragContext: string;
@@ -711,6 +838,7 @@ export class EnhancedRAGService {
       primaryContextIncluded: boolean;
       procedureChunksRetrieved: number;
       contextChunksRetrieved: number;
+      summariesGenerated: number;
       totalTokensEstimate: number;
       sources: string[];
     };
@@ -718,38 +846,68 @@ export class EnhancedRAGService {
     // 1. Load knowledge (from cache if valid)
     const knowledge = await this.loadKnowledge(projectPath, primaryContextPath);
     
-    // 2. Embed the prompt
+    // 2. Generate SOP summaries if requested
+    let sopSummaries = new Map<string, string>();
+    if (options.includeSummaries ?? true) {
+      try {
+        // Get procedure files
+        const proceduresPath = path.join(projectPath, 'Procedures');
+        let proceduresFiles: ParsedDocument[] = [];
+        try {
+          await fs.access(proceduresPath);
+          proceduresFiles = await this.fileParser.scanAndParseFolder(proceduresPath);
+        } catch {
+          // No procedures folder
+        }
+        
+        if (proceduresFiles.length > 0) {
+          // Use provided LLM service or create one
+          const llmService = options.llmService || this.getLLMService();
+          sopSummaries = await this.generateSOPSummaries(
+            proceduresFiles,
+            llmService,
+            projectPath,
+            options.summaryWordCount || 250
+          );
+        }
+      } catch (error) {
+        console.warn('[EnhancedRAG] Failed to generate SOP summaries, continuing without them:', error);
+      }
+    }
+    
+    // 3. Embed the prompt
     const embeddingService = await this.getEmbeddingService(projectPath);
     const promptEmbedding = await embeddingService.embedText(prompt);
     const promptEmbeddingArray = VectorStore.float32ArrayToNumbers(promptEmbedding);
     
-    // 3. Search procedures
+    // 4. Search procedures
     const procedureResults = this.vectorStore!.search(
       promptEmbeddingArray,
       options.procedureChunks || 5,
       'procedure'
     );
     
-    // 4. Search context files
+    // 5. Search context files
     const contextResults = this.vectorStore!.search(
       promptEmbeddingArray,
       options.contextChunks || 5,
       'context'
     );
     
-    // 5. Assemble tiered context
+    // 6. Assemble tiered context
     let ragContext = this.assembleContext(
       knowledge.primaryContext,
       procedureResults,
       contextResults,
+      sopSummaries,
       options
     );
     
-    // 6. Enforce token limits if needed
+    // 7. Enforce token limits if needed
     const maxTokens = options.maxTokens || 150000;
     ragContext = await this.enforceTokenLimit(ragContext, maxTokens);
     
-    // 7. Build metadata
+    // 8. Build metadata
     const sources = new Set<string>();
     procedureResults.forEach(r => sources.add(r.entry.metadata.fileName));
     contextResults.forEach(r => sources.add(r.entry.metadata.fileName));
@@ -758,6 +916,7 @@ export class EnhancedRAGService {
       primaryContextIncluded: options.includeFullPrimary ?? true,
       procedureChunksRetrieved: procedureResults.length,
       contextChunksRetrieved: contextResults.length,
+      summariesGenerated: sopSummaries.size,
       totalTokensEstimate: this.estimateTokens(ragContext),
       sources: Array.from(sources)
     };
@@ -772,6 +931,7 @@ export class EnhancedRAGService {
     primaryContext: any,
     procedureChunks: SearchResult[],
     contextChunks: SearchResult[],
+    sopSummaries: Map<string, string>,
     options: any
   ): string {
     const sections: string[] = [];
@@ -783,12 +943,22 @@ export class EnhancedRAGService {
       sections.push('\n');
     }
     
-    // TIER 2: Retrieved Procedure Chunks (most relevant)
+    // TIER 1.5: SOP Executive Summaries (NEW - provides overview)
+    if (sopSummaries.size > 0) {
+      sections.push('=== COMPANY PROCEDURES OVERVIEW (Executive Summaries) ===\n');
+      sopSummaries.forEach((summary, fileName) => {
+        sections.push(`\n--- ${fileName} ---\n`);
+        sections.push(summary);
+        sections.push('\n');
+      });
+    }
+    
+    // TIER 2: Retrieved Procedure Chunks (detailed sections)
     if (procedureChunks.length > 0) {
-      sections.push('=== RELEVANT COMPANY PROCEDURES (Retrieved) ===\n');
+      sections.push('=== RELEVANT PROCEDURE DETAILS (Retrieved Sections) ===\n');
       procedureChunks.forEach((result, idx) => {
         const similarity = (result.similarity * 100).toFixed(1);
-        sections.push(`\n--- [Procedure ${idx + 1}] ${result.entry.metadata.fileName} (Section ${result.entry.metadata.chunkIndex + 1}, Similarity: ${similarity}%) ---\n`);
+        sections.push(`\n--- [${result.entry.metadata.fileName}] Section ${result.entry.metadata.chunkIndex + 1} (Similarity: ${similarity}%) ---\n`);
         sections.push(result.entry.metadata.content);
         sections.push('\n');
       });

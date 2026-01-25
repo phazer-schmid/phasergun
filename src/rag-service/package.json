@@ -12,7 +12,8 @@
     "test:embeddings": "ts-node test-embeddings.ts",
     "test:vector-store": "ts-node test-vector-store.ts",
     "test:chunking": "ts-node test-chunking-rag.ts",
-    "test:semantic-retrieval": "ts-node test-semantic-retrieval.ts"
+    "test:semantic-retrieval": "ts-node test-semantic-retrieval.ts",
+    "test:sop-summarization": "ts-node test-sop-summarization.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.0",
