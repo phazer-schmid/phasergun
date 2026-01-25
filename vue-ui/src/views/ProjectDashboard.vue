@@ -381,27 +381,6 @@ function getDocumentName(): string {
   return data?.document_name || '';
 }
 
-function getOverallCompliance(): string {
-  const data = getStructuredData();
-  const compliance = data?.overall_compliance || 'unknown';
-  return compliance.toUpperCase().replace(/-/g, ' ');
-}
-
-function getComplianceBadgeClass(): string {
-  const data = getStructuredData();
-  const compliance = data?.overall_compliance || '';
-  
-  if (compliance === 'compliant') return 'badge-compliant';
-  if (compliance === 'partially-compliant') return 'badge-partial';
-  if (compliance === 'non-compliant') return 'badge-non-compliant';
-  return '';
-}
-
-function getSummaryText(): string {
-  const data = getStructuredData();
-  return data?.summary || '';
-}
-
 function hasIssues(): boolean {
   const data = getStructuredData();
   return Array.isArray(data?.issues) && data.issues.length > 0;
