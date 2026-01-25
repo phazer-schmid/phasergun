@@ -5,6 +5,7 @@ import * as yaml from 'js-yaml';
 import * as crypto from 'crypto';
 import { ComprehensiveFileParser } from '@fda-compliance/file-parser';
 import { EmbeddingService } from './embedding-service';
+import { VectorStore, VectorEntry } from './vector-store';
 
 /**
  * Document chunk with metadata
@@ -25,12 +26,8 @@ interface KnowledgeCache {
   projectPath: string;
   fingerprint: string;
   primaryContext: any;
-  proceduresChunks: DocumentChunk[];
-  contextChunks: DocumentChunk[];
-  proceduresEmbeddings?: Float32Array[];
-  contextEmbeddings?: Float32Array[];
-  embeddingModelVersion?: string;
   indexedAt: string;
+  vectorStoreFingerprint: string;
 }
 
 /**
@@ -44,10 +41,18 @@ export class EnhancedRAGService {
   private cache: Map<string, KnowledgeCache> = new Map();
   private fileParser: ComprehensiveFileParser;
   private embeddingService: EmbeddingService | null = null;
+  private vectorStore: VectorStore | null = null;
   private useEmbeddings: boolean = true; // Feature flag
   
   constructor() {
     this.fileParser = new ComprehensiveFileParser();
+  }
+
+  /**
+   * Get vector store path for a project
+   */
+  private getVectorStorePath(projectPath: string): string {
+    return path.join(projectPath, '.phasergun-cache', 'vector-store.json');
   }
 
   /**
@@ -75,7 +80,192 @@ export class EnhancedRAGService {
   }
 
   /**
-   * Chunk a document into semantic segments
+   * Chunk SOPs with section-aware splitting
+   * Detects headers (##, ###, numbered sections) and keeps sections together
+   */
+  private chunkSectionAware(content: string, fileName: string, filePath: string): string[] {
+    const chunks: string[] = [];
+    const MIN_CHUNK_SIZE = 2000; // ~500 tokens
+    const MAX_CHUNK_SIZE = 4000; // ~1000 tokens
+    
+    // Detect section headers: ##, ###, numbered (1., 1.1, etc.)
+    const sectionRegex = /^(#{1,6}\s+.*|\d+\.(\d+\.)*\s+.*)$/gm;
+    const lines = content.split('\n');
+    
+    let currentChunk = '';
+    let currentSection = '';
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const isHeader = sectionRegex.test(line.trim());
+      
+      if (isHeader && currentChunk.length > MIN_CHUNK_SIZE) {
+        // Save current chunk and start new one
+        if (currentChunk.trim()) {
+          chunks.push(currentChunk.trim());
+        }
+        currentChunk = line + '\n';
+      } else if (currentChunk.length + line.length > MAX_CHUNK_SIZE && currentChunk.length > MIN_CHUNK_SIZE) {
+        // Chunk is getting too large, split here
+        if (currentChunk.trim()) {
+          chunks.push(currentChunk.trim());
+        }
+        currentChunk = line + '\n';
+      } else {
+        currentChunk += line + '\n';
+      }
+    }
+    
+    // Add final chunk
+    if (currentChunk.trim()) {
+      chunks.push(currentChunk.trim());
+    }
+    
+    // If no sections detected, fall back to paragraph chunking
+    if (chunks.length === 0 || (chunks.length === 1 && chunks[0].length > MAX_CHUNK_SIZE)) {
+      return this.chunkWithOverlap(content, fileName, filePath);
+    }
+    
+    return chunks;
+  }
+
+  /**
+   * Chunk context files with paragraph-based splitting and overlap
+   * Chunk size: 500-1000 tokens (~2000-4000 chars)
+   * Overlap: 100 tokens (~400 chars)
+   */
+  private chunkWithOverlap(content: string, fileName: string, filePath: string): string[] {
+    const chunks: string[] = [];
+    const TARGET_CHUNK_SIZE = 3000; // ~750 tokens
+    const MAX_CHUNK_SIZE = 4000; // ~1000 tokens
+    const OVERLAP_SIZE = 400; // ~100 tokens
+    
+    // Split by paragraphs
+    const paragraphs = content.split(/\n\n+/).filter(p => p.trim());
+    
+    let currentChunk = '';
+    let previousOverlap = '';
+    
+    for (const paragraph of paragraphs) {
+      const trimmed = paragraph.trim();
+      if (!trimmed) continue;
+      
+      // Start new chunk with overlap from previous
+      if (currentChunk.length === 0 && previousOverlap) {
+        currentChunk = previousOverlap + '\n\n';
+      }
+      
+      // Check if adding this paragraph would exceed max size
+      if (currentChunk.length > 0 && (currentChunk.length + trimmed.length) > MAX_CHUNK_SIZE) {
+        // Save current chunk
+        chunks.push(currentChunk.trim());
+        
+        // Extract overlap (last OVERLAP_SIZE characters)
+        previousOverlap = currentChunk.substring(Math.max(0, currentChunk.length - OVERLAP_SIZE)).trim();
+        
+        // Start new chunk with overlap
+        currentChunk = previousOverlap + '\n\n' + trimmed;
+      } else {
+        // Add paragraph to current chunk
+        if (currentChunk.length > 0) {
+          currentChunk += '\n\n' + trimmed;
+        } else {
+          currentChunk = trimmed;
+        }
+      }
+    }
+    
+    // Add final chunk
+    if (currentChunk.trim()) {
+      chunks.push(currentChunk.trim());
+    }
+    
+    return chunks.length > 0 ? chunks : [content];
+  }
+
+  /**
+   * Chunk and embed a parsed document
+   * Returns VectorEntry objects ready for storage
+   */
+  private async chunkAndEmbedDocument(
+    doc: ParsedDocument,
+    category: 'procedure' | 'context',
+    projectPath: string
+  ): Promise<VectorEntry[]> {
+    // 1. Intelligent chunking based on category
+    const contentChunks = category === 'procedure'
+      ? this.chunkSectionAware(doc.content, doc.fileName, doc.filePath)
+      : this.chunkWithOverlap(doc.content, doc.fileName, doc.filePath);
+    
+    console.log(`[EnhancedRAG] Chunked ${doc.fileName}: ${contentChunks.length} chunks`);
+    
+    if (contentChunks.length === 0) {
+      return [];
+    }
+    
+    // 2. Generate embeddings for all chunks (batch processing)
+    const embeddingService = await this.getEmbeddingService(projectPath);
+    const embeddings = await embeddingService.embedBatch(
+      contentChunks,
+      Array(contentChunks.length).fill(doc.filePath)
+    );
+    
+    // 3. Create VectorEntry objects
+    const vectorEntries: VectorEntry[] = contentChunks.map((content, chunkIndex) => {
+      return VectorStore.createEntry(
+        content,
+        embeddings[chunkIndex],
+        {
+          fileName: doc.fileName,
+          filePath: doc.filePath,
+          category,
+          chunkIndex
+        }
+      );
+    });
+    
+    return vectorEntries;
+  }
+
+  /**
+   * Process all documents and build vector store
+   */
+  private async buildVectorStore(
+    proceduresFiles: ParsedDocument[],
+    contextFiles: ParsedDocument[],
+    projectPath: string
+  ): Promise<void> {
+    console.log('[EnhancedRAG] Building vector store...');
+    
+    // Get embedding service model info
+    const embeddingService = await this.getEmbeddingService(projectPath);
+    const modelInfo = embeddingService.getModelInfo();
+    
+    // Create new vector store
+    this.vectorStore = new VectorStore(projectPath, modelInfo.version);
+    
+    // Process procedures
+    const procedureVectors = await Promise.all(
+      proceduresFiles.map(doc => this.chunkAndEmbedDocument(doc, 'procedure', projectPath))
+    );
+    
+    // Process context files
+    const contextVectors = await Promise.all(
+      contextFiles.map(doc => this.chunkAndEmbedDocument(doc, 'context', projectPath))
+    );
+    
+    // Flatten and add to vector store
+    const allVectors = [...procedureVectors.flat(), ...contextVectors.flat()];
+    allVectors.forEach(entry => this.vectorStore!.addEntry(entry));
+    
+    // Save to disk
+    await this.vectorStore.save(this.getVectorStorePath(projectPath));
+    
+    console.log(`[EnhancedRAG] ✓ Vector store built: ${allVectors.length} chunks indexed`);
+  }
+
+  /**
+   * Chunk a document into semantic segments (OLD - DEPRECATED)
    */
   private chunkDocument(doc: ParsedDocument): DocumentChunk[] {
     const chunks: DocumentChunk[] = [];
@@ -357,75 +547,77 @@ export class EnhancedRAGService {
     
     if (cacheValid) {
       console.log('[EnhancedRAG] ✓ Cache is valid, using cached knowledge\n');
+      // Load vector store from disk
+      const vectorStorePath = this.getVectorStorePath(projectPath);
+      this.vectorStore = await VectorStore.load(vectorStorePath, projectPath);
       return this.cache.get(projectPath)!;
     }
     
     console.log('[EnhancedRAG] Cache invalid or missing, loading fresh knowledge...\n');
     
-    // Load all three sources
-    const [primaryContext, proceduresChunks, contextChunks] = await Promise.all([
-      this.loadPrimaryContext(primaryContextPath),
-      this.loadProceduresFolder(path.join(projectPath, 'Procedures')),
-      this.loadContextFolder(path.join(projectPath, 'Context'))
-    ]);
+    // Load primary context
+    const primaryContext = await this.loadPrimaryContext(primaryContextPath);
     
-    // Generate embeddings for chunks if enabled
-    let proceduresEmbeddings: Float32Array[] | undefined;
-    let contextEmbeddings: Float32Array[] | undefined;
-    let embeddingModelVersion: string | undefined;
+    // Load and parse documents
+    const proceduresPath = path.join(projectPath, 'Procedures');
+    const contextPath = path.join(projectPath, 'Context');
     
-    if (this.useEmbeddings && (proceduresChunks.length > 0 || contextChunks.length > 0)) {
-      try {
-        const embeddingService = await this.getEmbeddingService(projectPath);
-        const modelInfo = embeddingService.getModelInfo();
-        embeddingModelVersion = modelInfo.version;
-        
-        // Generate embeddings for procedures chunks
-        if (proceduresChunks.length > 0) {
-          const texts = proceduresChunks.map(c => c.content);
-          const paths = proceduresChunks.map(c => c.filePath);
-          proceduresEmbeddings = await embeddingService.embedBatch(texts, paths);
-        }
-        
-        // Generate embeddings for context chunks
-        if (contextChunks.length > 0) {
-          const texts = contextChunks.map(c => c.content);
-          const paths = contextChunks.map(c => c.filePath);
-          contextEmbeddings = await embeddingService.embedBatch(texts, paths);
-        }
-        
-        console.log(`[EnhancedRAG] ✓ Embeddings generated (${modelInfo.name}, ${modelInfo.dimensions}D)`);
-      } catch (error) {
-        console.warn('[EnhancedRAG] Failed to generate embeddings, falling back to keyword matching:', error);
-      }
+    let proceduresFiles: ParsedDocument[] = [];
+    let contextFiles: ParsedDocument[] = [];
+    
+    try {
+      await fs.access(proceduresPath);
+      proceduresFiles = await this.fileParser.scanAndParseFolder(proceduresPath);
+      console.log(`[EnhancedRAG] Loaded ${proceduresFiles.length} files from Procedures folder`);
+    } catch (error) {
+      console.warn('[EnhancedRAG] Procedures folder not found or empty');
     }
     
-    // Compute fingerprint
+    try {
+      await fs.access(contextPath);
+      contextFiles = await this.fileParser.scanAndParseFolder(contextPath);
+      console.log(`[EnhancedRAG] Loaded ${contextFiles.length} files from Context folder`);
+    } catch (error) {
+      console.warn('[EnhancedRAG] Context folder not found or empty');
+    }
+    
+    // Build vector store if there are documents to process
+    if (proceduresFiles.length > 0 || contextFiles.length > 0) {
+      await this.buildVectorStore(proceduresFiles, contextFiles, projectPath);
+    } else {
+      console.log('[EnhancedRAG] No documents to index, creating empty vector store');
+      const embeddingService = await this.getEmbeddingService(projectPath);
+      const modelInfo = embeddingService.getModelInfo();
+      this.vectorStore = new VectorStore(projectPath, modelInfo.version);
+      // Save empty vector store
+      await this.vectorStore.save(this.getVectorStorePath(projectPath));
+    }
+    
+    // Compute fingerprint including vector store
     const fingerprint = await this.computeCacheFingerprint(projectPath, primaryContextPath);
+    const vectorStoreFingerprint = this.vectorStore?.getFingerprint() || 'empty';
     
     // Create cache entry
     const knowledgeCache: KnowledgeCache = {
       projectPath,
       fingerprint,
       primaryContext,
-      proceduresChunks,
-      contextChunks,
-      proceduresEmbeddings,
-      contextEmbeddings,
-      embeddingModelVersion,
-      indexedAt: new Date().toISOString()
+      indexedAt: new Date().toISOString(),
+      vectorStoreFingerprint
     };
     
     // Store in cache
     this.cache.set(projectPath, knowledgeCache);
     
+    const stats = this.vectorStore!.getStats();
     console.log('[EnhancedRAG] ========================================');
     console.log('[EnhancedRAG] Knowledge Base Loaded Successfully');
     console.log(`[EnhancedRAG] Primary Context: ✓`);
-    console.log(`[EnhancedRAG] Procedures: ${proceduresChunks.length} chunks`);
-    console.log(`[EnhancedRAG] Context: ${contextChunks.length} chunks`);
-    console.log(`[EnhancedRAG] Embeddings: ${proceduresEmbeddings || contextEmbeddings ? '✓' : '✗'}`);
+    console.log(`[EnhancedRAG] Procedures: ${stats.procedureEntries} chunks`);
+    console.log(`[EnhancedRAG] Context: ${stats.contextEntries} chunks`);
+    console.log(`[EnhancedRAG] Total Vectors: ${stats.totalEntries}`);
     console.log(`[EnhancedRAG] Cache Fingerprint: ${fingerprint.substring(0, 16)}...`);
+    console.log(`[EnhancedRAG] VectorStore Fingerprint: ${vectorStoreFingerprint.substring(0, 16)}...`);
     console.log('[EnhancedRAG] ========================================\n');
     
     return knowledgeCache;
@@ -501,73 +693,73 @@ export class EnhancedRAGService {
 
   /**
    * Build RAG context for LLM prompt with relevance filtering
-   * Uses embeddings for semantic search when available
+   * Uses VectorStore for semantic search
    */
-  async buildRAGContext(knowledge: KnowledgeCache, promptText?: string): Promise<string> {
+  async buildRAGContext(knowledge: KnowledgeCache, promptText?: string, projectPath?: string): Promise<string> {
     const sections: string[] = [];
     const MAX_CHUNKS_PER_SOURCE = 8; // Limit chunks to avoid token overflow
-    
-    // Extract keywords from prompt for relevance matching
-    const promptKeywords = promptText ? this.extractKeywords(promptText) : [];
     
     // Section 1: Primary Context (always include - it's the role definition)
     sections.push('=== PRIMARY CONTEXT: PHASERGUN AI REGULATORY ENGINEER ===\n');
     sections.push(yaml.dump(knowledge.primaryContext));
     sections.push('\n');
     
-    // Section 2: Procedures (Company SOPs and Guidelines) - Top relevant chunks
-    if (knowledge.proceduresChunks.length > 0) {
-      let relevantChunks: DocumentChunk[];
-      
-      // Use embeddings if available and we have a query
-      if (promptText && knowledge.proceduresEmbeddings && this.useEmbeddings) {
-        relevantChunks = await this.retrieveRelevantChunksWithEmbeddings(
-          knowledge.proceduresChunks,
-          knowledge.proceduresEmbeddings,
-          promptText,
-          knowledge.projectPath,
-          MAX_CHUNKS_PER_SOURCE
-        );
-      } else if (promptKeywords.length > 0) {
-        relevantChunks = this.retrieveRelevantChunks(knowledge.proceduresChunks, promptKeywords, MAX_CHUNKS_PER_SOURCE);
-      } else {
-        relevantChunks = knowledge.proceduresChunks.slice(0, MAX_CHUNKS_PER_SOURCE);
+    // If no vector store or no prompt, skip retrieval
+    if (!this.vectorStore) {
+      console.warn('[EnhancedRAG] No vector store available for retrieval');
+      return sections.join('');
+    }
+    
+    // Section 2 & 3: Use vector store to retrieve relevant chunks
+    if (promptText && this.useEmbeddings) {
+      try {
+        const embeddingService = await this.getEmbeddingService(projectPath || knowledge.projectPath);
+        const queryEmbedding = await embeddingService.embedText(promptText);
+        const queryEmbeddingArray = VectorStore.float32ArrayToNumbers(queryEmbedding);
+        
+        // Search for procedures
+        const procedureResults = this.vectorStore.search(queryEmbeddingArray, MAX_CHUNKS_PER_SOURCE, 'procedure');
+        if (procedureResults.length > 0) {
+          sections.push('=== COMPANY PROCEDURES AND SOPS (Relevant Sections) ===\n');
+          procedureResults.forEach((result, idx) => {
+            sections.push(`\n--- ${result.entry.metadata.fileName} (Chunk ${result.entry.metadata.chunkIndex + 1}, Similarity: ${(result.similarity * 100).toFixed(1)}%) ---\n`);
+            sections.push(result.entry.metadata.content);
+            sections.push('\n');
+          });
+        }
+        
+        // Search for context
+        const contextResults = this.vectorStore.search(queryEmbeddingArray, MAX_CHUNKS_PER_SOURCE, 'context');
+        if (contextResults.length > 0) {
+          sections.push('=== PROJECT-SPECIFIC CONTEXT (Relevant Sections) ===\n');
+          contextResults.forEach((result, idx) => {
+            sections.push(`\n--- ${result.entry.metadata.fileName} (Chunk ${result.entry.metadata.chunkIndex + 1}, Similarity: ${(result.similarity * 100).toFixed(1)}%) ---\n`);
+            sections.push(result.entry.metadata.content);
+            sections.push('\n');
+          });
+        }
+      } catch (error) {
+        console.warn('[EnhancedRAG] Vector search failed, returning primary context only:', error);
       }
+    } else {
+      // No query provided, return top chunks from each category
+      const procedureEntries = this.vectorStore.getEntriesByCategory('procedure').slice(0, MAX_CHUNKS_PER_SOURCE);
+      const contextEntries = this.vectorStore.getEntriesByCategory('context').slice(0, MAX_CHUNKS_PER_SOURCE);
       
-      if (relevantChunks.length > 0) {
-        sections.push('=== COMPANY PROCEDURES AND SOPS (Relevant Sections) ===\n');
-        relevantChunks.forEach((chunk, idx) => {
-          sections.push(`\n--- ${chunk.fileName} (Chunk ${chunk.chunkIndex + 1}/${chunk.totalChunks}) ---\n`);
-          sections.push(chunk.content);
+      if (procedureEntries.length > 0) {
+        sections.push('=== COMPANY PROCEDURES AND SOPS (Sample Sections) ===\n');
+        procedureEntries.forEach((entry, idx) => {
+          sections.push(`\n--- ${entry.metadata.fileName} (Chunk ${entry.metadata.chunkIndex + 1}) ---\n`);
+          sections.push(entry.metadata.content);
           sections.push('\n');
         });
       }
-    }
-    
-    // Section 3: Context (Project-Specific Information) - Top relevant chunks
-    if (knowledge.contextChunks.length > 0) {
-      let relevantChunks: DocumentChunk[];
       
-      // Use embeddings if available and we have a query
-      if (promptText && knowledge.contextEmbeddings && this.useEmbeddings) {
-        relevantChunks = await this.retrieveRelevantChunksWithEmbeddings(
-          knowledge.contextChunks,
-          knowledge.contextEmbeddings,
-          promptText,
-          knowledge.projectPath,
-          MAX_CHUNKS_PER_SOURCE
-        );
-      } else if (promptKeywords.length > 0) {
-        relevantChunks = this.retrieveRelevantChunks(knowledge.contextChunks, promptKeywords, MAX_CHUNKS_PER_SOURCE);
-      } else {
-        relevantChunks = knowledge.contextChunks.slice(0, MAX_CHUNKS_PER_SOURCE);
-      }
-      
-      if (relevantChunks.length > 0) {
-        sections.push('=== PROJECT-SPECIFIC CONTEXT (Relevant Sections) ===\n');
-        relevantChunks.forEach((chunk, idx) => {
-          sections.push(`\n--- ${chunk.fileName} (Chunk ${chunk.chunkIndex + 1}/${chunk.totalChunks}) ---\n`);
-          sections.push(chunk.content);
+      if (contextEntries.length > 0) {
+        sections.push('=== PROJECT-SPECIFIC CONTEXT (Sample Sections) ===\n');
+        contextEntries.forEach((entry, idx) => {
+          sections.push(`\n--- ${entry.metadata.fileName} (Chunk ${entry.metadata.chunkIndex + 1}) ---\n`);
+          sections.push(entry.metadata.content);
           sections.push('\n');
         });
       }
@@ -585,15 +777,19 @@ export class EnhancedRAGService {
     promptText?: string
   ): Promise<{ ragContext: string; metadata: any }> {
     const knowledge = await this.loadKnowledge(projectPath, primaryContextPath);
-    const ragContext = await this.buildRAGContext(knowledge, promptText);
+    const ragContext = await this.buildRAGContext(knowledge, promptText, projectPath);
+    
+    const stats = this.vectorStore?.getStats() || { procedureEntries: 0, contextEntries: 0, totalEntries: 0 };
     
     const metadata = {
       primaryContextLoaded: !!knowledge.primaryContext,
-      proceduresChunksTotal: knowledge.proceduresChunks.length,
-      contextChunksTotal: knowledge.contextChunks.length,
-      embeddingsUsed: !!(knowledge.proceduresEmbeddings || knowledge.contextEmbeddings),
+      proceduresChunksTotal: stats.procedureEntries,
+      contextChunksTotal: stats.contextEntries,
+      totalChunks: stats.totalEntries,
+      embeddingsUsed: true,
       cachedAt: knowledge.indexedAt,
       fingerprint: knowledge.fingerprint.substring(0, 16),
+      vectorStoreFingerprint: knowledge.vectorStoreFingerprint.substring(0, 16),
       relevanceFiltering: !!promptText
     };
     
