@@ -4,6 +4,7 @@ import { ComprehensiveFileParser } from '@fda-compliance/file-parser';
 import { IntelligentChunker } from '@fda-compliance/chunker';
 import { EnhancedRAGService } from '@fda-compliance/rag-service';
 import * as path from 'path';
+import * as fs from 'fs/promises';
 
 const router = Router();
 
@@ -13,19 +14,36 @@ const router = Router();
  */
 router.post('/generate', async (req, res) => {
   try {
-    const { projectPath, primaryContextPath, prompt, options } = req.body;
+    const { projectPath, promptFilePath, options } = req.body;
     
     // Validate input
-    if (!projectPath || !primaryContextPath || !prompt) {
+    if (!projectPath || !promptFilePath) {
       return res.status(400).json({
-        error: 'Missing required fields: projectPath, primaryContextPath, prompt'
+        error: 'Missing required fields: projectPath, promptFilePath'
       });
     }
+    
+    // Read prompt file content
+    let prompt: string;
+    try {
+      prompt = await fs.readFile(promptFilePath, 'utf-8');
+    } catch (error) {
+      console.error('[API /generate] Failed to read prompt file:', error);
+      return res.status(400).json({
+        error: `Failed to read prompt file: ${promptFilePath}`
+      });
+    }
+    
+    // Determine primaryContextPath (from env or default location)
+    const primaryContextPath = process.env.PRIMARY_CONTEXT_PATH || 
+      path.join(__dirname, '../../../rag-service/knowledge-base/context/primary-context.yaml');
     
     console.log(`\n[API /generate] ========================================`);
     console.log(`[API /generate] Prompt-based generation request`);
     console.log(`[API /generate] Project: ${projectPath}`);
+    console.log(`[API /generate] Prompt file: ${promptFilePath}`);
     console.log(`[API /generate] Prompt length: ${prompt.length} chars`);
+    console.log(`[API /generate] Primary context: ${primaryContextPath}`);
     console.log(`[API /generate] ========================================\n`);
     
     // Initialize services
@@ -93,12 +111,18 @@ router.post('/generate', async (req, res) => {
     console.log(`[API /generate] Tokens: ${result.usageStats.tokensUsed}`);
     console.log(`[API /generate] ========================================\n`);
     
-    // Return with sources for footnotes
+    // Return in format expected by frontend
     res.json({
-      success: true,
-      generatedText: result.generatedText,
-      sources: result.sources,
-      usageStats: result.usageStats
+      status: 'complete',
+      message: 'Content generated successfully',
+      generatedContent: result.generatedText,
+      timestamp: new Date().toISOString(),
+      metadata: {
+        sources: result.sources,
+        usageStats: result.usageStats,
+        footnotes: result.footnotes,
+        footnotesMap: result.footnotesMap
+      }
     });
     
   } catch (error) {
