@@ -2,7 +2,7 @@
 import { OrchestratorService } from './index';
 import { MockFileParser } from '@fda-compliance/file-parser';
 import { MockChunker } from '@fda-compliance/chunker';
-import { MockRAGService } from '@fda-compliance/rag-service';
+import { EnhancedRAGService } from '@fda-compliance/rag-service';
 import { MockLLMService } from '@fda-compliance/llm-service';
 
 async function main() {
@@ -11,15 +11,15 @@ async function main() {
   console.log('╚═══════════════════════════════════════════════════════╝');
   console.log('');
   
-  // Initialize orchestrator with all mock services
+  // Initialize orchestrator with all services
   const orchestrator = new OrchestratorService(
     new MockFileParser(),
     new MockChunker(),
-    new MockRAGService(),
+    new EnhancedRAGService(),
     new MockLLMService()
   );
   
-  const testFolder = process.argv[2] || '/sample/dhf/planning-phase';
+  const testFolder = process.argv[2] || require('path').join(__dirname, '../test-project');
   
   console.log(`Test Input: ${testFolder}`);
   console.log('');
@@ -45,8 +45,21 @@ async function main() {
   }
   
   console.log('');
-  console.log('✓ Complete end-to-end orchestration test successful');
-  console.log('');
+  
+  // Exit with appropriate code based on result
+  if (result.status === 'complete') {
+    console.log('✓ Orchestration test PASSED - Analysis completed successfully');
+    console.log('');
+    process.exit(0);
+  } else {
+    console.log('✗ Orchestration test FAILED - Analysis returned error status');
+    console.log('');
+    process.exit(1);
+  }
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error('\n✗ Orchestration test FAILED - Unhandled exception');
+  console.error(error);
+  process.exit(1);
+});

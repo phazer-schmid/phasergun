@@ -214,6 +214,9 @@ export class InMemoryRAGService implements RAGService {
   }
 }
 
+// Export EnhancedRAGService for semantic retrieval
+export { EnhancedRAGService } from './enhanced-rag-service';
+
 /**
  * Mock Implementation of RAG Service
  * Returns static thinking document and regulatory context

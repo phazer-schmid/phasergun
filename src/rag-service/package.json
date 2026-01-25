@@ -1,8 +1,9 @@
 {
-  "name": "dhf-rag-validation-system",
+  "name": "@fda-compliance/rag-service",
   "version": "1.0.0",
   "description": "Complete DHF validation with 148 checks + RAG",
-  "main": "src/index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "dev": "ts-node src/index.ts",
