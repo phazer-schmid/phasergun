@@ -7,6 +7,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import * as os from 'os';
 
 /**
  * Vector entry with embedding and metadata
@@ -307,35 +308,41 @@ export class VectorStore {
 
   /**
    * Save vector store to disk
-   * Saves to: <projectPath>/.phasergun-cache/vector-store.json
+   * Saves to system temp directory to avoid permission issues
    */
   async save(storePath?: string): Promise<void> {
     const savePath = storePath || this.getDefaultStorePath();
     
-    // Ensure directory exists
-    const dir = path.dirname(savePath);
-    await fs.mkdir(dir, { recursive: true });
+    try {
+      // Ensure directory exists
+      const dir = path.dirname(savePath);
+      await fs.mkdir(dir, { recursive: true });
 
-    // Prepare data for serialization
-    const data: VectorStoreData = {
-      projectPath: this.projectPath,
-      entries: this.entries,
-      fingerprint: this.fingerprint,
-      createdAt: this.createdAt,
-      updatedAt: this.updatedAt,
-      modelVersion: this.modelVersion,
-      totalEntries: this.entries.length
-    };
+      // Prepare data for serialization
+      const data: VectorStoreData = {
+        projectPath: this.projectPath,
+        entries: this.entries,
+        fingerprint: this.fingerprint,
+        createdAt: this.createdAt,
+        updatedAt: this.updatedAt,
+        modelVersion: this.modelVersion,
+        totalEntries: this.entries.length
+      };
 
-    // Write to disk
-    await fs.writeFile(savePath, JSON.stringify(data, null, 2), 'utf8');
-    
-    console.log(`[VectorStore] Saved ${this.entries.length} entries to ${savePath}`);
+      // Write to disk
+      await fs.writeFile(savePath, JSON.stringify(data, null, 2), 'utf8');
+      
+      console.log(`[VectorStore] Saved ${this.entries.length} entries to ${savePath}`);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error(`[VectorStore] Failed to save vector store (continuing anyway):`, errorMsg);
+      // Don't throw - allow the system to continue even if save fails
+    }
   }
 
   /**
    * Load vector store from disk
-   * Loads from: <projectPath>/.phasergun-cache/vector-store.json
+   * Loads from system temp directory
    */
   static async load(storePath: string, projectPath?: string): Promise<VectorStore> {
     try {
@@ -396,9 +403,13 @@ export class VectorStore {
 
   /**
    * Get default store path (static method)
+   * Uses system temp directory to avoid permission issues with mounted volumes
    */
   private static getDefaultStorePathStatic(projectPath: string): string {
-    return path.join(projectPath, '.phasergun-cache', 'vector-store.json');
+    // Use system temp directory for cache instead of project directory
+    const tempBase = os.tmpdir();
+    const cacheBaseName = crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8);
+    return path.join(tempBase, 'phasergun-cache', 'vector-store', cacheBaseName, 'vector-store.json');
   }
 
   /**

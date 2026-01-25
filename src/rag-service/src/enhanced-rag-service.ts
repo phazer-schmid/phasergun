@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
 import * as crypto from 'crypto';
+import * as os from 'os';
 import { ComprehensiveFileParser } from '@fda-compliance/file-parser';
 import { EmbeddingService } from './embedding-service';
 import { VectorStore, VectorEntry, SearchResult } from './vector-store';
@@ -51,9 +52,22 @@ export class EnhancedRAGService {
 
   /**
    * Get vector store path for a project
+   * Uses system temp directory to avoid permission issues
    */
   private getVectorStorePath(projectPath: string): string {
-    return path.join(projectPath, '.phasergun-cache', 'vector-store.json');
+    const tempBase = os.tmpdir();
+    const cacheBaseName = crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8);
+    return path.join(tempBase, 'phasergun-cache', 'vector-store', cacheBaseName, 'vector-store.json');
+  }
+
+  /**
+   * Get SOP summaries cache path for a project
+   * Uses system temp directory to avoid permission issues
+   */
+  private getSOPSummariesCachePath(projectPath: string): string {
+    const tempBase = os.tmpdir();
+    const cacheBaseName = crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8);
+    return path.join(tempBase, 'phasergun-cache', 'sop-summaries', cacheBaseName, 'sop-summaries.json');
   }
 
   /**
@@ -511,7 +525,7 @@ Executive Summary:`;
     console.log('[EnhancedRAG] Generating SOP summaries...');
     
     // Load existing cache if available
-    const cachePath = path.join(projectPath, '.phasergun-cache', 'sop-summaries.json');
+    const cachePath = this.getSOPSummariesCachePath(projectPath);
     let cached: any = {};
     
     try {
@@ -563,8 +577,14 @@ Executive Summary:`;
       }
     }
     
-    await fs.mkdir(path.dirname(cachePath), { recursive: true });
-    await fs.writeFile(cachePath, JSON.stringify(cacheData, null, 2));
+    try {
+      await fs.mkdir(path.dirname(cachePath), { recursive: true });
+      await fs.writeFile(cachePath, JSON.stringify(cacheData, null, 2));
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.warn('[EnhancedRAG] Failed to save SOP summaries cache (non-fatal):', errorMsg);
+      // Continue anyway - cache is optional
+    }
     
     console.log('[EnhancedRAG] ✓ SOP summaries complete');
     return summaryCache;

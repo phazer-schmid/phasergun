@@ -10,6 +10,7 @@ import { pipeline } from '@xenova/transformers';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import * as os from 'os';
 
 /**
  * Embedding cache entry metadata
@@ -44,10 +45,16 @@ export class EmbeddingService {
   private cacheIndex: Map<string, string> = new Map(); // cacheKey -> filename
   
   private constructor(projectPath?: string) {
-    // Default cache location: project/.phasergun-cache/embeddings/
-    this.cacheDir = projectPath 
-      ? path.join(projectPath, '.phasergun-cache', 'embeddings')
-      : path.join(process.cwd(), '.phasergun-cache', 'embeddings');
+    // Use system temp directory for cache instead of project directory
+    // This avoids permission issues with mounted volumes and project paths
+    const tempBase = os.tmpdir();
+    const cacheBaseName = projectPath 
+      ? crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8)
+      : 'default';
+    
+    this.cacheDir = path.join(tempBase, 'phasergun-cache', 'embeddings', cacheBaseName);
+    
+    console.log(`[EmbeddingService] Cache directory will be: ${this.cacheDir}`);
   }
 
   /**
@@ -97,9 +104,18 @@ export class EmbeddingService {
   private async ensureCacheDir(): Promise<void> {
     try {
       await fs.mkdir(this.cacheDir, { recursive: true });
-      console.log(`[EmbeddingService] Cache directory: ${this.cacheDir}`);
+      
+      // Test write permissions by creating a test file
+      const testFile = path.join(this.cacheDir, '.write-test');
+      await fs.writeFile(testFile, 'test');
+      await fs.unlink(testFile);
+      
+      console.log(`[EmbeddingService] ✓ Cache directory ready: ${this.cacheDir}`);
     } catch (error) {
-      console.error('[EmbeddingService] Failed to create cache directory:', error);
+      console.warn('[EmbeddingService] ⚠ Cache directory not writable, caching will be disabled:', error);
+      console.warn('[EmbeddingService] Embeddings will still work, but without caching');
+      // Set cache dir to null to disable caching
+      this.cacheDir = '';
     }
   }
 
@@ -107,6 +123,12 @@ export class EmbeddingService {
    * Load cache index from disk
    */
   private async loadCacheIndex(): Promise<void> {
+    if (!this.cacheDir) {
+      console.log('[EmbeddingService] Cache disabled, skipping index load');
+      this.cacheIndex = new Map();
+      return;
+    }
+    
     try {
       const indexPath = path.join(this.cacheDir, 'index.json');
       const indexData = await fs.readFile(indexPath, 'utf8');
@@ -125,12 +147,17 @@ export class EmbeddingService {
    * Save cache index to disk
    */
   private async saveCacheIndex(): Promise<void> {
+    if (!this.cacheDir) {
+      // Cache disabled, skip
+      return;
+    }
+    
     try {
       const indexPath = path.join(this.cacheDir, 'index.json');
       const indexData = Object.fromEntries(this.cacheIndex);
       await fs.writeFile(indexPath, JSON.stringify(indexData, null, 2));
     } catch (error) {
-      console.error('[EmbeddingService] Failed to save cache index:', error);
+      console.warn('[EmbeddingService] Failed to save cache index (non-fatal):', error);
     }
   }
 
@@ -147,6 +174,11 @@ export class EmbeddingService {
    * Load embedding from cache
    */
   private async loadFromCache(cacheKey: string): Promise<CachedEmbedding | null> {
+    if (!this.cacheDir) {
+      // Cache disabled
+      return null;
+    }
+    
     try {
       const filename = this.cacheIndex.get(cacheKey);
       if (!filename) {
@@ -166,7 +198,7 @@ export class EmbeddingService {
 
       return { embedding, metadata };
     } catch (error) {
-      // Cache miss or corrupt, return null
+      // Cache miss or corrupt, return null (non-fatal)
       return null;
     }
   }
@@ -175,6 +207,11 @@ export class EmbeddingService {
    * Save embedding to cache
    */
   private async saveToCache(cacheKey: string, embedding: Float32Array, text: string, filePath?: string): Promise<void> {
+    if (!this.cacheDir) {
+      // Cache disabled, skip silently
+      return;
+    }
+    
     try {
       const filename = cacheKey.substring(0, 16); // Use first 16 chars as filename
       const embeddingPath = path.join(this.cacheDir, `${filename}.embedding`);
@@ -199,7 +236,10 @@ export class EmbeddingService {
       await this.saveCacheIndex();
 
     } catch (error) {
-      console.error('[EmbeddingService] Failed to save to cache:', error);
+      // Cache save failed - log but don't crash (non-fatal)
+      // This prevents the cascade of ENOENT errors we were seeing
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.warn('[EmbeddingService] Cache save failed (non-fatal), continuing without cache:', errorMsg);
     }
   }
 
