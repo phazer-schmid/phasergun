@@ -83,14 +83,111 @@ async function loadDHFMapping(): Promise<void> {
 }
 
 /**
- * Health check endpoint
+ * Health check endpoint - performs comprehensive system health verification
  */
-app.get('/api/health', (_req: Request, res: Response) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    dhfMappingLoaded: dhfMapping.length > 0
-  });
+app.get('/api/health', async (_req: Request, res: Response) => {
+  const checks: any = {
+    dhfMapping: { status: 'unknown' },
+    folderStructure: { status: 'unknown' },
+    environment: { status: 'unknown' },
+    configFiles: { status: 'unknown' }
+  };
+  const warnings: string[] = [];
+  let overallStatus = 'healthy';
+
+  try {
+    // Check 1: DHF Mapping
+    if (dhfMapping && dhfMapping.length > 0) {
+      const totalFiles = dhfMapping.reduce((sum, p) => sum + p.dhfFiles.length, 0);
+      checks.dhfMapping = {
+        status: 'ok',
+        details: `${totalFiles} DHF files across ${dhfMapping.length} phases loaded`
+      };
+    } else {
+      checks.dhfMapping = { status: 'error', details: 'DHF mapping not loaded' };
+      overallStatus = 'unhealthy';
+    }
+
+    // Check 2: Folder Structure
+    if (folderStructure && folderStructure.folder_structure) {
+      const phaseCount = Object.keys(folderStructure.folder_structure).length;
+      checks.folderStructure = {
+        status: 'ok',
+        details: `${phaseCount} phases with folder structure configured`
+      };
+    } else {
+      checks.folderStructure = { status: 'error', details: 'Folder structure not loaded' };
+      overallStatus = 'unhealthy';
+    }
+
+    // Check 3: Environment Configuration
+    const llmMode = process.env.LLM_MODE || 'mock';
+    const ragChecksPath = process.env.RAG_CHECKS;
+    const envChecks: any = { llmMode };
+
+    if (!ragChecksPath) {
+      warnings.push('RAG_CHECKS environment variable not set');
+      overallStatus = overallStatus === 'healthy' ? 'degraded' : overallStatus;
+    } else {
+      envChecks.ragChecksConfigured = true;
+    }
+
+    // Check LLM-specific configuration
+    if (llmMode === 'anthropic' && !process.env.ANTHROPIC_API_KEY) {
+      warnings.push('LLM_MODE=anthropic but ANTHROPIC_API_KEY not set');
+      overallStatus = overallStatus === 'healthy' ? 'degraded' : overallStatus;
+    } else if (llmMode === 'mistral' && !process.env.MISTRAL_API_KEY) {
+      warnings.push('LLM_MODE=mistral but MISTRAL_API_KEY not set');
+      overallStatus = overallStatus === 'healthy' ? 'degraded' : overallStatus;
+    } else if (llmMode === 'groq' && !process.env.GROQ_API_KEY) {
+      warnings.push('LLM_MODE=groq but GROQ_API_KEY not set');
+      overallStatus = overallStatus === 'healthy' ? 'degraded' : overallStatus;
+    }
+
+    checks.environment = {
+      status: warnings.length === 0 ? 'ok' : 'warning',
+      ...envChecks
+    };
+
+    // Check 4: Critical Config Files
+    const configFiles = [
+      path.join(__dirname, '../../rag-service/config/folder-structure.yaml'),
+      path.join(__dirname, '../../rag-service/knowledge-base/context/dhf-phase-mapping.yaml')
+    ];
+
+    let accessibleFiles = 0;
+    for (const file of configFiles) {
+      try {
+        await fs.access(file);
+        accessibleFiles++;
+      } catch {
+        warnings.push(`Config file not accessible: ${path.basename(file)}`);
+        overallStatus = 'degraded';
+      }
+    }
+
+    checks.configFiles = {
+      status: accessibleFiles === configFiles.length ? 'ok' : 'warning',
+      accessible: accessibleFiles,
+      total: configFiles.length
+    };
+
+    // Return comprehensive health status
+    res.json({
+      status: overallStatus,
+      timestamp: new Date().toISOString(),
+      services: checks,
+      warnings: warnings.length > 0 ? warnings : undefined
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: error instanceof Error ? error.message : 'Health check failed',
+      services: checks
+    });
+  }
 });
 
 /**
@@ -679,11 +776,13 @@ async function startServer() {
     await loadFolderStructure();
     await loadDHFMapping();
 
+    const totalDHFFiles = dhfMapping.reduce((sum, p) => sum + p.dhfFiles.length, 0);
+
     app.listen(PORT, () => {
       console.log(`\n=== FDA Compliance API Server ===`);
       console.log(`Server running on http://localhost:${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/api/health`);
-      console.log(`DHF mapping loaded: ${dhfMapping.length} phases\n`);
+      console.log(`Configuration loaded: ${totalDHFFiles} DHF files tracked across project lifecycle\n`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
