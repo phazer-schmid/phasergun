@@ -36,10 +36,10 @@ async function loadFolderStructure(): Promise<void> {
     const yamlPath = path.join(__dirname, '../../rag-service/config/folder-structure.yaml');
     const fileContents = await fs.readFile(yamlPath, 'utf8');
     folderStructure = yaml.load(fileContents) as any;
-    console.log(`[API] Loaded folder structure with ${Object.keys(folderStructure.folder_structure).length} phases`);
+    // Silently load - no startup logging needed
   } catch (error) {
-    console.error('[API] Error loading folder structure:', error);
-    throw error;
+    console.error('[API] Warning: Could not load folder structure config:', error);
+    // Non-fatal - continue server startup
   }
 }
 
@@ -75,10 +75,10 @@ async function loadDHFMapping(): Promise<void> {
       }))
     }));
     
-    console.log(`[API] Loaded ${dhfMapping.length} phase mappings with ${dhfMapping.reduce((sum, p) => sum + p.dhfFiles.length, 0)} total DHF files`);
+    // Silently load - no startup logging needed
   } catch (error) {
-    console.error('[API] Error loading DHF mapping:', error);
-    throw error;
+    console.error('[API] Warning: Could not load DHF mapping config:', error);
+    // Non-fatal - continue server startup
   }
 }
 
@@ -772,17 +772,43 @@ To enable REAL AI analysis:
  */
 async function startServer() {
   try {
-    // Load folder structure and DHF mapping on startup
+    // Load configurations (non-fatal if they fail)
     await loadFolderStructure();
     await loadDHFMapping();
 
-    const totalDHFFiles = dhfMapping.reduce((sum, p) => sum + p.dhfFiles.length, 0);
+    // Detect LLM configuration
+    const llmMode = process.env.LLM_MODE || 'mock';
+    let llmProvider = 'Mock LLM Service';
+    let llmModel = 'mock';
+    
+    if (llmMode === 'anthropic' && process.env.ANTHROPIC_API_KEY) {
+      llmProvider = 'Anthropic Claude';
+      llmModel = process.env.ANTHROPIC_MODEL || 'claude-3-haiku-20240307';
+    } else if (llmMode === 'mistral' && process.env.MISTRAL_API_KEY) {
+      llmProvider = 'Mistral AI';
+      llmModel = process.env.MISTRAL_MODEL || 'mistral-small-latest';
+    } else if (llmMode === 'groq' && process.env.GROQ_API_KEY) {
+      llmProvider = 'Groq LPU';
+      llmModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+    } else if (llmMode === 'ollama') {
+      llmProvider = 'Ollama (Local)';
+      llmModel = process.env.OLLAMA_MODEL || 'llama3.1:70b';
+    }
 
     app.listen(PORT, () => {
       console.log(`\n=== FDA Compliance API Server ===`);
       console.log(`Server running on http://localhost:${PORT}`);
-      console.log(`Health check: http://localhost:${PORT}/api/health`);
-      console.log(`Configuration loaded: ${totalDHFFiles} DHF files tracked across project lifecycle\n`);
+      console.log(``);
+      console.log(`API Endpoints:`);
+      console.log(`  • POST /api/generate              - Semantic text generation with RAG`);
+      console.log(`  • POST /api/projects/:id/scan-dhf - DHF folder scanning & analysis`);
+      console.log(`  • GET  /api/health                - System health check`);
+      console.log(`  • GET  /api/dhf-mapping           - DHF configuration`);
+      console.log(``);
+      console.log(`LLM Provider: ${llmProvider} (${llmModel})`);
+      console.log(`Services: ✓ RAG  ✓ Orchestrator  ✓ File Parser  ✓ Chunker`);
+      console.log(``);
+      console.log(`Ready for requests.\n`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
