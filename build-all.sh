@@ -17,14 +17,19 @@ modules=(
   "api-server"
 )
 
-# Clean all dist directories for fresh build
+# Clean all dist directories AND TypeScript caches for fresh build
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🧹 Cleaning dist directories..."
+echo "🧹 Cleaning dist directories and TypeScript caches..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 for module in "${modules[@]}"; do
   if [ -d "src/$module/dist" ]; then
     rm -rf "src/$module/dist"
     echo "  ✓ Cleaned src/$module/dist"
+  fi
+  # Also clean TypeScript incremental build cache to prevent stale cache issues
+  if [ -f "src/$module/tsconfig.tsbuildinfo" ]; then
+    rm -f "src/$module/tsconfig.tsbuildinfo"
+    echo "  ✓ Cleaned src/$module/tsconfig.tsbuildinfo"
   fi
 done
 
