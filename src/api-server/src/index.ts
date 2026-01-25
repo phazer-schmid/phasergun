@@ -383,7 +383,7 @@ app.get('/api/checks/:phaseId', async (req: Request, res: Response) => {
     }
 
     // Dynamic import to avoid TypeScript rootDir issues
-    const { listCheckFiles } = await import('../../rag-service/src/check-parser.js');
+    const { listCheckFiles } = await import('../../rag-service/dist/check-parser.js');
     const checkFiles = await listCheckFiles(ragChecksPath, phase);
     
     // Format check files for UI (remove .docx extension)
@@ -474,7 +474,7 @@ app.post('/api/analyze', async (req: Request, res: Response) => {
     }
     
     // Dynamic import to avoid TypeScript rootDir issues
-    const { parseCheckDocument, getCheckFilePath } = await import('../../rag-service/src/check-parser.js');
+    const { parseCheckDocument, getCheckFilePath } = await import('../../rag-service/dist/check-parser.js');
     
     const checkFilePath = getCheckFilePath(ragChecksPath, pathInfo.phaseId, selectedCheck);
     console.log(`[API] Parsing check: ${selectedCheck}`);
