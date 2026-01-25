@@ -11,7 +11,8 @@
     "validate:category": "ts-node scripts/validate-category.ts",
     "test:embeddings": "ts-node test-embeddings.ts",
     "test:vector-store": "ts-node test-vector-store.ts",
-    "test:chunking": "ts-node test-chunking-rag.ts"
+    "test:chunking": "ts-node test-chunking-rag.ts",
+    "test:semantic-retrieval": "ts-node test-semantic-retrieval.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.0",

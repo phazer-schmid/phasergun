@@ -5,7 +5,7 @@ import * as yaml from 'js-yaml';
 import * as crypto from 'crypto';
 import { ComprehensiveFileParser } from '@fda-compliance/file-parser';
 import { EmbeddingService } from './embedding-service';
-import { VectorStore, VectorEntry } from './vector-store';
+import { VectorStore, VectorEntry, SearchResult } from './vector-store';
 
 /**
  * Document chunk with metadata
@@ -689,6 +689,152 @@ export class EnhancedRAGService {
       .sort((a, b) => b.score - a.score)
       .slice(0, topK)
       .map(sc => sc.chunk);
+  }
+
+  /**
+   * Retrieve relevant context for a prompt using semantic search
+   */
+  async retrieveRelevantContext(
+    projectPath: string,
+    primaryContextPath: string,
+    prompt: string,
+    options: {
+      topK?: number;              // Default: 10
+      procedureChunks?: number;   // How many procedure chunks (default: 5)
+      contextChunks?: number;     // How many context file chunks (default: 5)
+      includeFullPrimary?: boolean; // Always include full primary context (default: true)
+      maxTokens?: number;         // Maximum tokens for context (default: 150000)
+    } = {}
+  ): Promise<{
+    ragContext: string;
+    metadata: {
+      primaryContextIncluded: boolean;
+      procedureChunksRetrieved: number;
+      contextChunksRetrieved: number;
+      totalTokensEstimate: number;
+      sources: string[];
+    };
+  }> {
+    // 1. Load knowledge (from cache if valid)
+    const knowledge = await this.loadKnowledge(projectPath, primaryContextPath);
+    
+    // 2. Embed the prompt
+    const embeddingService = await this.getEmbeddingService(projectPath);
+    const promptEmbedding = await embeddingService.embedText(prompt);
+    const promptEmbeddingArray = VectorStore.float32ArrayToNumbers(promptEmbedding);
+    
+    // 3. Search procedures
+    const procedureResults = this.vectorStore!.search(
+      promptEmbeddingArray,
+      options.procedureChunks || 5,
+      'procedure'
+    );
+    
+    // 4. Search context files
+    const contextResults = this.vectorStore!.search(
+      promptEmbeddingArray,
+      options.contextChunks || 5,
+      'context'
+    );
+    
+    // 5. Assemble tiered context
+    let ragContext = this.assembleContext(
+      knowledge.primaryContext,
+      procedureResults,
+      contextResults,
+      options
+    );
+    
+    // 6. Enforce token limits if needed
+    const maxTokens = options.maxTokens || 150000;
+    ragContext = await this.enforceTokenLimit(ragContext, maxTokens);
+    
+    // 7. Build metadata
+    const sources = new Set<string>();
+    procedureResults.forEach(r => sources.add(r.entry.metadata.fileName));
+    contextResults.forEach(r => sources.add(r.entry.metadata.fileName));
+    
+    const metadata = {
+      primaryContextIncluded: options.includeFullPrimary ?? true,
+      procedureChunksRetrieved: procedureResults.length,
+      contextChunksRetrieved: contextResults.length,
+      totalTokensEstimate: this.estimateTokens(ragContext),
+      sources: Array.from(sources)
+    };
+    
+    return { ragContext, metadata };
+  }
+
+  /**
+   * Assemble context in tiered structure
+   */
+  private assembleContext(
+    primaryContext: any,
+    procedureChunks: SearchResult[],
+    contextChunks: SearchResult[],
+    options: any
+  ): string {
+    const sections: string[] = [];
+    
+    // TIER 1: Primary Context (always included)
+    if (options.includeFullPrimary ?? true) {
+      sections.push('=== PRIMARY CONTEXT: PHASERGUN AI REGULATORY ENGINEER ===\n');
+      sections.push(yaml.dump(primaryContext));
+      sections.push('\n');
+    }
+    
+    // TIER 2: Retrieved Procedure Chunks (most relevant)
+    if (procedureChunks.length > 0) {
+      sections.push('=== RELEVANT COMPANY PROCEDURES (Retrieved) ===\n');
+      procedureChunks.forEach((result, idx) => {
+        const similarity = (result.similarity * 100).toFixed(1);
+        sections.push(`\n--- [Procedure ${idx + 1}] ${result.entry.metadata.fileName} (Section ${result.entry.metadata.chunkIndex + 1}, Similarity: ${similarity}%) ---\n`);
+        sections.push(result.entry.metadata.content);
+        sections.push('\n');
+      });
+    }
+    
+    // TIER 3: Retrieved Context Chunks (most relevant)
+    if (contextChunks.length > 0) {
+      sections.push('=== RELEVANT PROJECT CONTEXT (Retrieved) ===\n');
+      contextChunks.forEach((result, idx) => {
+        const similarity = (result.similarity * 100).toFixed(1);
+        sections.push(`\n--- [Context ${idx + 1}] ${result.entry.metadata.fileName} (Chunk ${result.entry.metadata.chunkIndex + 1}, Similarity: ${similarity}%) ---\n`);
+        sections.push(result.entry.metadata.content);
+        sections.push('\n');
+      });
+    }
+    
+    return sections.join('');
+  }
+
+  /**
+   * Estimate token count (rough approximation)
+   */
+  private estimateTokens(text: string): number {
+    // Rough estimate: 1 token ≈ 4 characters
+    return Math.ceil(text.length / 4);
+  }
+
+  /**
+   * Ensure context fits within token limits
+   */
+  private async enforceTokenLimit(
+    ragContext: string,
+    maxTokens: number = 150000  // Leave room for prompt + response
+  ): Promise<string> {
+    const estimatedTokens = this.estimateTokens(ragContext);
+    
+    if (estimatedTokens <= maxTokens) {
+      return ragContext;
+    }
+    
+    console.warn(`[EnhancedRAG] Context exceeds limit (${estimatedTokens} > ${maxTokens}), truncating...`);
+    
+    // Truncate from the bottom (keep primary context + top results)
+    // This is a simple implementation; can be enhanced later
+    const targetChars = maxTokens * 4;
+    return ragContext.substring(0, targetChars) + '\n\n[...truncated...]';
   }
 
   /**
