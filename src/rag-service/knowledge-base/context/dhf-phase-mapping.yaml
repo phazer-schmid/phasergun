@@ -1,183 +1,81 @@
-# DHF Documents Mapped to Development Phases
-# Based on PDP Guidebook and 510(k) Submission Requirements
+# DHF Documents by Development Phase
+# Start small - Phase 1 focus, expand as needed
 
 dhf_phase_mapping:
   phase_1:
-    name: "Phase 1: Planning (Concept/Feasibility)"
-    dhf_files:
-      - id: "product_specifications"
-        name: "Product Specifications\n(User Requirements)"
-        document_reference: "PS0228.03/PS0228.A/PS0228.B"
-        submission_section: "Section 11 - Device Description"
-        required: true
+    name: "Planning (Concept/Feasibility)"
+    required_documents:
+      - id: "project_plan"
+        name: "Project Plan / Development Plan"
         
-      - id: "preliminary_design_traceability"
-        name: "Preliminary Design\nTraceability Matrix"
-        document_reference: "DTM0226.03"
-        submission_section: "Section 11 - Device Description"
-        required: true
+      - id: "product_specification"
+        name: "Product Specification"
         
-      - id: "preliminary_risk_analysis"
-        name: "Preliminary Risk Analysis\n(Risk Management Plan)"
-        document_reference: "RM0246.01"
-        submission_section: "Section 13 - Substantial Equivalence"
-        required: true
+      - id: "traceability_matrix"
+        name: "Traceability Matrix"
         
-      - id: "design_feasibility"
-        name: "Design Feasibility/\nPreliminary Testing"
-        document_reference: "Memo to File"
-        submission_section: "Section 11 - Device Description"
-        required: false
+      - id: "risk_analysis"
+        name: "Risk Analysis"
+        
+      - id: "phase_review_checklist"
+        name: "Project Feasibility Checklist"
 
   phase_2:
-    name: "Phase 2: Design (Design Optimization)"
-    dhf_files:
+    name: "Design (Design Optimization)"
+    required_documents:
       - id: "engineering_specifications"
-        name: "Engineering Specifications\n(Design Input)"
-        document_reference: "ES0298.01/ES0298.A"
-        submission_section: "Section 11, 20 - Performance Testing"
-        required: true
+        name: "Engineering Specifications"
         
-      - id: "preliminary_dv_protocol"
-        name: "Preliminary Design Verification\n(DV) Protocol"
-        document_reference: "VP0291.01"
-        submission_section: "Section 20 - Performance Testing - Bench"
-        required: true
+      - id: "design_verification_protocol"
+        name: "Design Verification Protocol"
         
-      - id: "risk_management_docs"
-        name: "Preliminary Risk Management\nDocuments (dFMEA, pFMEA)"
-        document_reference: "RM0296.01, RM0299.01"
-        submission_section: "Section 13 - Substantial Equivalence"
-        required: true
+      - id: "design_fmea"
+        name: "Design FMEA"
         
-      - id: "preliminary_animal_testing"
-        name: "Preliminary Animal\nTesting Plan"
-        document_reference: "Parachute Animal Testing Memo"
-        submission_section: "Section 21 - Performance Testing - Animal"
-        required: false
-
+      - id: "process_fmea"
+        name: "Process FMEA"
+        
+      - id: "updated_traceability_matrix"
+        name: "Updated Traceability Matrix"
+        
+      - id: "phase_2_review_checklist"
+        name: "Phase 2 Review Checklist"
+    
   phase_3:
-    name: "Phase 3: Development (Verification)"
-    dhf_files:
+    name: "Development (Verification)"
+    required_documents:
       - id: "design_verification_report"
-        name: "Design Verification\nTest Report (Bench Testing)"
-        document_reference: "VR0301.A"
-        submission_section: "Appendix B - DV Report; Section 20"
-        required: true
-        
-      - id: "animal_test_report"
-        name: "Simulated Use Acute\nAnimal Test Report"
-        document_reference: "VR0302.A"
-        submission_section: "Section 21 - Performance Testing - Animal"
-        required: true
-        
-      - id: "thrombogenicity_study"
-        name: "Preliminary Thrombogenicity\nAcute Animal Study Report"
-        document_reference: "VR0304.A"
-        submission_section: "Section 21 - Performance Testing - Animal"
-        required: false
-        
-      - id: "biocompatibility_report"
-        name: "Biocompatibility\nTest Report"
-        document_reference: "VR0284.A"
-        submission_section: "Section 17 - Biocompatibility"
-        required: true
+        name: "Design Verification Test Report"
         
       - id: "biocompatibility_protocol"
-        name: "Biocompatibility\nTest Protocol"
-        document_reference: "VP0252.B"
-        submission_section: "Appendix A - Biocompatibility Protocol"
-        required: true
+        name: "Biocompatibility Test Protocol"
+        
+      - id: "biocompatibility_report"
+        name: "Biocompatibility Test Report"
         
       - id: "sterilization_validation"
-        name: "Sterilization Validation Report\n(eBeam Radiation)"
-        document_reference: "VR0283.A"
-        submission_section: "Section 15 - Sterilization"
-        required: true
+        name: "Sterilization Validation Report"
         
       - id: "shelf_life_study"
-        name: "Shelf Life Study 1 Year Report\n(Accelerated Aging/Packaging)"
-        document_reference: "VR0287.A"
-        submission_section: "Section 16 - Shelf Life"
-        required: true
+        name: "Shelf Life Study Report"
         
-      - id: "final_traceability_matrix"
-        name: "Updated/Final Traceability Matrix\n(Post-Verification)"
-        document_reference: "DTM0226.A"
-        submission_section: "Sections 11, 13, 20, 21"
-        required: true
+      - id: "updated_risk_management"
+        name: "Updated Risk Management Documents"
         
-      - id: "final_risk_management"
-        name: "Final Risk Management Documents\n(Clinical Risk, FMEA)"
-        document_reference: "RM0246.A, RM0296.A, RM0299.A"
-        submission_section: "Section 13 - Substantial Equivalence"
-        required: true
-        
-      - id: "production_documentation"
-        name: "Preliminary Production\nDocumentation (LHR, WI)"
-        document_reference: "LHRs, WI0238"
-        submission_section: "Various sections"
-        required: false
-
+      - id: "phase_3_review_checklist"
+        name: "Phase 3 Review Checklist"
+    
   phase_4:
-    name: "Phase 4: Qualification (Validation/Pilot)"
-    dhf_files:
+    name: "Qualification (Validation/Pilot)"
+    required_documents:
       - id: "packaging_validation"
-        name: "Packaging Integrity/Process\nValidation Report"
-        document_reference: "VR0268.A"
-        submission_section: "Sections 15, 16 - Sterilization/Shelf Life"
-        required: true
+        name: "Packaging Validation Report"
         
       - id: "manufacturing_flow"
-        name: "Manufacturing Flow Diagram\n(DMR)"
-        document_reference: "DMR0300.01"
-        submission_section: "Section 11 - Manufacturing/Device Description"
-        required: true
+        name: "Manufacturing Flow Diagram"
         
-      - id: "proposed_labeling"
-        name: "Proposed Product Label\nand IFU"
-        document_reference: "LS0282, IFU0306"
-        submission_section: "Section 14 - Proposed Labeling"
-        required: true
+      - id: "product_labeling"
+        name: "Proposed Product Label and IFU"
         
-      - id: "predicate_device_summary"
-        name: "Predicate Device\n510(k) Summary"
-        document_reference: "K043580, K970668"
-        submission_section: "Section 12, Appendix D - Predicate Comparison"
-        required: false
-
-# Document completion status for mock data
-mock_document_status:
-  completed_dhf_files:
-    - dhf_id: "biocompatibility_report"
-      documents:
-        - name: "ISO 10993-1 Biocompatibility Evaluation"
-          status: "complete"
-          date: "2025-01-15"
-          reviewer: "Dr. Johnson"
-        - name: "Cytotoxicity Test Results"
-          status: "complete"
-          date: "2025-01-18"
-          reviewer: "Lab Tech A"
-        - name: "Sensitization Study Report"
-          status: "complete"
-          date: "2025-01-20"
-          reviewer: "Dr. Smith"
-          
-  in_progress_dhf_files:
-    - dhf_id: "shelf_life_study"
-      documents:
-        - name: "Accelerated Aging Protocol V1.2"
-          status: "in_progress"
-          progress: 65
-        - name: "Package Integrity Testing - Interim Report"
-          status: "in_progress"
-          progress: 45
-          issues:
-            - type: "documentation"
-              severity: "medium"
-              description: "Missing test data for temperature extremes"
-              
-  missing_dhf_files:
-    - dhf_id: "thrombogenicity_study"
-      documents: []
+      - id: "phase_4_review_checklist"
+        name: "Phase 4 Review Checklist"

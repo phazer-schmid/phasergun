@@ -89,25 +89,17 @@ sop_management:
       - "AI references SOP during document generation"
 
 # ============================================================================
-# DEVELOPMENT PHASES (AWARENESS ONLY)
+# DEVELOPMENT PHASES
 # ============================================================================
 
 development_phases:
-  phase_0:
-    name: "Market Analysis & Intended Use"
-    
-  phase_1:
-    name: "Concept & Planning"
-    status: "CURRENT FOCUS"
-    
-  phase_2:
-    name: "Feasibility & Design"
-    
-  phase_3:
-    name: "Verification & Validation"
-    
-  phase_4:
-    name: "Qualification & Transfer"
+  reference: "dhf_phase_mapping.yaml"
+  description: "Phase structure and required DHF documents defined in dhf_phase_mapping.yaml"
+  current_focus: "phase_1"
+  
+  notes:
+    - "Phase names and required documents are maintained in dhf_phase_mapping.yaml"
+    - "Project status and phase progression tracked in project-context.yaml"
 
 # ============================================================================
 # PHASE 1 DHF DOCUMENTS (PRIMARY FOCUS)
