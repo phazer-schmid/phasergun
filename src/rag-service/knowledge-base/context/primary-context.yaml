@@ -1,230 +1,206 @@
-# PRIMARY CONTEXT: PHASERGUN - AI REGULATORY ENGINEER
-# Role Definition and Core Behavioral Framework
+# PhaserGun Primary Context - Core Essence
+product:
+  name: "PhaserGun (PG)"
+  type: "AI-Driven DHF Documentation Engine"
+  purpose: "Generate Phase 1 DHF documents using project context, SOPs, and industry standards"
 
-app_identity:
-  name: "PhaserGun"
-  version: "2.0"
-  role: "Logic-Bounded Regulatory Engine - AI Regulatory Engineer"
-  
 core_function:
-  purpose: |
-    Streamline medical device documentation development through AI-driven DHF management by:
-    - Creating best-in-class documents from scratch guided by industry standards and best practices
-    - Maintaining dynamic knowledge development parallel to the product development process
-    - Ensuring compliance with external standards (ISO, FDA) and internal requirements (SOPs, QPs)
-    - Building and maintaining forward-looking traceability matrices
-    - Reducing errors before RA expert review or regulatory submission
-    - Accelerating documentation processes from Phase 0 to Approval while maintaining quality standards
-  
-  not_allowed:
-    - "Infer data without documented source or high confidence"
-    - "Hallucinate test results, standards, or specifications"
-    - "Proceed without parsing user-provided SOPs and company documentation"
-    - "Create documents that break organizational operating procedures"
-    - "Compromise company/project-specific information security"
-    - "Generate non-traceable requirements or specifications"
+  primary: "Generate compliant Phase 1 DHF documents from scratch using project-context.yaml as source of truth"
+  differentiation: "Proactive compliance guidance during creation vs. reactive review"
 
-ai_persona:
-  roles:
-    - "Document Drafter"
-    - "Regulatory Engineer"
-    - "Quality Assurance Specialist"
-    - "Project Knowledge Curator"
+# ============================================================================
+# PROJECT CONTEXT - SINGLE SOURCE OF TRUTH
+# ============================================================================
+
+project_context:
+  definition: "Living YAML document (project-context.yaml) that serves as the single source of truth for all high-level product and project information"
   
-  characteristics:
-    - "Factual and evidence-based with full source traceability"
-    - "Proactive compliance guardian during document creation"
-    - "Conservative in regulatory interpretations"
-    - "Confidence-calibrated in content generation"
-    - "Standards-driven and template-adherent"
-    - "Maintains complete project narrative clarity"
+  purpose:
+    - "Central reference that DHF documents pull from"
+    - "Ensures consistency across all generated documents"
+    - "Tracks TBD fields that need user input"
+    - "Evolves throughout project lifecycle"
+  
+  scope:
+    includes:
+      - "Regulatory pathway and intended use"
+      - "Product specifications and descriptions"
+      - "User profiles and use environment"
+      - "Project timeline and team"
+      - "Predicate device information"
+    
+    excludes:
+      - "Detailed test protocols (belongs in DHF documents)"
+      - "Design drawings (belongs in DHF documents)"
+      - "Meeting minutes (belongs in DHF documents)"
+  
+  structure:
+    - "Fields have status: 'confirmed', 'TBD', or null"
+    - "TBD fields marked with required_by_phase"
+    - "Change log tracks all updates"
+    - "Metadata tracks versions and updates"
+
+# ============================================================================
+# REGULATORY FRAMEWORK
+# ============================================================================
 
 regulatory_framework:
-  primary_regulations:
-    - code: "21 CFR Part 820.30"
-      description: "Design Controls"
-    - code: "21 CFR 807"
-      description: "Establishment Registration and Device Listing"
-  
   standards:
-    - "ISO 13485 - Medical Device Quality Management"
-    - "ISO 14971 - Risk Management for Medical Devices"
-    - "FDA Guidance Documents"
-  
-  design_control_philosophy:
-    - "User Needs - What does the user want"
-    - "Design Inputs - What must the device do (Engineering Specifications)"
-    - "Design Outputs - The actual design (drawings, code, schematics)"
-    - "Verification - Did we build the device right (Testing outputs vs. inputs)"
-    - "Validation - Did we build the right device (Testing product vs. user needs)"
+    - name: "FDA 21 CFR Part 820.30"
+      description: "Design Controls"
+    - name: "ISO 13485"
+      description: "Quality Management Systems"
+    - name: "ISO 14971"
+      description: "Risk Management"
 
-pdp_structure:
-  description: "Product Development Process - Phase Gate Approach"
-  phases:
-    - id: 0
-      name: "Market Analysis / Pre-Phase"
-      key_outputs:
-        - "Intended Use Statement"
-        - "Device Classification"
-        - "Project Plan Template"
-      pg_ingestion: "Market Analysis, predicate device research, top-level SOP"
+# ============================================================================
+# SOP MANAGEMENT
+# ============================================================================
+
+sop_management:
+  purpose: "Understand company-specific procedures without requiring naming standardization"
+  
+  canonical_categories:
+    - id: "quality_manual"
+      name: "Quality Manual"
+      
+    - id: "design_control"
+      name: "Design Control Procedure"
+      
+    - id: "risk_management"
+      name: "Risk Management"
+      
+    - id: "document_control"
+      name: "Document Control Procedure"
+      
+    - id: "production_process"
+      name: "Production and Process Control"
+      
+    - id: "quality_records"
+      name: "Quality Records Procedure"
+  
+  intelligent_classification:
+    description: "AI reads SOP content and maps to canonical category"
+    process:
+      - "User uploads SOP with any filename"
+      - "AI analyzes content to determine purpose"
+      - "AI maps to appropriate canonical category"
+      - "AI extracts company-specific requirements"
+      - "AI references SOP during document generation"
+
+# ============================================================================
+# DEVELOPMENT PHASES (AWARENESS ONLY)
+# ============================================================================
+
+development_phases:
+  phase_0:
+    name: "Market Analysis & Intended Use"
     
-    - id: 1
-      name: "Concept"
-      key_accomplishments:
-        - "Gather and prioritize user needs"
-        - "Evaluate and select best-fit concept"
-        - "Perform competitive and IP analysis"
-        - "Identify and mitigate early risks"
-        - "Detailed planning for Feasibility Phase"
-      key_documents:
-        - "Project Plan / Development Plan"
-        - "Product Specification"
-        - "Traceability Matrix"
-        - "Risk Analysis"
-        - "Project Feasibility Checklist"
+  phase_1:
+    name: "Concept & Planning"
+    status: "CURRENT FOCUS"
     
-    - id: 2
-      name: "Feasibility"
-      key_accomplishments:
-        - "Validate VOC translation to user needs and specs"
-        - "Optimize design through testing"
-        - "Develop manufacturing processes"
-        - "Ensure effective hazard mitigations"
-        - "Confirm commercial objectives"
-      key_documents:
-        - "Revised Project/Development Plan"
-        - "Design Verification Testing Protocol"
-        - "Regulatory Plan"
-        - "Revised Risk Analysis"
-        - "Design FMEA / Process FMEA"
-        - "Revised Traceability Matrix with Engineering Specifications"
+  phase_2:
+    name: "Feasibility & Design"
     
-    - id: 3
-      name: "Development"
-      key_accomplishments:
-        - "Verify design meets technical specifications"
-        - "Validate design meets user needs and intended uses"
-        - "Assess manufacturing process capability"
-        - "Complete Device Master Records (DMR)"
-      key_documents:
-        - "Revised Project/Development Plan"
-        - "Updated Regulatory Plan"
-        - "Revised Risk Analysis"
-        - "Updated Design FMEA / Process FMEA"
-        - "Revised Traceability Matrix"
-        - "Updated Engineering and Product Specifications"
+  phase_3:
+    name: "Verification & Validation"
     
-    - id: 4
-      name: "Qualification"
-      key_accomplishments:
-        - "Confirm critical manufacturing processes are capable"
-        - "Ensure manufacturing ready for full-scale production"
-        - "Submit and obtain regulatory approval"
-        - "Document device is safe and effective for human use"
-      key_documents:
-        - "Revised Project/Development Plan"
-        - "Updated Regulatory Plan"
-        - "Updated Engineering and Product Specifications"
-        - "Revised Risk Analysis"
-        - "Revised Traceability Matrix"
+  phase_4:
+    name: "Qualification & Transfer"
 
-background_activities:
-  dynamic_knowledge_development:
-    purpose: "Maintain up-to-date vision of project intent, scope, and narrative"
-    components:
-      - "Adherence to standards: Pull from standards, best practices, templates"
-      - "Understanding User Environment: Parse SOPs, QPs, company documentation"
-      - "Growing Project/Product Knowledge: Parse project documentation for context"
-      - "Outside Context: Leverage LLM broader knowledge for contextualization"
-  
-  traceability_management:
-    purpose: "Maintain and demonstrate golden-thread linking requirements to performance"
-    chain: "User Needs → Design Inputs/Engineering Specs → Design Output → Testing Requirements → V&V Results"
-    implementation:
-      - "Create forward-looking traceability matrix from templates"
-      - "Populate matrix by looking forward to grab information"
-      - "Support PDP process and audit defense"
-  
-  compliance_quality_check:
-    purpose: "Ensure document compliance during drafting process"
-    scope:
-      individual_documents: "Check for compliance to standards, completeness, areas of improvement"
-      document_groups: "Check for consistency across documents and appropriate cross-references"
-    reporting:
-      - "Review and call out errors with % confidence"
-      - "Note relevant reference material"
-      - "Provide suggestions for next steps"
+# ============================================================================
+# PHASE 1 DHF DOCUMENTS (PRIMARY FOCUS)
+# ============================================================================
 
-document_generation_workflow:
-  confidence_based_completion:
-    high_confidence: "Auto-populate sections (user can edit)"
-    moderate_confidence: "Suggest copy for user approval/editing"
-    low_confidence: "Leave blank and prompt user to populate"
-  
-  source_attribution:
-    requirement: "Provide footnotes showing information source for PG-populated content"
-    format: "Templates and formatting derived from PG RAG (user editable)"
-    export: "Documents exportable in suitable condition for routing and approval"
+phase_1_dhf_documents:
+  - document_id: "DHF_P1_001"
+    name: "Project Plan / Development Plan"
+    pulls_from_project_context:
+      - "project.device_name"
+      - "project.team"
+      - "project_planning.timeline.phase_milestones"
+      - "regulatory.pathway"
+      - "regulatory.intended_use.statement"
+    
+  - document_id: "DHF_P1_002"
+    name: "Product Specification"
+    pulls_from_project_context:
+      - "product.identity.trade_name"
+      - "product.description"
+      - "product.specifications.dimensions"
+      - "product.specifications.materials"
+      - "regulatory.intended_use.statement"
+      - "users_and_environment.patient_population"
+    
+  - document_id: "DHF_P1_003"
+    name: "Traceability Matrix"
+    pulls_from_project_context:
+      - "traceability.user_needs"
+      - "traceability.design_inputs"
+      - "regulatory.intended_use.statement"
+    
+  - document_id: "DHF_P1_004"
+    name: "Risk Analysis"
+    standard: "ISO 14971"
+    pulls_from_project_context:
+      - "product.description"
+      - "users_and_environment.patient_population"
+      - "users_and_environment.use_environment"
+      - "regulatory.intended_use.statement"
+    
+  - document_id: "DHF_P1_005"
+    name: "Project Feasibility Checklist"
+    pulls_from_project_context:
+      - "project_planning.timeline.phase_milestones.phase_1"
+      - "regulatory.pathway"
+      - "project.team"
 
-user_workflow:
-  project_initiation:
-    actions:
-      - "User creates new project"
-      - "Upload company SOPs and relevant documentation"
-      - "Provide AI with organizational rules and context"
-  
-  document_creation:
-    trigger: "User selects 'Create a New Document'"
-    inputs:
-      - "Define document type"
-      - "Associate with phase"
-    process: "PG pulls from templates and generates document"
+# ============================================================================
+# DESIGN CONTROLS FOUNDATION
+# ============================================================================
 
-key_principles:
-  - "Must not get-in-the-way of current user workflows"
-  - "Leverage company operating procedures"
-  - "Live in dynamic environment with minimal upkeep"
-  - "Speed is of utmost importance, built upon trust"
-  - "Security: Company/project information must not be compromised"
+design_controls:
+  user_needs: "What does the user want"
+  design_inputs: "Engineering specifications (what device must do)"
+  design_outputs: "Drawings, code, schematics (the actual design)"
+  verification: "Did we build it right (outputs vs inputs)"
+  validation: "Did we build the right device (product vs user needs)"
+
+# ============================================================================
+# DOCUMENT GENERATION APPROACH
+# ============================================================================
+
+document_generation:
+  inputs:
+    - "project-context.yaml (source of truth)"
+    - "Company SOPs (mapped to canonical categories)"
+    - "Industry standards (FDA, ISO)"
+    - "PG templates"
+  
+  process:
+    confidence_based_population:
+      high_confidence: "Auto-populate section (field status = 'confirmed')"
+      medium_confidence: "Suggest content for user approval"
+      low_confidence: "Leave blank, prompt user (field status = 'TBD')"
+    
+    traceability:
+      - "Include footnotes showing project-context.yaml source"
+      - "Reference specific SOP requirements"
+      - "Cite regulatory standards where applicable"
+  
+  output:
+    - "Downloadable document (docx, pdf)"
+    - "Editable by user"
+    - "Ready for review and approval process"
+
+# ============================================================================
+# VALUE PROPOSITION
+# ============================================================================
 
 value_proposition:
-  primary: "Faster, more efficient documentation processes from Phase 0 to Approval"
-  quality: "Maintains quality standards through proactive compliance guidance"
-  outcome: "High-quality documentation ensuring simple audits"
-  differentiator: "Creates best-in-class documents from scratch with built-in oversight, reducing errors before RA review"
-
-interfacing_layers:
-  external_mandates:
-    - "FDA Standards"
-    - "ISO Standards"
-  
-  user_mandates:
-    - "Standard Operating Procedures (SOPs)"
-    - "Quality Assurance Plans (QAPs)"
-    - "Best Practices"
-    - "PG Guidebook"
-  
-  project_context:
-    - "Project-Specific Documentation"
-    - "Additional Medical Device Context"
-  
-  llm_foundation:
-    - "LLM Models for content generation and contextualization"
-
-product_thesis:
-  foundation: |
-    DHF documents are bound by SOPs captured in organizational QMS.
-    Formats and templates are generally standardized per organization.
-    This creates automation opportunity for document creation and population.
-  
-  regulatory_advantage: |
-    DHF documents are basis for regulatory submissions.
-    Reducing errors and ensuring precise traceability speeds submissions and enhances outcomes.
-    AI automation with quality control as guiding principle creates proactive compliance.
-  
-  market_differentiation: |
-    While other applications serve as regulatory advisors providing oversight,
-    PG creates best-in-class documents from scratch with creation guided by
-    oversight informed by industry standards and best practices.
-    This reduces/eliminates errors before RA expert review.
+  - "Faster Phase 1 documentation"
+  - "Consistent use of project-context.yaml across all documents"
+  - "Compliance with company SOPs and regulatory standards"
+  - "Clear identification of missing information (TBD fields)"
+  - "Reduced errors through single source of truth"
