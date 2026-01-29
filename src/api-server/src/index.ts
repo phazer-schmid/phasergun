@@ -128,10 +128,10 @@ app.get('/api/dhf-mapping', (_req: Request, res: Response) => {
 
 /**
  * POST /api/list-files
- * List files in a specific directory (used by UI for Procedures/Context/Prompts)
+ * List files and directories in a specific directory (used by UI for Procedures/Context/Prompts)
  */
 app.post('/api/list-files', async (req: Request, res: Response) => {
-  const { path: dirPath } = req.body;
+  const { path: dirPath, includeDirectories = false } = req.body;
 
   if (!dirPath) {
     return res.status(400).json({
@@ -147,28 +147,45 @@ app.post('/api/list-files', async (req: Request, res: Response) => {
     // Read directory contents
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
     
-    // Filter to files only (not subdirectories)
-    const files = [];
+    // Process all entries
+    const items = [];
     for (const entry of entries) {
+      const itemPath = path.join(dirPath, entry.name);
+      const stats = await fs.stat(itemPath);
+      
       if (entry.isFile()) {
-        const filePath = path.join(dirPath, entry.name);
-        const stats = await fs.stat(filePath);
-        
-        files.push({
+        items.push({
           name: entry.name,
-          path: filePath,
+          path: itemPath,
+          type: 'file',
           size: stats.size,
+          modified: stats.mtime
+        });
+      } else if (entry.isDirectory() && includeDirectories) {
+        items.push({
+          name: entry.name,
+          path: itemPath,
+          type: 'directory',
           modified: stats.mtime
         });
       }
     }
     
-    res.json({ files });
+    // Return backward-compatible format
+    if (includeDirectories) {
+      res.json({ items });
+    } else {
+      res.json({ files: items });
+    }
     
   } catch (error) {
     // Directory doesn't exist or is inaccessible - return empty list
     console.log(`[API] Directory not accessible: ${dirPath}`);
-    res.json({ files: [] });
+    if (includeDirectories) {
+      res.json({ items: [] });
+    } else {
+      res.json({ files: [] });
+    }
   }
 });
 
