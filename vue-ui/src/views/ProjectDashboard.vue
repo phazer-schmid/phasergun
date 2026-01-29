@@ -725,7 +725,8 @@ function getStrengths(): string[] {
   background: var(--light-bg);
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
   width: calc(100vw - 320px);
   max-width: calc(100vw - 320px);
   overflow-x: hidden;
