@@ -5,7 +5,7 @@ product:
   purpose: "Generate Phase 1 DHF documents using project context, SOPs, and industry standards"
 
 core_function:
-  primary: "Generate compliant Phase 1 DHF documents from scratch using project-context.yaml as source of truth"
+  primary: "Generate compliant Phase 1 DHF documents from scratch using Project-Context.docx as source of truth"
   differentiation: "Proactive compliance guidance during creation vs. reactive review"
 
 # ============================================================================
@@ -13,13 +13,19 @@ core_function:
 # ============================================================================
 
 project_context:
-  definition: "Living YAML document (project-context.yaml) that serves as the single source of truth for all high-level product and project information"
+  definition: "Living document (Project-Context.docx) managed via Google Docs and synced to local system that serves as the single source of truth for all high-level product and project information"
   
+  location:
+    google_docs: "Managed and edited in Google Docs for easy collaboration"
+    local_sync: "{RAG_FOLDER}/Context/Project-Context.docx"
+    sync_method: "rclone automatic sync from Google Drive"
+    
   purpose:
     - "Central reference that DHF documents pull from"
     - "Ensures consistency across all generated documents"
     - "Tracks TBD fields that need user input"
     - "Evolves throughout project lifecycle"
+    - "Enables collaborative editing via Google Docs"
   
   scope:
     includes:
@@ -34,11 +40,10 @@ project_context:
       - "Design drawings (belongs in DHF documents)"
       - "Meeting minutes (belongs in DHF documents)"
   
-  structure:
-    - "Fields have status: 'confirmed', 'TBD', or null"
-    - "TBD fields marked with required_by_phase"
-    - "Change log tracks all updates"
-    - "Metadata tracks versions and updates"
+  access_pattern:
+    structured_references: "Supports references like [Project-Context|Section Name|Field Name]"
+    parsing: "Automatically parsed from .docx format into structured sections and fields"
+    api_access: "GenerationEngine provides programmatic access to sections and fields"
 
 # ============================================================================
 # CONTEXT FOLDER ORGANIZATION
@@ -201,7 +206,7 @@ development_phases:
   
   notes:
     - "Phase names and required documents are maintained in dhf_phase_mapping.yaml"
-    - "Project status and phase progression tracked in project-context.yaml"
+    - "Project status and phase progression tracked in Project-Context.docx"
 
 # ============================================================================
 # PHASE 1 DHF DOCUMENTS (PRIMARY FOCUS)
@@ -211,44 +216,44 @@ phase_1_dhf_documents:
   - document_id: "DHF_P1_001"
     name: "Project Plan / Development Plan"
     pulls_from_project_context:
-      - "project.device_name"
-      - "project.team"
-      - "project_planning.timeline.phase_milestones"
-      - "regulatory.pathway"
-      - "regulatory.intended_use.statement"
+      - "[Project-Context|Project|Device Name]"
+      - "[Project-Context|Project|Team]"
+      - "[Project-Context|Project Planning|Timeline]"
+      - "[Project-Context|Regulatory|Pathway]"
+      - "[Project-Context|Regulatory|Intended Use]"
     
   - document_id: "DHF_P1_002"
     name: "Product Specification"
     pulls_from_project_context:
-      - "product.identity.trade_name"
-      - "product.description"
-      - "product.specifications.dimensions"
-      - "product.specifications.materials"
-      - "regulatory.intended_use.statement"
-      - "users_and_environment.patient_population"
+      - "[Project-Context|Product|Trade Name]"
+      - "[Project-Context|Product|Description]"
+      - "[Project-Context|Product|Specifications]"
+      - "[Project-Context|Product|Materials]"
+      - "[Project-Context|Regulatory|Intended Use]"
+      - "[Project-Context|Users and Environment|Patient Population]"
     
   - document_id: "DHF_P1_003"
     name: "Traceability Matrix"
     pulls_from_project_context:
-      - "traceability.user_needs"
-      - "traceability.design_inputs"
-      - "regulatory.intended_use.statement"
+      - "[Project-Context|Traceability|User Needs]"
+      - "[Project-Context|Traceability|Design Inputs]"
+      - "[Project-Context|Regulatory|Intended Use]"
     
   - document_id: "DHF_P1_004"
     name: "Risk Analysis"
     standard: "ISO 14971"
     pulls_from_project_context:
-      - "product.description"
-      - "users_and_environment.patient_population"
-      - "users_and_environment.use_environment"
-      - "regulatory.intended_use.statement"
+      - "[Project-Context|Product|Description]"
+      - "[Project-Context|Users and Environment|Patient Population]"
+      - "[Project-Context|Users and Environment|Use Environment]"
+      - "[Project-Context|Regulatory|Intended Use]"
     
   - document_id: "DHF_P1_005"
     name: "Project Feasibility Checklist"
     pulls_from_project_context:
-      - "project_planning.timeline.phase_milestones.phase_1"
-      - "regulatory.pathway"
-      - "project.team"
+      - "[Project-Context|Project Planning|Phase Milestones]"
+      - "[Project-Context|Regulatory|Pathway]"
+      - "[Project-Context|Project|Team]"
 
 # ============================================================================
 # DESIGN CONTROLS FOUNDATION
@@ -267,21 +272,26 @@ design_controls:
 
 document_generation:
   inputs:
-    - "project-context.yaml (source of truth)"
+    - "Project-Context.docx (source of truth, synced from Google Docs)"
     - "Company SOPs (mapped to canonical categories)"
     - "Industry standards (FDA, ISO)"
     - "PG templates"
   
   process:
     confidence_based_population:
-      high_confidence: "Auto-populate section (field status = 'confirmed')"
+      high_confidence: "Auto-populate section (field has definitive value)"
       medium_confidence: "Suggest content for user approval"
-      low_confidence: "Leave blank, prompt user (field status = 'TBD')"
+      low_confidence: "Leave blank, prompt user (field marked TBD or missing)"
     
     traceability:
-      - "Include footnotes showing project-context.yaml source"
+      - "Include footnotes showing Project-Context.docx source sections"
       - "Reference specific SOP requirements"
       - "Cite regulatory standards where applicable"
+    
+    structured_references:
+      - "Support [Project-Context|Section|Field] notation in prompts"
+      - "GenerationEngine resolves references to actual values"
+      - "Enables precise field extraction from document"
   
   output:
     - "Downloadable document (docx, pdf)"
@@ -294,7 +304,9 @@ document_generation:
 
 value_proposition:
   - "Faster Phase 1 documentation"
-  - "Consistent use of project-context.yaml across all documents"
+  - "Consistent use of Project-Context.docx across all documents"
   - "Compliance with company SOPs and regulatory standards"
   - "Clear identification of missing information (TBD fields)"
   - "Reduced errors through single source of truth"
+  - "Collaborative editing via Google Docs with automatic sync"
+  - "Structured document parsing for precise field extraction"
