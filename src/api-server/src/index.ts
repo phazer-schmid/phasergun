@@ -40,13 +40,13 @@ async function loadDHFMapping(): Promise<void> {
     dhfMapping = phases.map((phase: any) => ({
       phaseId: phase.id,
       phaseName: phase.name,
-      dhfFiles: phase.dhf_files.map((dhfFile: any) => ({
-        id: dhfFile.id,
-        name: dhfFile.name,
-        documentReference: dhfFile.document_reference,
-        submissionSection: dhfFile.submission_section,
-        required: dhfFile.required,
-        status: 'missing',
+      dhfFiles: (phase.required_documents || []).map((dhfFile: any) => ({
+        id: dhfFile.id || 'unknown',
+        name: dhfFile.name || 'Unknown Document',
+        documentReference: dhfFile.document_reference || dhfFile.id || 'N/A',
+        submissionSection: dhfFile.submission_section || 'General',
+        required: dhfFile.required !== undefined ? dhfFile.required : true,
+        status: 'missing' as const,
         documents: []
       }))
     }));
