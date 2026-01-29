@@ -198,86 +198,90 @@ export class EnhancedRAGService {
     return chunks.length > 0 ? chunks : [content];
   }
 
-  /**
-   * Chunk and embed a parsed document
-   * Returns VectorEntry objects ready for storage
-   */
-  private async chunkAndEmbedDocument(
-    doc: ParsedDocument,
-    category: 'procedure' | 'context',
-    projectPath: string
-  ): Promise<VectorEntry[]> {
-    // 1. Intelligent chunking based on category
-    const contentChunks = category === 'procedure'
-      ? this.chunkSectionAware(doc.content, doc.fileName, doc.filePath)
-      : this.chunkWithOverlap(doc.content, doc.fileName, doc.filePath);
-    
-    console.log(`[EnhancedRAG] Chunked ${doc.fileName}: ${contentChunks.length} chunks`);
-    
-    if (contentChunks.length === 0) {
-      return [];
-    }
-    
-    // 2. Generate embeddings for all chunks (batch processing)
-    const embeddingService = await this.getEmbeddingService(projectPath);
-    const embeddings = await embeddingService.embedBatch(
-      contentChunks,
-      Array(contentChunks.length).fill(doc.filePath)
-    );
-    
-    // 3. Create VectorEntry objects
-    const vectorEntries: VectorEntry[] = contentChunks.map((content, chunkIndex) => {
-      return VectorStore.createEntry(
-        content,
-        embeddings[chunkIndex],
-        {
-          fileName: doc.fileName,
-          filePath: doc.filePath,
-          category,
-          chunkIndex
-        }
-      );
-    });
-    
-    return vectorEntries;
+/**
+ * Chunk and embed a parsed document
+ * Returns VectorEntry objects ready for storage
+ */
+private async chunkAndEmbedDocument(
+  doc: ParsedDocument,
+  category: 'procedure' | 'context',
+  projectPath: string,
+  contextCategory?: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates'
+): Promise<VectorEntry[]> {
+  // 1. Intelligent chunking based on category
+  const contentChunks = category === 'procedure'
+    ? this.chunkSectionAware(doc.content, doc.fileName, doc.filePath)
+    : this.chunkWithOverlap(doc.content, doc.fileName, doc.filePath);
+  
+  console.log(`[EnhancedRAG] Chunked ${doc.fileName}: ${contentChunks.length} chunks`);
+  
+  if (contentChunks.length === 0) {
+    return [];
   }
+  
+  // 2. Generate embeddings for all chunks (batch processing)
+  const embeddingService = await this.getEmbeddingService(projectPath);
+  const embeddings = await embeddingService.embedBatch(
+    contentChunks,
+    Array(contentChunks.length).fill(doc.filePath)
+  );
+  
+  // 3. Create VectorEntry objects
+  const vectorEntries: VectorEntry[] = contentChunks.map((content, chunkIndex) => {
+    return VectorStore.createEntry(
+      content,
+      embeddings[chunkIndex],
+      {
+        fileName: doc.fileName,
+        filePath: doc.filePath,
+        category,
+        chunkIndex,
+        contextCategory
+      }
+    );
+  });
+  
+  return vectorEntries;
+}
 
-  /**
-   * Process all documents and build vector store
-   */
-  private async buildVectorStore(
-    proceduresFiles: ParsedDocument[],
-    contextFiles: ParsedDocument[],
-    projectPath: string
-  ): Promise<void> {
-    console.log('[EnhancedRAG] Building vector store...');
-    
-    // Get embedding service model info
-    const embeddingService = await this.getEmbeddingService(projectPath);
-    const modelInfo = embeddingService.getModelInfo();
-    
-    // Create new vector store
-    this.vectorStore = new VectorStore(projectPath, modelInfo.version);
-    
-    // Process procedures
-    const procedureVectors = await Promise.all(
-      proceduresFiles.map(doc => this.chunkAndEmbedDocument(doc, 'procedure', projectPath))
-    );
-    
-    // Process context files
-    const contextVectors = await Promise.all(
-      contextFiles.map(doc => this.chunkAndEmbedDocument(doc, 'context', projectPath))
-    );
-    
-    // Flatten and add to vector store
-    const allVectors = [...procedureVectors.flat(), ...contextVectors.flat()];
-    allVectors.forEach(entry => this.vectorStore!.addEntry(entry));
-    
-    // Save to disk
-    await this.vectorStore.save(this.getVectorStorePath(projectPath));
-    
-    console.log(`[EnhancedRAG] ✓ Vector store built: ${allVectors.length} chunks indexed`);
-  }
+/**
+ * Process all documents and build vector store
+ */
+private async buildVectorStore(
+  proceduresFiles: ParsedDocument[],
+  contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[],
+  projectPath: string
+): Promise<void> {
+  console.log('[EnhancedRAG] Building vector store...');
+  
+  // Get embedding service model info
+  const embeddingService = await this.getEmbeddingService(projectPath);
+  const modelInfo = embeddingService.getModelInfo();
+  
+  // Create new vector store
+  this.vectorStore = new VectorStore(projectPath, modelInfo.version);
+  
+  // Process procedures
+  const procedureVectors = await Promise.all(
+    proceduresFiles.map(doc => this.chunkAndEmbedDocument(doc, 'procedure', projectPath))
+  );
+  
+  // Process context files with their categories
+  const contextVectors = await Promise.all(
+    contextFiles.map(({ doc, contextCategory }) => 
+      this.chunkAndEmbedDocument(doc, 'context', projectPath, contextCategory)
+    )
+  );
+  
+  // Flatten and add to vector store
+  const allVectors = [...procedureVectors.flat(), ...contextVectors.flat()];
+  allVectors.forEach(entry => this.vectorStore!.addEntry(entry));
+  
+  // Save to disk
+  await this.vectorStore.save(this.getVectorStorePath(projectPath));
+  
+  console.log(`[EnhancedRAG] ✓ Vector store built: ${allVectors.length} chunks indexed`);
+}
 
   /**
    * Chunk a document into semantic segments (OLD - DEPRECATED)
@@ -435,31 +439,107 @@ export class EnhancedRAGService {
     }
   }
 
-  /**
-   * Load and chunk all files from Context folder
-   */
-  async loadContextFolder(folderPath: string): Promise<DocumentChunk[]> {
-    console.log('[EnhancedRAG] Loading Context folder:', folderPath);
-    
-    try {
-      await fs.access(folderPath);
-      const documents = await this.fileParser.scanAndParseFolder(folderPath);
-      console.log(`[EnhancedRAG] Loaded ${documents.length} files from Context folder`);
-      
-      // Chunk all documents
-      const allChunks: DocumentChunk[] = [];
-      for (const doc of documents) {
-        const chunks = this.chunkDocument(doc);
-        allChunks.push(...chunks);
-      }
-      
-      console.log(`[EnhancedRAG] Created ${allChunks.length} chunks from Context`);
-      return allChunks;
-    } catch (error) {
-      console.warn('[EnhancedRAG] Context folder not found or empty:', folderPath);
-      return [];
-    }
+/**
+ * Load and organize files from Context folder with subfolder structure
+ * Returns documents tagged with their context category
+ */
+async loadContextFolderStructured(
+  folderPath: string
+): Promise<{ doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[]> {
+  console.log('[EnhancedRAG] Loading Context folder with subfolder structure:', folderPath);
+  
+  const contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[] = [];
+  
+  try {
+    await fs.access(folderPath);
+  } catch {
+    console.warn('[EnhancedRAG] Context folder not found:', folderPath);
+    return [];
   }
+  
+  // 1. Check for root-level "Primary Context.docx" file
+  const primaryContextPath = path.join(folderPath, 'Primary Context.docx');
+  try {
+    await fs.access(primaryContextPath);
+    // Parse the single file by scanning just the root level and filtering
+    const allRootDocs = await this.fileParser.scanAndParseFolder(folderPath);
+    const primaryDoc = allRootDocs.find(doc => doc.fileName === 'Primary Context.docx');
+    if (primaryDoc) {
+      contextFiles.push({ doc: primaryDoc, contextCategory: 'primary-context-root' });
+      console.log('[EnhancedRAG] ✓ Found Primary Context.docx at root level');
+    }
+  } catch {
+    console.log('[EnhancedRAG] No Primary Context.docx found at root level (optional)');
+  }
+  
+  // 2. Load Initiation subfolder
+  const initiationPath = path.join(folderPath, 'Initiation');
+  try {
+    await fs.access(initiationPath);
+    const initiationDocs = await this.fileParser.scanAndParseFolder(initiationPath);
+    initiationDocs.forEach(doc => {
+      contextFiles.push({ doc, contextCategory: 'initiation' });
+    });
+    console.log(`[EnhancedRAG] ✓ Loaded ${initiationDocs.length} files from Initiation/`);
+  } catch {
+    console.warn('[EnhancedRAG] Initiation subfolder not found or empty');
+  }
+  
+  // 3. Load Ongoing subfolder
+  const ongoingPath = path.join(folderPath, 'Ongoing');
+  try {
+    await fs.access(ongoingPath);
+    const ongoingDocs = await this.fileParser.scanAndParseFolder(ongoingPath);
+    ongoingDocs.forEach(doc => {
+      contextFiles.push({ doc, contextCategory: 'ongoing' });
+    });
+    console.log(`[EnhancedRAG] ✓ Loaded ${ongoingDocs.length} files from Ongoing/`);
+  } catch {
+    console.warn('[EnhancedRAG] Ongoing subfolder not found or empty');
+  }
+  
+  // 4. Load Predicates subfolder
+  const predicatesPath = path.join(folderPath, 'Predicates');
+  try {
+    await fs.access(predicatesPath);
+    const predicatesDocs = await this.fileParser.scanAndParseFolder(predicatesPath);
+    predicatesDocs.forEach(doc => {
+      contextFiles.push({ doc, contextCategory: 'predicates' });
+    });
+    console.log(`[EnhancedRAG] ✓ Loaded ${predicatesDocs.length} files from Predicates/`);
+  } catch {
+    console.warn('[EnhancedRAG] Predicates subfolder not found or empty');
+  }
+  
+  console.log(`[EnhancedRAG] Total context files loaded: ${contextFiles.length}`);
+  return contextFiles;
+}
+
+/**
+ * Load and chunk all files from Context folder (DEPRECATED - use loadContextFolderStructured)
+ */
+async loadContextFolder(folderPath: string): Promise<DocumentChunk[]> {
+  console.log('[EnhancedRAG] Loading Context folder:', folderPath);
+  
+  try {
+    await fs.access(folderPath);
+    const documents = await this.fileParser.scanAndParseFolder(folderPath);
+    console.log(`[EnhancedRAG] Loaded ${documents.length} files from Context folder`);
+    
+    // Chunk all documents
+    const allChunks: DocumentChunk[] = [];
+    for (const doc of documents) {
+      const chunks = this.chunkDocument(doc);
+      allChunks.push(...chunks);
+    }
+    
+    console.log(`[EnhancedRAG] Created ${allChunks.length} chunks from Context`);
+    return allChunks;
+  } catch (error) {
+    console.warn('[EnhancedRAG] Context folder not found or empty:', folderPath);
+    return [];
+  }
+}
 
   /**
    * Hash content for cache validation
@@ -663,16 +743,130 @@ Executive Summary:`;
   }
 
   /**
+   * Detect what changed in the cache
+   */
+  private async detectCacheChanges(
+    projectPath: string,
+    primaryContextPath: string,
+    cachedFingerprint: string
+  ): Promise<{
+    changed: boolean;
+    primaryContextChanged: boolean;
+    proceduresChanged: boolean;
+    contextChanged: boolean;
+    details: string[];
+  }> {
+    const proceduresPath = path.join(projectPath, 'Procedures');
+    const contextPath = path.join(projectPath, 'Context');
+    
+    // Get current fingerprints
+    const [currentPrimaryStats, currentProceduresFingerprint, currentContextFingerprint] = await Promise.all([
+      fs.stat(primaryContextPath).catch(() => ({ mtimeMs: 0, size: 0 })),
+      this.computeFolderFingerprint(proceduresPath),
+      this.computeFolderFingerprint(contextPath)
+    ]);
+    
+    const currentPrimaryFingerprint = `${primaryContextPath}:${currentPrimaryStats.size}:${currentPrimaryStats.mtimeMs}`;
+    const currentCombined = `${currentPrimaryFingerprint}|${currentProceduresFingerprint}|${currentContextFingerprint}`;
+    const currentFingerprint = crypto.createHash('sha256').update(currentCombined).digest('hex');
+    
+    // Compare
+    const changed = cachedFingerprint !== currentFingerprint;
+    const details: string[] = [];
+    
+    if (!changed) {
+      return { changed: false, primaryContextChanged: false, proceduresChanged: false, contextChanged: false, details: [] };
+    }
+    
+    // Detect what changed by comparing individual components
+    // We need to reconstruct the old fingerprints - for now, we'll just report that something changed
+    // A more sophisticated approach would store individual fingerprints in the cache
+    
+    try {
+      // Check if files exist and count them
+      const proceduresFiles = await this.getAllFiles(proceduresPath).catch(() => []);
+      const contextFiles = await this.getAllFiles(contextPath).catch(() => []);
+      
+      details.push(`Current state: ${proceduresFiles.length} procedure files, ${contextFiles.length} context files`);
+    } catch {
+      details.push('Unable to determine specific changes');
+    }
+    
+    return {
+      changed: true,
+      primaryContextChanged: false, // We can't determine this without storing old fingerprints
+      proceduresChanged: false,
+      contextChanged: false,
+      details
+    };
+  }
+
+  /**
+   * Clear old cache files for a project
+   */
+  private async clearOldCache(projectPath: string): Promise<void> {
+    console.log('[EnhancedRAG] 🗑️  Clearing old cache files...');
+    
+    try {
+      const vectorStorePath = this.getVectorStorePath(projectPath);
+      const sopSummariesPath = this.getSOPSummariesCachePath(projectPath);
+      
+      // Try to delete vector store
+      try {
+        await fs.unlink(vectorStorePath);
+        console.log('[EnhancedRAG] ✓ Deleted old vector store');
+      } catch (error) {
+        // File might not exist, which is fine
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          console.log('[EnhancedRAG] ⚠️  Could not delete old vector store (continuing anyway)');
+        }
+      }
+      
+      // Try to delete SOP summaries
+      try {
+        await fs.unlink(sopSummariesPath);
+        console.log('[EnhancedRAG] ✓ Deleted old SOP summaries cache');
+      } catch (error) {
+        // File might not exist, which is fine
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          console.log('[EnhancedRAG] ⚠️  Could not delete old SOP summaries (continuing anyway)');
+        }
+      }
+    } catch (error) {
+      console.warn('[EnhancedRAG] ⚠️  Error during cache cleanup (non-fatal):', error);
+    }
+  }
+
+  /**
    * Check if cache is valid for a project
    */
   async isCacheValid(projectPath: string, primaryContextPath: string): Promise<boolean> {
     const cached = this.cache.get(projectPath);
     if (!cached) {
+      console.log('[EnhancedRAG] 🔍 No cached knowledge found for project');
       return false;
     }
     
+    console.log('[EnhancedRAG] 🔍 Checking cache validity...');
     const currentFingerprint = await this.computeCacheFingerprint(projectPath, primaryContextPath);
-    return cached.fingerprint === currentFingerprint;
+    const isValid = cached.fingerprint === currentFingerprint;
+    
+    if (isValid) {
+      console.log('[EnhancedRAG] ✅ Cache is valid (fingerprints match)');
+      console.log(`[EnhancedRAG] 📊 Cache fingerprint: ${cached.fingerprint.substring(0, 16)}...`);
+    } else {
+      console.log('[EnhancedRAG] ⚠️  Cache EXPIRED - fingerprint mismatch');
+      console.log(`[EnhancedRAG] 📊 Old fingerprint: ${cached.fingerprint.substring(0, 16)}...`);
+      console.log(`[EnhancedRAG] 📊 New fingerprint: ${currentFingerprint.substring(0, 16)}...`);
+      
+      // Detect what changed
+      const changes = await this.detectCacheChanges(projectPath, primaryContextPath, cached.fingerprint);
+      if (changes.details.length > 0) {
+        changes.details.forEach(detail => console.log(`[EnhancedRAG] 📋 ${detail}`));
+      }
+    }
+    
+    return isValid;
   }
 
   /**
@@ -694,10 +888,20 @@ Executive Summary:`;
       // Load vector store from disk
       const vectorStorePath = this.getVectorStorePath(projectPath);
       this.vectorStore = await VectorStore.load(vectorStorePath, projectPath);
-      return this.cache.get(projectPath)!;
+      
+      const cached = this.cache.get(projectPath)!;
+      console.log('[EnhancedRAG] 📊 Cached Knowledge Statistics:');
+      console.log(`[EnhancedRAG]    - Last built: ${cached.indexedAt}`);
+      console.log(`[EnhancedRAG]    - Cache location: ${path.dirname(vectorStorePath)}`);
+      console.log('[EnhancedRAG] ========================================\n');
+      
+      return cached;
     }
     
-    console.log('[EnhancedRAG] Cache invalid or missing, loading fresh knowledge...\n');
+    console.log('[EnhancedRAG] 🔄 Cache invalid or missing - regenerating...\n');
+    
+    // Clear old cache files before rebuilding
+    await this.clearOldCache(projectPath);
     
     // Load primary context
     const primaryContext = await this.loadPrimaryContext(primaryContextPath);
@@ -707,7 +911,7 @@ Executive Summary:`;
     const contextPath = path.join(projectPath, 'Context');
     
     let proceduresFiles: ParsedDocument[] = [];
-    let contextFiles: ParsedDocument[] = [];
+    let contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[] = [];
     
     try {
       await fs.access(proceduresPath);
@@ -719,17 +923,25 @@ Executive Summary:`;
     
     try {
       await fs.access(contextPath);
-      contextFiles = await this.fileParser.scanAndParseFolder(contextPath);
-      console.log(`[EnhancedRAG] Loaded ${contextFiles.length} files from Context folder`);
+      contextFiles = await this.loadContextFolderStructured(contextPath);
+      console.log(`[EnhancedRAG] Loaded ${contextFiles.length} files from Context folder (with subfolder structure)`);
     } catch (error) {
       console.warn('[EnhancedRAG] Context folder not found or empty');
     }
     
     // Build vector store if there are documents to process
     if (proceduresFiles.length > 0 || contextFiles.length > 0) {
+      console.log('[EnhancedRAG] 🔄 Regenerating vector store...');
+      console.log(`[EnhancedRAG]    - Processing ${proceduresFiles.length} procedure files`);
+      console.log(`[EnhancedRAG]    - Processing ${contextFiles.length} context files`);
+      
+      const buildStart = Date.now();
       await this.buildVectorStore(proceduresFiles, contextFiles, projectPath);
+      const buildDuration = ((Date.now() - buildStart) / 1000).toFixed(1);
+      
+      console.log(`[EnhancedRAG] ✅ Vector store regenerated in ${buildDuration}s`);
     } else {
-      console.log('[EnhancedRAG] No documents to index, creating empty vector store');
+      console.log('[EnhancedRAG] ⚠️  No documents to index, creating empty vector store');
       const embeddingService = await this.getEmbeddingService(projectPath);
       const modelInfo = embeddingService.getModelInfo();
       this.vectorStore = new VectorStore(projectPath, modelInfo.version);
@@ -754,14 +966,21 @@ Executive Summary:`;
     this.cache.set(projectPath, knowledgeCache);
     
     const stats = this.vectorStore!.getStats();
+    const vectorStorePath = this.getVectorStorePath(projectPath);
+    
     console.log('[EnhancedRAG] ========================================');
-    console.log('[EnhancedRAG] Knowledge Base Loaded Successfully');
-    console.log(`[EnhancedRAG] Primary Context: ✓`);
-    console.log(`[EnhancedRAG] Procedures: ${stats.procedureEntries} chunks`);
-    console.log(`[EnhancedRAG] Context: ${stats.contextEntries} chunks`);
-    console.log(`[EnhancedRAG] Total Vectors: ${stats.totalEntries}`);
-    console.log(`[EnhancedRAG] Cache Fingerprint: ${fingerprint.substring(0, 16)}...`);
-    console.log(`[EnhancedRAG] VectorStore Fingerprint: ${vectorStoreFingerprint.substring(0, 16)}...`);
+    console.log('[EnhancedRAG] ✅ Knowledge Base Regeneration Complete');
+    console.log('[EnhancedRAG] ========================================');
+    console.log(`[EnhancedRAG] 📊 Statistics:`);
+    console.log(`[EnhancedRAG]    - Primary Context: ✓`);
+    console.log(`[EnhancedRAG]    - Procedures: ${stats.procedureEntries} chunks`);
+    console.log(`[EnhancedRAG]    - Context: ${stats.contextEntries} chunks`);
+    console.log(`[EnhancedRAG]    - Total Vectors: ${stats.totalEntries}`);
+    console.log(`[EnhancedRAG] 💾 Cache Details:`);
+    console.log(`[EnhancedRAG]    - Built at: ${knowledgeCache.indexedAt}`);
+    console.log(`[EnhancedRAG]    - Location: ${path.dirname(vectorStorePath)}`);
+    console.log(`[EnhancedRAG]    - Cache Fingerprint: ${fingerprint.substring(0, 16)}...`);
+    console.log(`[EnhancedRAG]    - VectorStore Fingerprint: ${vectorStoreFingerprint.substring(0, 16)}...`);
     console.log('[EnhancedRAG] ========================================\n');
     
     return knowledgeCache;
@@ -991,12 +1210,26 @@ Executive Summary:`;
       });
     }
     
-    // TIER 3: Retrieved Context Chunks (most relevant)
+    // TIER 3: Retrieved Context Chunks (most relevant) - organized by category
     if (contextChunks.length > 0) {
       sections.push('=== RELEVANT PROJECT CONTEXT (Retrieved) ===\n');
       contextChunks.forEach((result, idx) => {
         const similarity = (result.similarity * 100).toFixed(1);
-        sections.push(`\n--- [Context ${idx + 1}] ${result.entry.metadata.fileName} (Chunk ${result.entry.metadata.chunkIndex + 1}, Similarity: ${similarity}%) ---\n`);
+        const contextCategory = result.entry.metadata.contextCategory;
+        let categoryLabel = '';
+        
+        // Add category label for better context
+        if (contextCategory === 'primary-context-root') {
+          categoryLabel = '[PRIMARY CONTEXT FILE] ';
+        } else if (contextCategory === 'initiation') {
+          categoryLabel = '[Initiation] ';
+        } else if (contextCategory === 'ongoing') {
+          categoryLabel = '[Ongoing] ';
+        } else if (contextCategory === 'predicates') {
+          categoryLabel = '[Predicate Device] ';
+        }
+        
+        sections.push(`\n--- ${categoryLabel}${result.entry.metadata.fileName} (Chunk ${result.entry.metadata.chunkIndex + 1}, Similarity: ${similarity}%) ---\n`);
         sections.push(result.entry.metadata.content);
         sections.push('\n');
       });
