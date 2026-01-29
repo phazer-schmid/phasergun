@@ -36,11 +36,42 @@
             <h3 class="sidebar-card-title">Context</h3>
           </div>
           <div class="sidebar-card-content">
-            <ul v-if="contextFiles.length > 0" class="file-bullet-list">
-              <li v-for="file in contextFiles" :key="file.path">
-                {{ file.name }}
-              </li>
-            </ul>
+            <div v-if="contextItems.length > 0" class="file-tree-list">
+              <div v-for="item in sortedContextItems" :key="item.path" class="tree-item">
+                <!-- Folder -->
+                <div v-if="item.type === 'directory'" class="tree-folder">
+                  <div class="tree-folder-header" @click="toggleFolder(item.path)">
+                    <span class="tree-toggle">{{ expandedFolders.has(item.path) ? '▼' : '▶' }}</span>
+                    <span class="tree-folder-name">{{ item.name }}/</span>
+                  </div>
+                  <div v-if="expandedFolders.has(item.path)" class="tree-folder-content">
+                    <div v-if="item.children && item.children.length > 0" class="tree-nested">
+                      <div v-for="child in item.children" :key="child.path" class="tree-item">
+                        <div v-if="child.type === 'directory'" class="tree-folder">
+                          <div class="tree-folder-header" @click="toggleFolder(child.path)">
+                            <span class="tree-toggle">{{ expandedFolders.has(child.path) ? '▼' : '▶' }}</span>
+                            <span class="tree-folder-name">{{ child.name }}/</span>
+                          </div>
+                          <div v-if="expandedFolders.has(child.path) && child.children" class="tree-nested">
+                            <div v-for="nestedChild in child.children" :key="nestedChild.path" class="tree-file">
+                              • {{ nestedChild.name }}
+                            </div>
+                          </div>
+                        </div>
+                        <div v-else class="tree-file">
+                          • {{ child.name }}
+                        </div>
+                      </div>
+                    </div>
+                    <p v-else class="tree-empty">Empty folder</p>
+                  </div>
+                </div>
+                <!-- File -->
+                <div v-else class="tree-file">
+                  • {{ item.name }}
+                </div>
+              </div>
+            </div>
             <p v-else class="no-files-text">No files found</p>
           </div>
         </div>
@@ -185,7 +216,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useProjectService } from '../composables/useProjectService';
 import { Project } from '../models/project.model';
@@ -203,7 +234,8 @@ const analysisResult = ref<AppStatusOutput | null>(null);
 
 // Sidebar files state
 const proceduresFiles = ref<any[]>([]);
-const contextFiles = ref<any[]>([]);
+const contextItems = ref<any[]>([]); // Changed to support folders and files
+const expandedFolders = ref<Set<string>>(new Set()); // Track expanded folders
 
 // Selected check state
 const selectedCheck = ref<string>('');
@@ -254,18 +286,92 @@ async function loadContextFiles() {
     const response = await fetch(getApiEndpoint('/list-files'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: contextFolderPath })
+      body: JSON.stringify({ 
+        path: contextFolderPath,
+        includeDirectories: true 
+      })
     });
     
     const result = await response.json();
-    contextFiles.value = result.files || [];
-    console.log(`[Dashboard] Loaded ${contextFiles.value.length} files from Context folder`);
+    contextItems.value = result.items || [];
+    console.log(`[Dashboard] Loaded ${contextItems.value.length} items from Context folder`);
     
   } catch (error) {
     console.error('[Dashboard] Failed to load Context files:', error);
-    contextFiles.value = [];
+    contextItems.value = [];
   }
 }
+
+// Toggle folder expansion
+async function toggleFolder(folderPath: string) {
+  const newExpanded = new Set(expandedFolders.value);
+  
+  if (newExpanded.has(folderPath)) {
+    // Collapse
+    newExpanded.delete(folderPath);
+  } else {
+    // Expand - load children if not already loaded
+    newExpanded.add(folderPath);
+    await loadFolderContents(folderPath);
+  }
+  
+  expandedFolders.value = newExpanded;
+}
+
+// Load contents of a folder
+async function loadFolderContents(folderPath: string) {
+  try {
+    const response = await fetch(getApiEndpoint('/list-files'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        path: folderPath,
+        includeDirectories: true 
+      })
+    });
+    
+    const result = await response.json();
+    const children = result.items || [];
+    
+    // Find the folder in contextItems and add children
+    const updateChildren = (items: any[]): any[] => {
+      return items.map(item => {
+        if (item.path === folderPath) {
+          return { ...item, children };
+        } else if (item.children) {
+          return { ...item, children: updateChildren(item.children) };
+        }
+        return item;
+      });
+    };
+    
+    contextItems.value = updateChildren(contextItems.value);
+    
+  } catch (error) {
+    console.error('[Dashboard] Failed to load folder contents:', error);
+  }
+}
+
+// Sort items with "Project Context" doc first, then alphabetically
+const sortedContextItems = computed(() => {
+  const items = [...contextItems.value];
+  
+  return items.sort((a, b) => {
+    // Check if either is the "Project Context" file
+    const aIsProjectContext = a.type === 'file' && a.name.toLowerCase().includes('project context');
+    const bIsProjectContext = b.type === 'file' && b.name.toLowerCase().includes('project context');
+    
+    if (aIsProjectContext) return -1;
+    if (bIsProjectContext) return 1;
+    
+    // Folders before files
+    if (a.type === 'directory' && b.type === 'file') return -1;
+    if (a.type === 'file' && b.type === 'directory') return 1;
+    
+    // Alphabetical
+    return a.name.localeCompare(b.name);
+  });
+});
 
 // Load files from Prompts folder for dropdown
 async function loadPromptsFiles() {
@@ -533,6 +639,75 @@ function getStrengths(): string[] {
   color: var(--text-light);
   font-style: italic;
   margin: 0;
+}
+
+/* File Tree Styles */
+.file-tree-list {
+  margin: 0;
+  padding: 0;
+}
+
+.tree-item {
+  margin: 0;
+}
+
+.tree-folder {
+  margin-bottom: 4px;
+}
+
+.tree-folder-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+  user-select: none;
+}
+
+.tree-folder-header:hover {
+  background: rgba(74, 59, 140, 0.06);
+}
+
+.tree-toggle {
+  font-size: 10px;
+  color: var(--text-gray);
+  width: 12px;
+  flex-shrink: 0;
+  display: inline-block;
+  transition: transform var(--transition-fast);
+}
+
+.tree-folder-name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-dark);
+}
+
+.tree-folder-content {
+  margin-top: 2px;
+}
+
+.tree-nested {
+  margin-left: 18px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border-light);
+}
+
+.tree-file {
+  font-size: var(--font-size-sm);
+  color: var(--text-dark);
+  padding: 2px 8px 2px 18px;
+  line-height: 1.6;
+}
+
+.tree-empty {
+  font-size: var(--font-size-xs);
+  color: var(--text-light);
+  font-style: italic;
+  margin: 4px 0 4px 18px;
+  padding-left: 8px;
 }
 
 .nav-item {
