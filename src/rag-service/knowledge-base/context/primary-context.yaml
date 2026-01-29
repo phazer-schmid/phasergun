@@ -41,6 +41,100 @@ project_context:
     - "Metadata tracks versions and updates"
 
 # ============================================================================
+# CONTEXT FOLDER ORGANIZATION
+# ============================================================================
+
+context_folder_structure:
+  description: "Structured organization of customer-provided project documents from Google Drive"
+  location: "{ProjectPath}/Context/"
+  
+  root_level:
+    primary_context_file:
+      filename: "Primary Context.docx"
+      purpose: "PRIMARY SOURCE OF TRUTH for entire project"
+      description: "Result of initial project intake containing key answers to defining questions"
+      importance: "CRITICAL - Highest priority in all retrieval operations"
+      content_includes:
+        - "High-level product description and definition"
+        - "Key answers to critical questions that define the product"
+        - "Core product identity and specifications"
+        - "Foundational project information"
+      retrieval_priority: "MAXIMUM - Always included first"
+      note: "This file contains the essential 'what' of the project - the definitive description of what is being developed"
+  
+  subfolders:
+    initiation:
+      path: "{ProjectPath}/Context/Initiation/"
+      purpose: "Documents uploaded when customer starts the project"
+      description: "Foundational documents that establish project direction and scope"
+      examples:
+        - "Market Analysis"
+        - "Competitive Landscape"
+        - "Initial Requirements Documents"
+        - "Stakeholder Needs Assessment"
+        - "Regulatory Strategy Documents"
+      retrieval_priority: "High"
+      timing: "Uploaded at project inception"
+      
+    ongoing:
+      path: "{ProjectPath}/Context/Ongoing/"
+      purpose: "Documents uploaded throughout the project lifecycle"
+      description: "Living documentation that tracks project evolution and decisions"
+      examples:
+        - "Project Memos"
+        - "Meeting Minutes"
+        - "Decision Records"
+        - "Progress Updates"
+        - "Change Requests"
+      retrieval_priority: "High"
+      timing: "Uploaded continuously during project execution"
+      
+    predicates:
+      path: "{ProjectPath}/Context/Predicates/"
+      purpose: "Predicate device documentation for establishing substantial equivalence"
+      description: "REGULATORY DEVICES - Documents related to predicate devices that support 510(k) clearance pathway"
+      
+      what_are_predicates:
+        definition: "Legally marketed devices to which your new device claims substantial equivalence"
+        regulatory_context: "FDA 510(k) pathway - demonstrate your device is as safe and effective as a predicate"
+        key_principle: "Predicates DO NOT dictate what your device IS, but establish what it is SIMILAR TO"
+        strategic_value: "Can significantly reduce testing burden by leveraging predicate's existing safety/efficacy data"
+      
+      examples:
+        - "Predicate Device 510(k) Submissions"
+        - "Predicate Device Technical Specifications"
+        - "ISO Standards (when used to establish equivalence)"
+        - "Comparative Analysis Documents"
+        - "Substantial Equivalence Arguments"
+      
+      retrieval_priority: "High"
+      timing: "Uploaded during regulatory strategy phase"
+      
+      special_handling:
+        note: "While predicates receive same semantic search weight as other context, they serve a unique regulatory purpose"
+        distinction: "Initiation/Ongoing define YOUR device; Predicates define REFERENCE devices for comparison"
+        usage: "Referenced when establishing equivalence, justifying design choices, or reducing testing requirements"
+  
+  retrieval_strategy:
+    semantic_search_weights:
+      primary_context_root: "ALWAYS INCLUDED (Tier 0 - before all other context)"
+      initiation: "Equal weight in semantic similarity search"
+      ongoing: "Equal weight in semantic similarity search"
+      predicates: "Equal weight in semantic similarity search"
+    
+    context_assembly_order:
+      tier_0: "Primary Context.docx from root (if exists)"
+      tier_1: "PhaserGun primary-context.yaml (system role definition)"
+      tier_2: "Company SOP summaries"
+      tier_3: "Semantically retrieved context from all subfolders (Initiation, Ongoing, Predicates)"
+    
+    notes:
+      - "All three subfolders (Initiation, Ongoing, Predicates) participate equally in semantic search"
+      - "Primary Context.docx is ALWAYS included at highest priority before semantic retrieval"
+      - "Metadata tags preserve folder origin for traceability"
+      - "Predicates are conceptually distinct (regulatory comparison devices) but technically equal in retrieval"
+
+# ============================================================================
 # REGULATORY FRAMEWORK
 # ============================================================================
 
@@ -48,10 +142,18 @@ regulatory_framework:
   standards:
     - name: "FDA 21 CFR Part 820.30"
       description: "Design Controls"
+    - name: "FDA 21 CFR Part 807"
+      description: "Premarket Notification [510(k)] - Substantial Equivalence"
     - name: "ISO 13485"
       description: "Quality Management Systems"
     - name: "ISO 14971"
       description: "Risk Management"
+  
+  predicate_devices:
+    definition: "Legally marketed devices used as comparison basis for 510(k) clearance"
+    purpose: "Establish substantial equivalence to reduce regulatory burden"
+    documentation_location: "Context/Predicates/ folder"
+    key_concept: "Your device must be as safe and effective as the predicate, not identical to it"
 
 # ============================================================================
 # SOP MANAGEMENT
