@@ -352,23 +352,24 @@ async function loadFolderContents(folderPath: string) {
   }
 }
 
-// Sort items with "Project Context" doc first, then alphabetically
+// Sort items with "Primary Context" doc first, then folders, then other files
 const sortedContextItems = computed(() => {
   const items = [...contextItems.value];
   
   return items.sort((a, b) => {
-    // Check if either is the "Project Context" file
-    const aIsProjectContext = a.type === 'file' && a.name.toLowerCase().includes('project context');
-    const bIsProjectContext = b.type === 'file' && b.name.toLowerCase().includes('project context');
+    // Check if either is the "Primary Context" file
+    const aIsPrimaryContext = a.type === 'file' && a.name.toLowerCase().includes('primary context');
+    const bIsPrimaryContext = b.type === 'file' && b.name.toLowerCase().includes('primary context');
     
-    if (aIsProjectContext) return -1;
-    if (bIsProjectContext) return 1;
+    // Primary Context file always comes first
+    if (aIsPrimaryContext) return -1;
+    if (bIsPrimaryContext) return 1;
     
-    // Folders before files
+    // Then folders before other files
     if (a.type === 'directory' && b.type === 'file') return -1;
     if (a.type === 'file' && b.type === 'directory') return 1;
     
-    // Alphabetical
+    // Within same type, sort alphabetically
     return a.name.localeCompare(b.name);
   });
 });
