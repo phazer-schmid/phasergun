@@ -116,7 +116,8 @@ export class OrchestratorService implements Orchestrator {
           {
             procedureChunks: input.options?.topKProcedures || 5,
             contextChunks: input.options?.topKContext || 5,
-            includeFullPrimary: true
+            includeFullPrimary: true,
+            includeSummaries: true,
           }
         );
       
