@@ -726,6 +726,10 @@ function getStrengths(): string[] {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  width: calc(100vw - 320px);
+  max-width: calc(100vw - 320px);
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .dashboard-header {
@@ -735,6 +739,7 @@ function getStrengths(): string[] {
   background: var(--light-bg);
   z-index: 10;
   padding-bottom: var(--spacing-lg);
+  width: 100%;
 }
 
 .header-row {
@@ -853,6 +858,7 @@ function getStrengths(): string[] {
   cursor: pointer;
   transition: all var(--transition-fast);
   min-width: 250px;
+  max-width: 400px;
 }
 
 .check-dropdown:hover:not(:disabled) {
@@ -965,8 +971,11 @@ function getStrengths(): string[] {
 
 /* Dashboard Content - Full Width */
 .dashboard-content {
-  display: block;
+  display: flex;
+  flex-direction: column;
   width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Section Header */
@@ -992,11 +1001,23 @@ function getStrengths(): string[] {
 .analysis-card {
   border-radius: 12px;
   padding: 0 !important;
+  width: 100%;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  max-height: 100%;
 }
 
 .analysis-content {
   line-height: var(--line-height-relaxed);
   padding: var(--spacing-md) var(--spacing-lg);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .analysis-empty {
