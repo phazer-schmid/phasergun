@@ -1186,7 +1186,7 @@ function getStrengths(): string[] {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: 0;
   padding: 16px 20px 16px !important;
   border-bottom: 1px solid var(--border-light);
 }
@@ -1215,7 +1215,7 @@ function getStrengths(): string[] {
 
 .analysis-content {
   line-height: var(--line-height-relaxed);
-  padding: var(--spacing-md) var(--spacing-lg);
+  padding: 0 var(--spacing-lg) var(--spacing-md) var(--spacing-lg);
   word-wrap: break-word;
   overflow-wrap: break-word;
   overflow-y: auto;
@@ -1247,6 +1247,7 @@ function getStrengths(): string[] {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
+  padding-top: var(--spacing-md);
 }
 
 .narrative-title {
@@ -1260,12 +1261,14 @@ function getStrengths(): string[] {
   font-size: var(--font-size-sm);
   line-height: var(--line-height-relaxed);
   color: var(--text-dark);
+  margin: 0;
 }
 
 .narrative-text pre {
   white-space: pre-wrap;
   font-family: inherit;
   margin: 0;
+  color: var(--text-dark);
 }
 
 .analysis-error {

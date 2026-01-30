@@ -127,11 +127,14 @@ router.post('/generate', async (req, res) => {
       });
     }
     
+    // Trim leading whitespace from generated text to ensure it displays properly
+    const cleanedText = result.generatedText.trimStart();
+    
     // Return in format expected by frontend
     res.json({
       status: 'complete',
       message: 'Content generated successfully',
-      generatedContent: result.generatedText,
+      generatedContent: cleanedText,
       timestamp: new Date().toISOString(),
       metadata: {
         sources: result.sources,
