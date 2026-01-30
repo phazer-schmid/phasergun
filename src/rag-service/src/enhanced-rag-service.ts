@@ -71,6 +71,16 @@ export class EnhancedRAGService {
   }
 
   /**
+   * Get Context summaries cache path for a project
+   * Uses system temp directory to avoid permission issues
+   */
+  private getContextSummariesCachePath(projectPath: string): string {
+    const tempBase = os.tmpdir();
+    const cacheBaseName = crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8);
+    return path.join(tempBase, 'phasergun-cache', 'context-summaries', cacheBaseName, 'context-summaries.json');
+  }
+
+  /**
    * Get cache metadata path for a project
    * Uses system temp directory to avoid permission issues
    */
@@ -601,6 +611,141 @@ Executive Summary:`;
     }
     
     console.log('[EnhancedRAG] ✓ SOP summaries complete');
+    return summaryCache;
+  }
+
+  /**
+   * Generate executive summary for a Context file
+   */
+  private async summarizeContextFile(
+    doc: ParsedDocument,
+    contextCategory: string,
+    llmService: GroqLLMService,
+    summaryWordCount: number = 250
+  ): Promise<string> {
+    // Customize prompt based on context category
+    let focusAreas = '';
+    
+    if (contextCategory === 'predicates') {
+      focusAreas = `1. Predicate device name and regulatory clearance details
+2. Key similarities and differences to our device
+3. Critical design features and performance characteristics
+4. Relevant clinical data or performance testing`;
+    } else if (contextCategory === 'initiation') {
+      focusAreas = `1. Project objectives and scope
+2. Market analysis and competitive landscape
+3. Target users and use cases
+4. Key stakeholders and timeline`;
+    } else if (contextCategory === 'ongoing') {
+      focusAreas = `1. Current project status and milestones
+2. Recent decisions and action items
+3. Open issues or risks
+4. Next steps and deliverables`;
+    } else {
+      focusAreas = `1. Main purpose and scope
+2. Key information and findings
+3. Critical details and requirements
+4. Relevant stakeholders or references`;
+    }
+
+    const prompt = `You are a regulatory documentation expert. Provide a concise executive summary (${summaryWordCount} words) of the following project context document. Focus on:
+${focusAreas}
+
+Context Document:
+${doc.content}
+
+Executive Summary:`;
+
+    try {
+      const response = await llmService.generateText(prompt);
+      return response.generatedText;
+    } catch (error) {
+      console.error(`[EnhancedRAG] Failed to summarize ${doc.fileName}:`, error);
+      // Fallback: return first 500 words
+      return doc.content.split(/\s+/).slice(0, 500).join(' ') + '...';
+    }
+  }
+
+  /**
+   * Generate and cache summaries for all context files
+   */
+  private async generateContextSummaries(
+    contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[],
+    llmService: GroqLLMService,
+    projectPath: string,
+    summaryWordCount: number = 250
+  ): Promise<Map<string, string>> {
+    const summaryCache = new Map<string, string>();
+    
+    if (contextFiles.length === 0) {
+      return summaryCache;
+    }
+    
+    console.log('[EnhancedRAG] Generating Context file summaries...');
+    
+    // Load existing cache if available
+    const cachePath = this.getContextSummariesCachePath(projectPath);
+    let cached: any = {};
+    
+    try {
+      const cacheData = await fs.readFile(cachePath, 'utf-8');
+      cached = JSON.parse(cacheData);
+      
+      // Check if cached summaries are still valid
+      for (const { doc } of contextFiles) {
+        const hash = this.hashContent(doc.content);
+        if (cached[doc.fileName] && cached[doc.fileName].hash === hash) {
+          summaryCache.set(doc.fileName, cached[doc.fileName].summary);
+          console.log(`[EnhancedRAG] ✓ Using cached summary for ${doc.fileName}`);
+        }
+      }
+    } catch {
+      // No cache exists, will generate fresh
+      console.log('[EnhancedRAG] No existing context summary cache found');
+    }
+    
+    // Generate missing summaries
+    for (const { doc, contextCategory } of contextFiles) {
+      if (!summaryCache.has(doc.fileName)) {
+        console.log(`[EnhancedRAG] Summarizing ${doc.fileName}...`);
+        const summary = await this.summarizeContextFile(doc, contextCategory, llmService, summaryWordCount);
+        summaryCache.set(doc.fileName, summary);
+        
+        // Rate limit: wait 1 second between API calls
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    // Save cache - preserve original timestamps for cached entries
+    const cacheData: any = {};
+    for (const { doc } of contextFiles) {
+      const summary = summaryCache.get(doc.fileName);
+      if (summary) {
+        const hash = this.hashContent(doc.content);
+        // Preserve original timestamp if entry was cached, otherwise use current time
+        const existingEntry = cached[doc.fileName];
+        const generatedAt = (existingEntry && existingEntry.hash === hash) 
+          ? existingEntry.generatedAt 
+          : new Date().toISOString();
+        
+        cacheData[doc.fileName] = {
+          hash: hash,
+          summary: summary,
+          generatedAt: generatedAt
+        };
+      }
+    }
+    
+    try {
+      await fs.mkdir(path.dirname(cachePath), { recursive: true });
+      await fs.writeFile(cachePath, JSON.stringify(cacheData, null, 2));
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.warn('[EnhancedRAG] Failed to save Context summaries cache (non-fatal):', errorMsg);
+      // Continue anyway - cache is optional
+    }
+    
+    console.log('[EnhancedRAG] ✓ Context file summaries complete');
     return summaryCache;
   }
 
@@ -1204,6 +1349,7 @@ async loadContextFolderStructured(
       procedureChunksRetrieved: number;
       contextChunksRetrieved: number;
       summariesGenerated: number;
+      contextSummariesGenerated: number;
       totalTokensEstimate: number;
       sources: string[];
     };
@@ -1241,6 +1387,35 @@ async loadContextFolderStructured(
         console.warn('[EnhancedRAG] Failed to generate SOP summaries, continuing without them:', error);
       }
     }
+
+    // 2.5. Generate Context file summaries if requested
+    let contextSummaries = new Map<string, string>();
+    if (options.includeSummaries ?? true) {
+      try {
+        // Get context files
+        const contextPath = path.join(projectPath, 'Context');
+        let contextFilesWithCategory: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[] = [];
+        try {
+          await fs.access(contextPath);
+          contextFilesWithCategory = await this.loadContextFolderStructured(contextPath);
+        } catch {
+          // No context folder
+        }
+        
+        if (contextFilesWithCategory.length > 0) {
+          // Use provided LLM service or create one
+          const llmService = options.llmService || this.getLLMService();
+          contextSummaries = await this.generateContextSummaries(
+            contextFilesWithCategory,
+            llmService,
+            projectPath,
+            options.summaryWordCount || 250
+          );
+        }
+      } catch (error) {
+        console.warn('[EnhancedRAG] Failed to generate Context summaries, continuing without them:', error);
+      }
+    }
     
     // 3. Embed the prompt
     const embeddingService = await this.getEmbeddingService(projectPath);
@@ -1267,6 +1442,7 @@ async loadContextFolderStructured(
       procedureResults,
       contextResults,
       sopSummaries,
+      contextSummaries,
       options
     );
     
@@ -1284,6 +1460,7 @@ async loadContextFolderStructured(
       procedureChunksRetrieved: procedureResults.length,
       contextChunksRetrieved: contextResults.length,
       summariesGenerated: sopSummaries.size,
+      contextSummariesGenerated: contextSummaries.size,
       totalTokensEstimate: this.estimateTokens(ragContext),
       sources: Array.from(sources)
     };
@@ -1304,6 +1481,7 @@ async loadContextFolderStructured(
     procedureChunks: SearchResult[],
     contextChunks: SearchResult[],
     sopSummaries: Map<string, string>,
+    contextSummaries: Map<string, string>,
     options: any
   ): string {
     const sections: string[] = [];
@@ -1315,10 +1493,20 @@ async loadContextFolderStructured(
       sections.push('\n');
     }
     
-    // TIER 1.5: SOP Executive Summaries (NEW - provides overview)
+    // TIER 1.5: SOP Executive Summaries (provides overview)
     if (sopSummaries.size > 0) {
       sections.push('=== COMPANY PROCEDURES OVERVIEW (Executive Summaries) ===\n');
       sopSummaries.forEach((summary, fileName) => {
+        sections.push(`\n--- ${fileName} ---\n`);
+        sections.push(summary);
+        sections.push('\n');
+      });
+    }
+    
+    // TIER 1.6: Context File Executive Summaries (NEW - provides context overview)
+    if (contextSummaries.size > 0) {
+      sections.push('=== PROJECT CONTEXT OVERVIEW (Executive Summaries) ===\n');
+      contextSummaries.forEach((summary, fileName) => {
         sections.push(`\n--- ${fileName} ---\n`);
         sections.push(summary);
         sections.push('\n');
@@ -1338,7 +1526,7 @@ async loadContextFolderStructured(
     
     // TIER 3: Retrieved Context Chunks (most relevant) - organized by category
     if (contextChunks.length > 0) {
-      sections.push('=== RELEVANT PROJECT CONTEXT (Retrieved) ===\n');
+      sections.push('=== RELEVANT PROJECT CONTEXT (Retrieved Details) ===\n');
       contextChunks.forEach((result, idx) => {
         const similarity = (result.similarity * 100).toFixed(1);
         const contextCategory = result.entry.metadata.contextCategory;
