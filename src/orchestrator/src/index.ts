@@ -150,8 +150,16 @@ export class OrchestratorService implements Orchestrator {
       // Step 3: Combine RAG context + user prompt
       const fullPrompt = `${ragContext}\n\n=== USER REQUEST ===\n${input.prompt}`;
       
+      console.log(`[Orchestrator] Full prompt length: ${fullPrompt.length} chars`);
+      console.log(`[Orchestrator] Calling LLM service...`);
+      
       // Step 4: Generate using LLM
       const response = await this.llmService.generateText(fullPrompt);
+      
+      console.log(`[Orchestrator] LLM response received:`);
+      console.log(`  - Generated text length: ${response.generatedText?.length || 0} chars`);
+      console.log(`  - Tokens used: ${response.usageStats?.tokensUsed || 0}`);
+      console.log(`  - Text preview: ${response.generatedText?.substring(0, 100) || '(empty)'}`);
       
       // Step 5: Append footnotes to generated text
       const footnotes = footnoteTracker.generateFootnotes();

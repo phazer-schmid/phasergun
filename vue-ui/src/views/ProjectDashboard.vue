@@ -419,6 +419,11 @@ async function analyzeSelectedDocument() {
   analysisResult.value = null;
   
   try {
+    console.log('[Dashboard] Starting generation with:', {
+      projectPath: project.value.folderPath,
+      promptFilePath: selectedCheck.value
+    });
+    
     // Generate content using the new /api/generate endpoint
     const response = await fetch(getApiEndpoint('/generate'), {
       method: 'POST',
@@ -429,9 +434,24 @@ async function analyzeSelectedDocument() {
       })
     });
     
+    console.log('[Dashboard] Response status:', response.status);
+    
     const result = await response.json();
+    console.log('[Dashboard] Result:', {
+      status: result.status,
+      hasContent: !!result.generatedContent,
+      contentLength: result.generatedContent?.length || 0,
+      error: result.error
+    });
     
     if (result.status === 'complete') {
+      // Validate that we actually have content
+      if (!result.generatedContent || result.generatedContent.trim().length === 0) {
+        scanError.value = 'Generation completed but returned no content. Check server logs for details.';
+        console.error('[Dashboard] Empty content received despite complete status');
+        return;
+      }
+      
       // Map the response to match the expected structure
       analysisResult.value = {
         status: 'complete',
@@ -440,13 +460,19 @@ async function analyzeSelectedDocument() {
         timestamp: result.timestamp,
         metadata: result.metadata
       };
+      
+      console.log('[Dashboard] Content successfully displayed:', result.generatedContent.substring(0, 100));
+    } else if (result.status === 'error') {
+      scanError.value = result.error || result.message || 'Content generation failed';
+      console.error('[Dashboard] Generation error:', result);
     } else {
       scanError.value = result.message || 'Content generation failed';
+      console.error('[Dashboard] Unexpected result status:', result.status);
     }
     
   } catch (error: any) {
-    console.error('[Dashboard] Generation failed:', error);
-    scanError.value = error.message || 'Failed to generate content';
+    console.error('[Dashboard] Generation failed with exception:', error);
+    scanError.value = `Failed to generate content: ${error.message || 'Unknown error'}`;
   } finally {
     isScanning.value = false;
   }

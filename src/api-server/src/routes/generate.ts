@@ -109,7 +109,23 @@ router.post('/generate', async (req, res) => {
     console.log(`[API /generate] Generation complete`);
     console.log(`[API /generate] Sources: ${result.sources.length}`);
     console.log(`[API /generate] Tokens: ${result.usageStats.tokensUsed}`);
+    console.log(`[API /generate] Generated text length: ${result.generatedText?.length || 0} chars`);
+    console.log(`[API /generate] Generated text preview: ${result.generatedText?.substring(0, 200) || '(empty)'}`);
     console.log(`[API /generate] ========================================\n`);
+    
+    // Validate that we have generated text
+    if (!result.generatedText || result.generatedText.trim().length === 0) {
+      console.error('[API /generate] ❌ ERROR: Generated text is empty or missing!');
+      console.error('[API /generate] Full result object:', JSON.stringify(result, null, 2));
+      return res.status(500).json({
+        status: 'error',
+        error: 'Generated text is empty. This may indicate an issue with the LLM service.',
+        details: {
+          sources: result.sources.length,
+          tokensUsed: result.usageStats?.tokensUsed || 0
+        }
+      });
+    }
     
     // Return in format expected by frontend
     res.json({
@@ -126,9 +142,12 @@ router.post('/generate', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[API /generate] Error:', error);
+    console.error('[API /generate] ❌ CAUGHT ERROR:', error);
+    console.error('[API /generate] Error stack:', error instanceof Error ? error.stack : 'N/A');
     res.status(500).json({
-      error: error instanceof Error ? error.message : 'Unknown error'
+      status: 'error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : undefined) : undefined
     });
   }
 });
