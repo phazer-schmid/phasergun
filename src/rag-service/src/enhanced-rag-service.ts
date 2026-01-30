@@ -71,6 +71,16 @@ export class EnhancedRAGService {
   }
 
   /**
+   * Get cache metadata path for a project
+   * Uses system temp directory to avoid permission issues
+   */
+  private getCacheMetadataPath(projectPath: string): string {
+    const tempBase = os.tmpdir();
+    const cacheBaseName = crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8);
+    return path.join(tempBase, 'phasergun-cache', 'metadata', cacheBaseName, 'cache-metadata.json');
+  }
+
+  /**
    * Get or initialize embedding service
    */
   private async getEmbeddingService(projectPath: string): Promise<EmbeddingService> {
@@ -440,82 +450,6 @@ private async buildVectorStore(
   }
 
 /**
- * Load and organize files from Context folder with subfolder structure
- * Returns documents tagged with their context category
- */
-async loadContextFolderStructured(
-  folderPath: string
-): Promise<{ doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[]> {
-  console.log('[EnhancedRAG] Loading Context folder with subfolder structure:', folderPath);
-  
-  const contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[] = [];
-  
-  try {
-    await fs.access(folderPath);
-  } catch {
-    console.warn('[EnhancedRAG] Context folder not found:', folderPath);
-    return [];
-  }
-  
-  // 1. Check for root-level "Primary Context.docx" file
-  const primaryContextPath = path.join(folderPath, 'Primary Context.docx');
-  try {
-    await fs.access(primaryContextPath);
-    // Parse the single file by scanning just the root level and filtering
-    const allRootDocs = await this.fileParser.scanAndParseFolder(folderPath);
-    const primaryDoc = allRootDocs.find(doc => doc.fileName === 'Primary Context.docx');
-    if (primaryDoc) {
-      contextFiles.push({ doc: primaryDoc, contextCategory: 'primary-context-root' });
-      console.log('[EnhancedRAG] ✓ Found Primary Context.docx at root level');
-    }
-  } catch {
-    console.log('[EnhancedRAG] No Primary Context.docx found at root level (optional)');
-  }
-  
-  // 2. Load Initiation subfolder
-  const initiationPath = path.join(folderPath, 'Initiation');
-  try {
-    await fs.access(initiationPath);
-    const initiationDocs = await this.fileParser.scanAndParseFolder(initiationPath);
-    initiationDocs.forEach(doc => {
-      contextFiles.push({ doc, contextCategory: 'initiation' });
-    });
-    console.log(`[EnhancedRAG] ✓ Loaded ${initiationDocs.length} files from Initiation/`);
-  } catch {
-    console.warn('[EnhancedRAG] Initiation subfolder not found or empty');
-  }
-  
-  // 3. Load Ongoing subfolder
-  const ongoingPath = path.join(folderPath, 'Ongoing');
-  try {
-    await fs.access(ongoingPath);
-    const ongoingDocs = await this.fileParser.scanAndParseFolder(ongoingPath);
-    ongoingDocs.forEach(doc => {
-      contextFiles.push({ doc, contextCategory: 'ongoing' });
-    });
-    console.log(`[EnhancedRAG] ✓ Loaded ${ongoingDocs.length} files from Ongoing/`);
-  } catch {
-    console.warn('[EnhancedRAG] Ongoing subfolder not found or empty');
-  }
-  
-  // 4. Load Predicates subfolder
-  const predicatesPath = path.join(folderPath, 'Predicates');
-  try {
-    await fs.access(predicatesPath);
-    const predicatesDocs = await this.fileParser.scanAndParseFolder(predicatesPath);
-    predicatesDocs.forEach(doc => {
-      contextFiles.push({ doc, contextCategory: 'predicates' });
-    });
-    console.log(`[EnhancedRAG] ✓ Loaded ${predicatesDocs.length} files from Predicates/`);
-  } catch {
-    console.warn('[EnhancedRAG] Predicates subfolder not found or empty');
-  }
-  
-  console.log(`[EnhancedRAG] Total context files loaded: ${contextFiles.length}`);
-  return contextFiles;
-}
-
-/**
  * Load and chunk all files from Context folder (DEPRECATED - use loadContextFolderStructured)
  */
 async loadContextFolder(folderPath: string): Promise<DocumentChunk[]> {
@@ -671,32 +605,11 @@ Executive Summary:`;
   }
 
   /**
-   * Compute fingerprint for a folder (all file paths, sizes, and mtimes)
-   */
-  private async computeFolderFingerprint(folderPath: string): Promise<string> {
-    try {
-      await fs.access(folderPath);
-      
-      const files = await this.getAllFiles(folderPath);
-      const fileInfos = await Promise.all(
-        files.map(async (filePath) => {
-          const stats = await fs.stat(filePath);
-          return `${filePath}:${stats.size}:${stats.mtimeMs}`;
-        })
-      );
-      
-      const combined = fileInfos.sort().join('|');
-      return crypto.createHash('sha256').update(combined).digest('hex');
-    } catch (error) {
-      // Folder doesn't exist, return empty fingerprint
-      return crypto.createHash('sha256').update('empty').digest('hex');
-    }
-  }
-
-  /**
    * Recursively get all files from a directory
+   * @param dirPath - Directory to scan
+   * @param excludeDirs - Directory names to skip (e.g., ['Prompt', 'node_modules'])
    */
-  private async getAllFiles(dirPath: string): Promise<string[]> {
+  private async getAllFiles(dirPath: string, excludeDirs: string[] = []): Promise<string[]> {
     const files: string[] = [];
     
     try {
@@ -706,7 +619,12 @@ Executive Summary:`;
         const fullPath = path.join(dirPath, entry.name);
         
         if (entry.isDirectory()) {
-          const subFiles = await this.getAllFiles(fullPath);
+          // Skip excluded directories (like Prompt folder)
+          if (excludeDirs.includes(entry.name)) {
+            console.log(`[EnhancedRAG] ⏭️  Skipping excluded directory: ${entry.name} (not cached)`);
+            continue;
+          }
+          const subFiles = await this.getAllFiles(fullPath, excludeDirs);
           files.push(...subFiles);
         } else if (entry.isFile()) {
           files.push(fullPath);
@@ -720,7 +638,41 @@ Executive Summary:`;
   }
 
   /**
+   * Compute fingerprint for a folder (all file paths, sizes, and mtimes)
+   * @param folderPath - Folder to fingerprint
+   * @param excludeDirs - Directory names to exclude from fingerprint (e.g., 'Prompt')
+   */
+  private async computeFolderFingerprint(folderPath: string, excludeDirs: string[] = []): Promise<string> {
+    try {
+      await fs.access(folderPath);
+      
+      const files = await this.getAllFiles(folderPath, excludeDirs);
+      
+      if (files.length === 0) {
+        console.log(`[EnhancedRAG] No files found in ${folderPath} for fingerprinting`);
+      } else {
+        console.log(`[EnhancedRAG] Computing fingerprint for ${files.length} files in ${path.basename(folderPath)}/`);
+      }
+      
+      const fileInfos = await Promise.all(
+        files.map(async (filePath) => {
+          const stats = await fs.stat(filePath);
+          return `${filePath}:${stats.size}:${stats.mtimeMs}`;
+        })
+      );
+      
+      const combined = fileInfos.sort().join('|');
+      return crypto.createHash('sha256').update(combined).digest('hex');
+    } catch (error) {
+      // Folder doesn't exist, return empty fingerprint
+      console.log(`[EnhancedRAG] Folder ${path.basename(folderPath)}/ not found, using empty fingerprint`);
+      return crypto.createHash('sha256').update('empty').digest('hex');
+    }
+  }
+
+  /**
    * Compute combined fingerprint for cache validation
+   * Excludes Context/Prompt folder - those files are parsed fresh each time
    */
   private async computeCacheFingerprint(
     projectPath: string,
@@ -729,11 +681,14 @@ Executive Summary:`;
     const proceduresPath = path.join(projectPath, 'Procedures');
     const contextPath = path.join(projectPath, 'Context');
     
+    console.log(`[EnhancedRAG] 🔍 Computing cache fingerprint...`);
+    
     // Get fingerprints for all three sources
+    // Note: Context folder excludes "Prompt" subfolder - those are never cached
     const [primaryStats, proceduresFingerprint, contextFingerprint] = await Promise.all([
       fs.stat(primaryContextPath).catch(() => ({ mtimeMs: 0, size: 0 })),
       this.computeFolderFingerprint(proceduresPath),
-      this.computeFolderFingerprint(contextPath)
+      this.computeFolderFingerprint(contextPath, ['Prompt']) // EXCLUDE Prompt folder
     ]);
     
     const primaryFingerprint = `${primaryContextPath}:${primaryStats.size}:${primaryStats.mtimeMs}`;
@@ -741,6 +696,124 @@ Executive Summary:`;
     
     return crypto.createHash('sha256').update(combined).digest('hex');
   }
+
+/**
+ * Load and organize files from Context folder with subfolder structure
+ * Returns documents tagged with their context category
+ * 
+ * IMPORTANT: This method excludes the Context/Prompt folder completely.
+ * Prompt files are NEVER cached and should be parsed on-demand each time.
+ */
+async loadContextFolderStructured(
+  folderPath: string
+): Promise<{ doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[]> {
+  console.log('[EnhancedRAG] 📂 Loading Context folder with subfolder structure:', folderPath);
+  console.log('[EnhancedRAG] NOTE: Context/Prompt folder is excluded (never cached, parsed on-demand)');
+  
+  const contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[] = [];
+  
+  try {
+    await fs.access(folderPath);
+  } catch {
+    console.warn('[EnhancedRAG] ⚠️  Context folder not found:', folderPath);
+    return [];
+  }
+  
+  // 1. Check for root-level files (e.g., "Primary Context.docx")
+  // Only scan root level, not recursive
+  console.log('[EnhancedRAG] Scanning root level of Context/ for Primary Context.docx...');
+  try {
+    const rootEntries = await fs.readdir(folderPath, { withFileTypes: true });
+    const rootFiles = rootEntries.filter(e => e.isFile()).map(e => e.name);
+    
+    if (rootFiles.length > 0) {
+      console.log(`[EnhancedRAG] Found ${rootFiles.length} file(s) at root: ${rootFiles.join(', ')}`);
+      
+      // Parse only root-level files that match Primary Context
+      for (const fileName of rootFiles) {
+        if (fileName === 'Primary Context.docx' || fileName.toLowerCase().includes('primary')) {
+          const filePath = path.join(folderPath, fileName);
+          try {
+            // Use scanAndParseFolder on the containing directory and filter
+            const allDocs = await this.fileParser.scanAndParseFolder(folderPath);
+            const doc = allDocs.find(d => d.fileName === fileName);
+            if (doc) {
+              contextFiles.push({ doc, contextCategory: 'primary-context-root' });
+              console.log(`[EnhancedRAG] ✓ Loaded and will cache: ${fileName} (${doc.content.length} chars)`);
+            }
+          } catch (err) {
+            console.warn(`[EnhancedRAG] Failed to parse ${fileName}:`, err);
+          }
+        }
+      }
+    } else {
+      console.log('[EnhancedRAG] No files found at root level of Context/');
+    }
+  } catch (err) {
+    console.warn('[EnhancedRAG] Error scanning root level:', err);
+  }
+  
+  // 2. Load Initiation subfolder
+  const initiationPath = path.join(folderPath, 'Initiation');
+  console.log('[EnhancedRAG] Scanning Context/Initiation/...');
+  try {
+    await fs.access(initiationPath);
+    const initiationDocs = await this.fileParser.scanAndParseFolder(initiationPath);
+    initiationDocs.forEach(doc => {
+      contextFiles.push({ doc, contextCategory: 'initiation' });
+      console.log(`[EnhancedRAG] ✓ Loaded and will cache: Initiation/${doc.fileName} (${doc.content.length} chars)`);
+    });
+    console.log(`[EnhancedRAG] ✓ Total from Initiation/: ${initiationDocs.length} files`);
+  } catch {
+    console.log('[EnhancedRAG] Context/Initiation/ not found or empty');
+  }
+  
+  // 3. Load Ongoing subfolder
+  const ongoingPath = path.join(folderPath, 'Ongoing');
+  console.log('[EnhancedRAG] Scanning Context/Ongoing/...');
+  try {
+    await fs.access(ongoingPath);
+    const ongoingDocs = await this.fileParser.scanAndParseFolder(ongoingPath);
+    ongoingDocs.forEach(doc => {
+      contextFiles.push({ doc, contextCategory: 'ongoing' });
+      console.log(`[EnhancedRAG] ✓ Loaded and will cache: Ongoing/${doc.fileName} (${doc.content.length} chars)`);
+    });
+    console.log(`[EnhancedRAG] ✓ Total from Ongoing/: ${ongoingDocs.length} files`);
+  } catch {
+    console.log('[EnhancedRAG] Context/Ongoing/ not found or empty');
+  }
+  
+  // 4. Load Predicates subfolder
+  const predicatesPath = path.join(folderPath, 'Predicates');
+  console.log('[EnhancedRAG] Scanning Context/Predicates/...');
+  try {
+    await fs.access(predicatesPath);
+    const predicatesDocs = await this.fileParser.scanAndParseFolder(predicatesPath);
+    predicatesDocs.forEach(doc => {
+      contextFiles.push({ doc, contextCategory: 'predicates' });
+      console.log(`[EnhancedRAG] ✓ Loaded and will cache: Predicates/${doc.fileName} (${doc.content.length} chars)`);
+    });
+    console.log(`[EnhancedRAG] ✓ Total from Predicates/: ${predicatesDocs.length} files`);
+  } catch {
+    console.log('[EnhancedRAG] Context/Predicates/ not found or empty');
+  }
+  
+  // NOTE: Context/Prompt is intentionally NOT scanned here - those files are parsed on-demand
+  
+  console.log(`[EnhancedRAG] 📊 TOTAL context files to cache: ${contextFiles.length}`);
+  if (contextFiles.length > 0) {
+    console.log('[EnhancedRAG] Files breakdown:');
+    const byCategory = contextFiles.reduce((acc, cf) => {
+      acc[cf.contextCategory] = (acc[cf.contextCategory] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    Object.entries(byCategory).forEach(([cat, count]) => {
+      console.log(`[EnhancedRAG]   - ${cat}: ${count} file(s)`);
+    });
+  }
+  
+  return contextFiles;
+}
 
   /**
    * Detect what changed in the cache
@@ -760,15 +833,7 @@ Executive Summary:`;
     const contextPath = path.join(projectPath, 'Context');
     
     // Get current fingerprints
-    const [currentPrimaryStats, currentProceduresFingerprint, currentContextFingerprint] = await Promise.all([
-      fs.stat(primaryContextPath).catch(() => ({ mtimeMs: 0, size: 0 })),
-      this.computeFolderFingerprint(proceduresPath),
-      this.computeFolderFingerprint(contextPath)
-    ]);
-    
-    const currentPrimaryFingerprint = `${primaryContextPath}:${currentPrimaryStats.size}:${currentPrimaryStats.mtimeMs}`;
-    const currentCombined = `${currentPrimaryFingerprint}|${currentProceduresFingerprint}|${currentContextFingerprint}`;
-    const currentFingerprint = crypto.createHash('sha256').update(currentCombined).digest('hex');
+    const currentFingerprint = await this.computeCacheFingerprint(projectPath, primaryContextPath);
     
     // Compare
     const changed = cachedFingerprint !== currentFingerprint;
@@ -779,13 +844,10 @@ Executive Summary:`;
     }
     
     // Detect what changed by comparing individual components
-    // We need to reconstruct the old fingerprints - for now, we'll just report that something changed
-    // A more sophisticated approach would store individual fingerprints in the cache
-    
     try {
       // Check if files exist and count them
       const proceduresFiles = await this.getAllFiles(proceduresPath).catch(() => []);
-      const contextFiles = await this.getAllFiles(contextPath).catch(() => []);
+      const contextFiles = await this.getAllFiles(contextPath, ['Prompt']).catch(() => []);
       
       details.push(`Current state: ${proceduresFiles.length} procedure files, ${contextFiles.length} context files`);
     } catch {
@@ -802,6 +864,44 @@ Executive Summary:`;
   }
 
   /**
+   * Save cache metadata to disk
+   */
+  private async saveCacheMetadata(cache: KnowledgeCache): Promise<void> {
+    const metadataPath = this.getCacheMetadataPath(cache.projectPath);
+    
+    try {
+      await fs.mkdir(path.dirname(metadataPath), { recursive: true });
+      await fs.writeFile(metadataPath, JSON.stringify(cache, null, 2), 'utf8');
+      console.log('[EnhancedRAG] ✓ Cache metadata saved to disk');
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.warn('[EnhancedRAG] Failed to save cache metadata (non-fatal):', errorMsg);
+      // Continue anyway - cache metadata is optional but helpful
+    }
+  }
+
+  /**
+   * Load cache metadata from disk
+   */
+  private async loadCacheMetadata(projectPath: string): Promise<KnowledgeCache | null> {
+    const metadataPath = this.getCacheMetadataPath(projectPath);
+    
+    try {
+      const fileContents = await fs.readFile(metadataPath, 'utf8');
+      const cache: KnowledgeCache = JSON.parse(fileContents);
+      console.log('[EnhancedRAG] ✓ Cache metadata loaded from disk');
+      return cache;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        console.log('[EnhancedRAG] No cache metadata found on disk');
+      } else {
+        console.warn('[EnhancedRAG] Failed to load cache metadata:', error);
+      }
+      return null;
+    }
+  }
+
+  /**
    * Clear old cache files for a project
    */
   private async clearOldCache(projectPath: string): Promise<void> {
@@ -810,6 +910,7 @@ Executive Summary:`;
     try {
       const vectorStorePath = this.getVectorStorePath(projectPath);
       const sopSummariesPath = this.getSOPSummariesCachePath(projectPath);
+      const metadataPath = this.getCacheMetadataPath(projectPath);
       
       // Try to delete vector store
       try {
@@ -832,6 +933,17 @@ Executive Summary:`;
           console.log('[EnhancedRAG] ⚠️  Could not delete old SOP summaries (continuing anyway)');
         }
       }
+      
+      // Try to delete cache metadata
+      try {
+        await fs.unlink(metadataPath);
+        console.log('[EnhancedRAG] ✓ Deleted old cache metadata');
+      } catch (error) {
+        // File might not exist, which is fine
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          console.log('[EnhancedRAG] ⚠️  Could not delete old cache metadata (continuing anyway)');
+        }
+      }
     } catch (error) {
       console.warn('[EnhancedRAG] ⚠️  Error during cache cleanup (non-fatal):', error);
     }
@@ -841,10 +953,21 @@ Executive Summary:`;
    * Check if cache is valid for a project
    */
   async isCacheValid(projectPath: string, primaryContextPath: string): Promise<boolean> {
-    const cached = this.cache.get(projectPath);
+    // Try to get from memory first
+    let cached = this.cache.get(projectPath);
+    
+    // If not in memory, try loading from disk
     if (!cached) {
-      console.log('[EnhancedRAG] 🔍 No cached knowledge found for project');
-      return false;
+      const diskCache = await this.loadCacheMetadata(projectPath);
+      if (diskCache !== null) {
+        // Store in memory for subsequent checks
+        cached = diskCache;
+        this.cache.set(projectPath, diskCache);
+        console.log('[EnhancedRAG] ✓ Cache metadata restored from disk to memory');
+      } else {
+        console.log('[EnhancedRAG] 🔍 No cached knowledge found (memory or disk)');
+        return false;
+      }
     }
     
     console.log('[EnhancedRAG] 🔍 Checking cache validity...');
@@ -862,7 +985,7 @@ Executive Summary:`;
       // Detect what changed
       const changes = await this.detectCacheChanges(projectPath, primaryContextPath, cached.fingerprint);
       if (changes.details.length > 0) {
-        changes.details.forEach(detail => console.log(`[EnhancedRAG] 📋 ${detail}`));
+        changes.details.forEach((detail: string) => console.log(`[EnhancedRAG] 📋 ${detail}`));
       }
     }
     
@@ -962,8 +1085,11 @@ Executive Summary:`;
       vectorStoreFingerprint
     };
     
-    // Store in cache
+    // Store in memory cache
     this.cache.set(projectPath, knowledgeCache);
+    
+    // Save cache metadata to disk for persistence across restarts
+    await this.saveCacheMetadata(knowledgeCache);
     
     const stats = this.vectorStore!.getStats();
     const vectorStorePath = this.getVectorStorePath(projectPath);
