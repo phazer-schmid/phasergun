@@ -314,10 +314,13 @@ export class VectorStore {
   async save(storePath?: string): Promise<void> {
     const savePath = storePath || this.getDefaultStorePath();
     
+    console.log(`[VectorStore] 💾 [VECTOR] Saving vector store to: ${savePath}`);
+    
     try {
       // Ensure directory exists
       const dir = path.dirname(savePath);
       await fs.mkdir(dir, { recursive: true });
+      console.log(`[VectorStore] 📁 [VECTOR] Directory created/verified: ${dir}`);
 
       // Prepare data for serialization
       const data: VectorStoreData = {
@@ -331,12 +334,22 @@ export class VectorStore {
       };
 
       // Write to disk
-      await fs.writeFile(savePath, JSON.stringify(data, null, 2), 'utf8');
+      const jsonData = JSON.stringify(data, null, 2);
+      await fs.writeFile(savePath, jsonData, 'utf8');
       
-      console.log(`[VectorStore] Saved ${this.entries.length} entries to ${savePath}`);
+      // Verify the file was written
+      try {
+        const stats = await fs.stat(savePath);
+        console.log(`[VectorStore] ✅ [VECTOR] Vector store saved successfully (${stats.size} bytes)`);
+        console.log(`[VectorStore] 📊 [VECTOR] Saved ${this.entries.length} entries`);
+        console.log(`[VectorStore] 📊 [VECTOR] Fingerprint: ${this.fingerprint.substring(0, 16)}...`);
+      } catch (verifyError) {
+        console.error(`[VectorStore] ⚠️  [VECTOR] File written but verification failed:`, verifyError);
+      }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error(`[VectorStore] Failed to save vector store (continuing anyway):`, errorMsg);
+      console.error(`[VectorStore] ❌ [VECTOR] Failed to save vector store:`, errorMsg);
+      console.error(`[VectorStore] ❌ [VECTOR] Target path was: ${savePath}`);
       // Don't throw - allow the system to continue even if save fails
     }
   }
@@ -346,7 +359,23 @@ export class VectorStore {
    * Loads from system temp directory
    */
   static async load(storePath: string, projectPath?: string): Promise<VectorStore> {
+    console.log(`[VectorStore] 📂 [VECTOR] Attempting to load vector store from: ${storePath}`);
+    
     try {
+      // First check if file exists
+      try {
+        const stats = await fs.stat(storePath);
+        console.log(`[VectorStore] ✅ [VECTOR] Vector store file found (${stats.size} bytes)`);
+      } catch (statError) {
+        if ((statError as NodeJS.ErrnoException).code === 'ENOENT') {
+          console.log('[VectorStore] ❌ [VECTOR] Vector store file does not exist (ENOENT)');
+          console.log(`[VectorStore] 🔨 [VECTOR] Creating new empty vector store`);
+          const usePath = projectPath || path.dirname(path.dirname(storePath));
+          return new VectorStore(usePath);
+        }
+        throw statError;
+      }
+      
       // Read from disk
       const fileContents = await fs.readFile(storePath, 'utf8');
       const data: VectorStoreData = JSON.parse(fileContents);
@@ -367,16 +396,22 @@ export class VectorStore {
         store.entryMap.set(entry.id, entry);
       });
 
-      console.log(`[VectorStore] Loaded ${data.totalEntries} entries from ${storePath}`);
+      console.log(`[VectorStore] ✅ [VECTOR] Vector store loaded successfully`);
+      console.log(`[VectorStore] 📊 [VECTOR] Loaded ${data.totalEntries} entries`);
+      console.log(`[VectorStore] 📊 [VECTOR] Store fingerprint: ${data.fingerprint.substring(0, 16)}...`);
+      console.log(`[VectorStore] 📊 [VECTOR] Created at: ${data.createdAt}`);
       
       return store;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         // File doesn't exist, return empty store
-        console.log(`[VectorStore] No existing store found at ${storePath}, creating new store`);
+        console.log(`[VectorStore] ❌ [VECTOR] Vector store file not found (ENOENT)`);
+        console.log(`[VectorStore] 🔨 [VECTOR] Creating new empty vector store`);
         const usePath = projectPath || path.dirname(path.dirname(storePath));
         return new VectorStore(usePath);
       }
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error(`[VectorStore] ❌ [VECTOR] Failed to load vector store:`, errorMsg);
       throw error;
     }
   }

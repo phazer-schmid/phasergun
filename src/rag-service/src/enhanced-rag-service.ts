@@ -1014,13 +1014,28 @@ async loadContextFolderStructured(
   private async saveCacheMetadata(cache: KnowledgeCache): Promise<void> {
     const metadataPath = this.getCacheMetadataPath(cache.projectPath);
     
+    console.log(`[EnhancedRAG] 💾 [CACHE] Saving cache metadata to: ${metadataPath}`);
+    
     try {
-      await fs.mkdir(path.dirname(metadataPath), { recursive: true });
-      await fs.writeFile(metadataPath, JSON.stringify(cache, null, 2), 'utf8');
-      console.log('[EnhancedRAG] ✓ Cache metadata saved to disk');
+      const dir = path.dirname(metadataPath);
+      await fs.mkdir(dir, { recursive: true });
+      console.log(`[EnhancedRAG] 📁 [CACHE] Cache directory created/verified: ${dir}`);
+      
+      const jsonData = JSON.stringify(cache, null, 2);
+      await fs.writeFile(metadataPath, jsonData, 'utf8');
+      
+      // Verify the file was actually written
+      try {
+        const stats = await fs.stat(metadataPath);
+        console.log(`[EnhancedRAG] ✅ [CACHE] Cache metadata saved successfully (${stats.size} bytes)`);
+        console.log(`[EnhancedRAG] 📊 [CACHE] Cache fingerprint: ${cache.fingerprint.substring(0, 16)}...`);
+      } catch (verifyError) {
+        console.error(`[EnhancedRAG] ⚠️  [CACHE] File written but verification failed:`, verifyError);
+      }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      console.warn('[EnhancedRAG] Failed to save cache metadata (non-fatal):', errorMsg);
+      console.error(`[EnhancedRAG] ❌ [CACHE] Failed to save cache metadata:`, errorMsg);
+      console.error(`[EnhancedRAG] ❌ [CACHE] Target path was: ${metadataPath}`);
       // Continue anyway - cache metadata is optional but helpful
     }
   }
@@ -1031,16 +1046,35 @@ async loadContextFolderStructured(
   private async loadCacheMetadata(projectPath: string): Promise<KnowledgeCache | null> {
     const metadataPath = this.getCacheMetadataPath(projectPath);
     
+    console.log(`[EnhancedRAG] 🔍 [CACHE] Attempting to load cache metadata from: ${metadataPath}`);
+    
     try {
+      // First check if file exists
+      try {
+        const stats = await fs.stat(metadataPath);
+        console.log(`[EnhancedRAG] 📂 [CACHE] Cache metadata file found (${stats.size} bytes)`);
+      } catch (statError) {
+        if ((statError as NodeJS.ErrnoException).code === 'ENOENT') {
+          console.log('[EnhancedRAG] ❌ [CACHE] Cache metadata file does not exist (ENOENT)');
+          return null;
+        }
+        throw statError;
+      }
+      
       const fileContents = await fs.readFile(metadataPath, 'utf8');
       const cache: KnowledgeCache = JSON.parse(fileContents);
-      console.log('[EnhancedRAG] ✓ Cache metadata loaded from disk');
+      
+      console.log('[EnhancedRAG] ✅ [CACHE] Cache metadata loaded from disk successfully');
+      console.log(`[EnhancedRAG] 📊 [CACHE] Cached fingerprint: ${cache.fingerprint.substring(0, 16)}...`);
+      console.log(`[EnhancedRAG] 📊 [CACHE] Cache indexed at: ${cache.indexedAt}`);
+      
       return cache;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        console.log('[EnhancedRAG] No cache metadata found on disk');
+        console.log('[EnhancedRAG] ❌ [CACHE] Cache metadata file does not exist (ENOENT)');
       } else {
-        console.warn('[EnhancedRAG] Failed to load cache metadata:', error);
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.error('[EnhancedRAG] ❌ [CACHE] Failed to load cache metadata:', errorMsg);
       }
       return null;
     }
@@ -1098,8 +1132,19 @@ async loadContextFolderStructured(
    * Check if cache is valid for a project
    */
   async isCacheValid(projectPath: string, primaryContextPath: string): Promise<boolean> {
+    console.log('[EnhancedRAG] 🔍 [CACHE] ========================================');
+    console.log('[EnhancedRAG] 🔍 [CACHE] Checking cache validity for project');
+    console.log(`[EnhancedRAG] 🔍 [CACHE] Project path: ${projectPath}`);
+    console.log('[EnhancedRAG] 🔍 [CACHE] ========================================');
+    
     // Try to get from memory first
     let cached = this.cache.get(projectPath);
+    
+    if (cached) {
+      console.log('[EnhancedRAG] 📦 [CACHE] Cache found in MEMORY');
+    } else {
+      console.log('[EnhancedRAG] 📦 [CACHE] Cache NOT in memory, checking disk...');
+    }
     
     // If not in memory, try loading from disk
     if (!cached) {
@@ -1108,30 +1153,36 @@ async loadContextFolderStructured(
         // Store in memory for subsequent checks
         cached = diskCache;
         this.cache.set(projectPath, diskCache);
-        console.log('[EnhancedRAG] ✓ Cache metadata restored from disk to memory');
+        console.log('[EnhancedRAG] ✅ [CACHE] Cache metadata restored from disk to memory');
       } else {
-        console.log('[EnhancedRAG] 🔍 No cached knowledge found (memory or disk)');
+        console.log('[EnhancedRAG] ❌ [CACHE] No cached knowledge found (memory or disk)');
+        console.log('[EnhancedRAG] 🔍 [CACHE] ========================================');
         return false;
       }
     }
     
-    console.log('[EnhancedRAG] 🔍 Checking cache validity...');
+    console.log('[EnhancedRAG] 🔍 [CACHE] Computing current fingerprint...');
     const currentFingerprint = await this.computeCacheFingerprint(projectPath, primaryContextPath);
+    console.log(`[EnhancedRAG] 🔍 [CACHE] Current fingerprint: ${currentFingerprint.substring(0, 16)}...`);
+    console.log(`[EnhancedRAG] 🔍 [CACHE] Cached fingerprint: ${cached.fingerprint.substring(0, 16)}...`);
+    
     const isValid = cached.fingerprint === currentFingerprint;
     
     if (isValid) {
-      console.log('[EnhancedRAG] ✅ Cache is valid (fingerprints match)');
-      console.log(`[EnhancedRAG] 📊 Cache fingerprint: ${cached.fingerprint.substring(0, 16)}...`);
+      console.log('[EnhancedRAG] ✅ [CACHE] Cache is VALID (fingerprints match)');
+      console.log(`[EnhancedRAG] 📊 [CACHE] Cache was built at: ${cached.indexedAt}`);
+      console.log('[EnhancedRAG] 🔍 [CACHE] ========================================');
     } else {
-      console.log('[EnhancedRAG] ⚠️  Cache EXPIRED - fingerprint mismatch');
-      console.log(`[EnhancedRAG] 📊 Old fingerprint: ${cached.fingerprint.substring(0, 16)}...`);
-      console.log(`[EnhancedRAG] 📊 New fingerprint: ${currentFingerprint.substring(0, 16)}...`);
+      console.log('[EnhancedRAG] ⚠️  [CACHE] Cache EXPIRED - fingerprint mismatch');
+      console.log(`[EnhancedRAG] 📊 [CACHE] Old fingerprint: ${cached.fingerprint.substring(0, 16)}...`);
+      console.log(`[EnhancedRAG] 📊 [CACHE] New fingerprint: ${currentFingerprint.substring(0, 16)}...`);
       
       // Detect what changed
       const changes = await this.detectCacheChanges(projectPath, primaryContextPath, cached.fingerprint);
       if (changes.details.length > 0) {
-        changes.details.forEach((detail: string) => console.log(`[EnhancedRAG] 📋 ${detail}`));
+        changes.details.forEach((detail: string) => console.log(`[EnhancedRAG] 📋 [CACHE] ${detail}`));
       }
+      console.log('[EnhancedRAG] 🔍 [CACHE] ========================================');
     }
     
     return isValid;
