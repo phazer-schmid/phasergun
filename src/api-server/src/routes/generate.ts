@@ -23,14 +23,35 @@ router.post('/generate', async (req, res) => {
       });
     }
     
+    // Initialize file parser early (needed for .docx prompt files)
+    const fileParser = new ComprehensiveFileParser();
+    
     // Read prompt file content
+    // Support both text files (.txt, .md) and Word documents (.docx)
     let prompt: string;
     try {
-      prompt = await fs.readFile(promptFilePath, 'utf-8');
+      const ext = path.extname(promptFilePath).toLowerCase();
+      
+      if (ext === '.docx') {
+        // Use file parser for Word documents
+        console.log('[API /generate] Parsing Word document prompt...');
+        const parsedDocs = await fileParser.scanAndParseFolder(path.dirname(promptFilePath));
+        const promptDoc = parsedDocs.find(doc => doc.filePath === promptFilePath);
+        
+        if (!promptDoc) {
+          throw new Error('Failed to parse .docx prompt file');
+        }
+        
+        prompt = promptDoc.content;
+        console.log('[API /generate] ✓ Word document parsed successfully');
+      } else {
+        // Read as plain text for .txt, .md, etc.
+        prompt = await fs.readFile(promptFilePath, 'utf-8');
+      }
     } catch (error) {
       console.error('[API /generate] Failed to read prompt file:', error);
       return res.status(400).json({
-        error: `Failed to read prompt file: ${promptFilePath}`
+        error: `Failed to read prompt file: ${promptFilePath}. Supported formats: .txt, .md, .docx`
       });
     }
     
@@ -46,8 +67,7 @@ router.post('/generate', async (req, res) => {
     console.log(`[API /generate] Primary context: ${primaryContextPath}`);
     console.log(`[API /generate] ========================================\n`);
     
-    // Initialize services
-    const fileParser = new ComprehensiveFileParser();
+    // Initialize remaining services
     const chunker = new IntelligentChunker();
     const enhancedRAGService = new EnhancedRAGService();
     
