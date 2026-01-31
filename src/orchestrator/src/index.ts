@@ -107,17 +107,25 @@ export class OrchestratorService implements Orchestrator {
     console.log(`Prompt length: ${input.prompt.length} chars`);
     
     try {
-      // Step 1: Retrieve relevant context using semantic search
+      // Step 1: Parse prompt to extract requested input data
+      const requestedData = this.parseInputDataSection(input.prompt);
+      console.log(`[Orchestrator] Parsed INPUT DATA from prompt:`);
+      console.log(`[Orchestrator]   - SOPs requested:`, requestedData.sops);
+      console.log(`[Orchestrator]   - Primary Context: ${requestedData.includePrimaryContext ? 'YES' : 'NO'}`);
+      console.log(`[Orchestrator]   - Context files requested:`, requestedData.contextFiles);
+      
+      // Step 2: Retrieve relevant context using intelligent filtering
       const { ragContext, metadata, procedureChunks, contextChunks } = 
         await this.enhancedRAGService.retrieveRelevantContext(
           input.projectPath,
           input.primaryContextPath,
           input.prompt,
           {
-            procedureChunks: input.options?.topKProcedures || 5,
-            contextChunks: input.options?.topKContext || 5,
-            includeFullPrimary: true,
-            includeSummaries: true,
+            // Dynamically set based on what's requested
+            procedureChunks: requestedData.sops.length > 0 ? 3 : 0,  // Fewer chunks per SOP
+            contextChunks: requestedData.includePrimaryContext ? 2 : 0,  // Minimal context chunks
+            includeFullPrimary: true,  // Always include primary context YAML
+            includeSummaries: requestedData.sops.length > 0,  // Only include SOP summaries if SOPs requested
           }
         );
       
@@ -147,8 +155,24 @@ export class OrchestratorService implements Orchestrator {
       console.log(`  - Footnotes tracked: ${footnoteTracker.getSourceCount()} sources`);
       console.log(`  - Estimated tokens: ${metadata.totalTokensEstimate}`);
       
-      // Step 3: Combine RAG context + user prompt
-      const fullPrompt = `${ragContext}\n\n=== USER REQUEST ===\n${input.prompt}`;
+      // Step 3: Combine RAG context + user prompt with TIER 3 emphasis and constraint enforcement
+      const fullPrompt = `${ragContext}=== YOUR SPECIFIC TASK ===
+
+This is what you must do. Read carefully and follow these instructions precisely:
+
+${input.prompt}
+
+MANDATORY ENFORCEMENT RULES
+You MUST follow these absolute constraints:
+
+1. SCOPE: Write ONLY what is requested above. If it says "Purpose section" → write ONLY Purpose, nothing else
+2. LENGTH: Respect ALL length limits (e.g., "2 paragraphs" = exactly 2 paragraphs, not 20)
+3. FORMAT: Follow the exact format specified (paragraphs, bullets, tables, etc.)
+4. STOP: When you complete the requested section, STOP immediately. Do NOT continue to other sections
+
+VIOLATION PENALTY: Generating content beyond the requested scope will result in rejection.
+
+Now write ONLY what was requested above. Begin immediately with the content - no preamble, no "Here is...", no analysis.`;
       
       console.log(`[Orchestrator] Full prompt length: ${fullPrompt.length} chars`);
       console.log(`[Orchestrator] Calling LLM service...`);
@@ -160,6 +184,27 @@ export class OrchestratorService implements Orchestrator {
       console.log(`  - Generated text length: ${response.generatedText?.length || 0} chars`);
       console.log(`  - Tokens used: ${response.usageStats?.tokensUsed || 0}`);
       console.log(`  - Text preview: ${response.generatedText?.substring(0, 100) || '(empty)'}`);
+      
+      // Check for empty response
+      if (!response.generatedText || response.generatedText.trim().length === 0) {
+        console.error('[Orchestrator] ⚠️  WARNING: LLM returned empty or blank text!');
+        console.error('[Orchestrator] Tokens used:', response.usageStats?.tokensUsed);
+        console.error('[Orchestrator] This likely indicates a stop sequence triggered too early or content was filtered.');
+        
+        // Return diagnostic message instead of blank
+        return {
+          generatedText: '[ERROR: No content generated]\n\n' +
+                        'The LLM generated ' + (response.usageStats?.tokensUsed || 0) + ' tokens but returned empty text.\n' +
+                        'Check server logs for details. This may indicate:\n' +
+                        '- Stop sequences triggering too early\n' +
+                        '- Content being filtered or stripped\n' +
+                        '- API response parsing issue',
+          sources: metadata.sources,
+          footnotes: [],
+          footnotesMap: {},
+          usageStats: response.usageStats
+        };
+      }
       
       // Step 5: Append footnotes to generated text
       const footnotes = footnoteTracker.generateFootnotes();
@@ -181,6 +226,60 @@ export class OrchestratorService implements Orchestrator {
       console.error('[Orchestrator] Error:', error);
       throw error;
     }
+  }
+
+  /**
+   * Parse the INPUT DATA section from the prompt to extract requested resources
+   */
+  private parseInputDataSection(prompt: string): {
+    sops: string[];
+    includePrimaryContext: boolean;
+    contextFiles: string[];
+  } {
+    const result = {
+      sops: [] as string[],
+      includePrimaryContext: false,
+      contextFiles: [] as string[]
+    };
+    
+    // Look for INPUT DATA section (very lenient matching)
+    // Matches "INPUT DATA:" followed by content until next section (ALL CAPS + colon) or end
+    // Allows single newline between sections (not just double)
+    const inputDataMatch = prompt.match(/INPUT DATA:?\s*(.*?)(?=\n+[A-Z][A-Z\s]*:|$)/is);
+    if (!inputDataMatch) {
+      console.log('[Orchestrator] ⚠️  No INPUT DATA section found in prompt');
+      console.log('[Orchestrator] Prompt preview:', prompt.substring(0, 200));
+      console.log('[Orchestrator] Using minimal defaults');
+      return result;
+    }
+    
+    const inputDataSection = inputDataMatch[1];
+    console.log('[Orchestrator] ✓ INPUT DATA section found and parsed');
+    console.log('[Orchestrator] INPUT DATA content:', inputDataSection.substring(0, 200));
+    
+    // Extract SOP references (e.g., SOP0004, SOP for design control)
+    const sopMatches = inputDataSection.match(/SOP\s*\d{4}|SOP\s+for\s+[\w\s]+/gi);
+    if (sopMatches) {
+      result.sops = sopMatches.map(s => s.trim());
+    }
+    
+    // Check for Primary Context request
+    if (/primary\s+context/i.test(inputDataSection)) {
+      result.includePrimaryContext = true;
+    }
+    
+    // Check for device information request (also implies primary context)
+    if (/device|product\s+information/i.test(inputDataSection)) {
+      result.includePrimaryContext = true;
+    }
+    
+    // Extract other context file references
+    const contextMatches = inputDataSection.match(/(?:context|predicate|market)[\w\s]*/gi);
+    if (contextMatches) {
+      result.contextFiles = contextMatches.map(c => c.trim()).filter(c => c.length > 0);
+    }
+    
+    return result;
   }
 
   private constructPrompt(chunks: any[], context: any): string {

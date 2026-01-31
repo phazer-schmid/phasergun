@@ -1474,18 +1474,45 @@ async loadContextFolderStructured(
     const promptEmbeddingArray = VectorStore.float32ArrayToNumbers(promptEmbedding);
     
     // 4. Search procedures
-    const procedureResults = this.vectorStore!.search(
-      promptEmbeddingArray,
-      options.procedureChunks || 5,
-      'procedure'
-    );
+    // CRITICAL: Use explicit undefined check so 0 is respected (0 || 5 would give 5!)
+    const procedureChunksToRetrieve = options.procedureChunks !== undefined ? options.procedureChunks : 5;
+    console.log(`[EnhancedRAG] 🔍 Searching for top ${procedureChunksToRetrieve} procedure chunks...`);
+    
+    const procedureResults = procedureChunksToRetrieve > 0
+      ? this.vectorStore!.search(promptEmbeddingArray, procedureChunksToRetrieve, 'procedure')
+      : [];
+    
+    if (procedureResults.length > 0) {
+      console.log(`[EnhancedRAG] 📄 Procedure files included in context:`);
+      const uniqueProcedures = new Set(procedureResults.map(r => r.entry.metadata.fileName));
+      uniqueProcedures.forEach(fileName => {
+        const chunks = procedureResults.filter(r => r.entry.metadata.fileName === fileName).length;
+        console.log(`[EnhancedRAG]    ✓ ${fileName} (${chunks} chunk${chunks > 1 ? 's' : ''})`);
+      });
+    } else if (procedureChunksToRetrieve === 0) {
+      console.log(`[EnhancedRAG] ℹ️  No procedure chunks requested (procedureChunks=0)`);
+    }
     
     // 5. Search context files
-    const contextResults = this.vectorStore!.search(
-      promptEmbeddingArray,
-      options.contextChunks || 5,
-      'context'
-    );
+    // CRITICAL: Use explicit undefined check so 0 is respected
+    const contextChunksToRetrieve = options.contextChunks !== undefined ? options.contextChunks : 5;
+    console.log(`[EnhancedRAG] 🔍 Searching for top ${contextChunksToRetrieve} context chunks...`);
+    
+    const contextResults = contextChunksToRetrieve > 0
+      ? this.vectorStore!.search(promptEmbeddingArray, contextChunksToRetrieve, 'context')
+      : [];
+    
+    if (contextResults.length > 0) {
+      console.log(`[EnhancedRAG] 📄 Context files included in prompt:`);
+      const uniqueContextFiles = new Set(contextResults.map(r => r.entry.metadata.fileName));
+      uniqueContextFiles.forEach(fileName => {
+        const chunks = contextResults.filter(r => r.entry.metadata.fileName === fileName).length;
+        const category = contextResults.find(r => r.entry.metadata.fileName === fileName)?.entry.metadata.contextCategory || 'unknown';
+        console.log(`[EnhancedRAG]    ✓ ${category}/${fileName} (${chunks} chunk${chunks > 1 ? 's' : ''})`);
+      });
+    } else if (contextChunksToRetrieve === 0) {
+      console.log(`[EnhancedRAG] ℹ️  No context chunks requested (contextChunks=0)`);
+    }
     
     // 6. Assemble tiered context
     let ragContext = this.assembleContext(
@@ -1525,7 +1552,12 @@ async loadContextFolderStructured(
   }
 
   /**
-   * Assemble context in tiered structure
+   * Assemble context in tiered structure with clear behavioral instructions
+   * 
+   * NEW THREE-TIER ARCHITECTURE:
+   * TIER 1: Role & Behavioral Instructions (WHO you are, HOW to behave)
+   * TIER 2: Reference Materials (WHAT you know - for informing your writing)
+   * TIER 3: User Task (reserved for orchestrator to append)
    */
   private assembleContext(
     primaryContext: any,
@@ -1537,68 +1569,132 @@ async loadContextFolderStructured(
   ): string {
     const sections: string[] = [];
     
-    // TIER 1: Primary Context (always included)
-    if (options.includeFullPrimary ?? true) {
-      sections.push('=== PRIMARY CONTEXT: PHASERGUN AI REGULATORY ENGINEER ===\n');
-      sections.push(yaml.dump(primaryContext));
+    // =========================================================================
+    // TIER 1: ROLE & BEHAVIORAL INSTRUCTIONS
+    // =========================================================================
+    sections.push('=== YOUR ROLE AND CRITICAL INSTRUCTIONS ===\n\n');
+    
+    // Extract key behavioral information from primary context
+    const role = primaryContext?.product?.name || 'PhaserGun AI';
+    const purpose = primaryContext?.product?.purpose || 'Generate Phase 1 DHF documents';
+    
+    sections.push(`You are ${role}, an AI regulatory documentation expert.\n\n`);
+    sections.push(`PRIMARY FUNCTION: ${purpose}\n\n`);
+    
+    sections.push('CRITICAL BEHAVIORAL RULES:\n');
+    sections.push('1. Write DIRECTLY in response to the user\'s task (provided at the end)\n');
+    sections.push('2. Do NOT analyze or summarize the reference materials below\n');
+    sections.push('3. Do NOT provide meta-commentary like "Based on the provided documents..."\n');
+    sections.push('4. Do NOT start with "Here is..." or "The following is..."\n');
+    sections.push('5. Follow the EXACT format, tone, length, and style specified in the user\'s request\n');
+    sections.push('6. Use reference materials to inform your writing, but write as if you are the author\n');
+    sections.push('7. If the user specifies word count or paragraph limits, strictly adhere to them\n');
+    sections.push('8. Use precise, professional language appropriate for regulatory documentation\n\n');
+    
+    sections.push('SCOPE ENFORCEMENT (ABSOLUTE REQUIREMENTS):\n');
+    sections.push('1. Write ONLY what is explicitly requested - if asked for "Purpose section" write ONLY Purpose\n');
+    sections.push('2. Do NOT expand scope by adding related sections, background, or full document structure\n');
+    sections.push('3. Do NOT generate additional sections beyond what is requested\n');
+    sections.push('4. STOP IMMEDIATELY after completing the requested section\n');
+    sections.push('5. Treat length constraints (e.g., "2 paragraphs") as HARD LIMITS, not suggestions\n');
+    sections.push('6. If request says "section X only" → generate ONLY section X, then STOP\n\n');
+    
+    sections.push('VIOLATION EXAMPLES (What NOT to do):\n');
+    sections.push('❌ Task: "Write Purpose section" → You generate entire document with multiple sections\n');
+    sections.push('❌ Task: "Two paragraphs maximum" → You write 15 sections\n');
+    sections.push('❌ Task: "Purpose only" → You add Background, Scope, Introduction, etc.\n');
+    sections.push('✅ CORRECT: Task: "Write Purpose section, 2 paragraphs" → You write exactly 2 paragraphs for Purpose, then STOP\n\n');
+    
+    // Include regulatory framework
+    if (primaryContext?.regulatory_framework?.standards) {
+      sections.push('REGULATORY STANDARDS YOU FOLLOW:\n');
+      primaryContext.regulatory_framework.standards.forEach((std: any) => {
+        sections.push(`- ${std.name}: ${std.description}\n`);
+      });
       sections.push('\n');
     }
     
-    // TIER 1.5: SOP Executive Summaries (provides overview)
+    // Include design controls foundation if present
+    if (primaryContext?.design_controls) {
+      sections.push('DESIGN CONTROLS FRAMEWORK:\n');
+      const dc = primaryContext.design_controls;
+      sections.push(`- User Needs: ${dc.user_needs}\n`);
+      sections.push(`- Design Inputs: ${dc.design_inputs}\n`);
+      sections.push(`- Design Outputs: ${dc.design_outputs}\n`);
+      sections.push(`- Verification: ${dc.verification}\n`);
+      sections.push(`- Validation: ${dc.validation}\n\n`);
+    }
+    
+    sections.push('---\n\n');
+    
+    // =========================================================================
+    // TIER 2: REFERENCE MATERIALS (for informing your writing)
+    // =========================================================================
+    sections.push('=== REFERENCE MATERIALS ===\n');
+    sections.push('Below are materials provided for your reference. Use them to inform your writing,\n');
+    sections.push('but remember: your task is to WRITE what the user requests, not to analyze these materials.\n\n');
+    
+    // SOP Executive Summaries
     if (sopSummaries.size > 0) {
-      sections.push('=== COMPANY PROCEDURES OVERVIEW (Executive Summaries) ===\n');
+      sections.push('--- Company Procedures (SOPs) ---\n');
       sopSummaries.forEach((summary, fileName) => {
-        sections.push(`\n--- ${fileName} ---\n`);
+        sections.push(`\n[${fileName}]\n`);
         sections.push(summary);
         sections.push('\n');
       });
+      sections.push('\n');
     }
     
-    // TIER 1.6: Context File Executive Summaries (NEW - provides context overview)
+    // Context File Executive Summaries
     if (contextSummaries.size > 0) {
-      sections.push('=== PROJECT CONTEXT OVERVIEW (Executive Summaries) ===\n');
+      sections.push('--- Project Context Summaries ---\n');
       contextSummaries.forEach((summary, fileName) => {
-        sections.push(`\n--- ${fileName} ---\n`);
+        sections.push(`\n[${fileName}]\n`);
         sections.push(summary);
         sections.push('\n');
       });
+      sections.push('\n');
     }
     
-    // TIER 2: Retrieved Procedure Chunks (detailed sections)
+    // Retrieved Procedure Chunks (detailed sections)
     if (procedureChunks.length > 0) {
-      sections.push('=== RELEVANT PROCEDURE DETAILS (Retrieved Sections) ===\n');
+      sections.push('--- Detailed Procedure Sections (Retrieved for Relevance) ---\n');
       procedureChunks.forEach((result, idx) => {
         const similarity = (result.similarity * 100).toFixed(1);
-        sections.push(`\n--- [${result.entry.metadata.fileName}] Section ${result.entry.metadata.chunkIndex + 1} (Similarity: ${similarity}%) ---\n`);
+        sections.push(`\n[${result.entry.metadata.fileName} - Section ${result.entry.metadata.chunkIndex + 1}]\n`);
         sections.push(result.entry.metadata.content);
         sections.push('\n');
       });
+      sections.push('\n');
     }
     
-    // TIER 3: Retrieved Context Chunks (most relevant) - organized by category
+    // Retrieved Context Chunks
     if (contextChunks.length > 0) {
-      sections.push('=== RELEVANT PROJECT CONTEXT (Retrieved Details) ===\n');
+      sections.push('--- Detailed Project Context (Retrieved for Relevance) ---\n');
       contextChunks.forEach((result, idx) => {
         const similarity = (result.similarity * 100).toFixed(1);
         const contextCategory = result.entry.metadata.contextCategory;
         let categoryLabel = '';
         
-        // Add category label for better context
         if (contextCategory === 'primary-context-root') {
-          categoryLabel = '[PRIMARY CONTEXT FILE] ';
+          categoryLabel = 'Primary Context File';
         } else if (contextCategory === 'initiation') {
-          categoryLabel = '[Initiation] ';
+          categoryLabel = 'Initiation';
         } else if (contextCategory === 'ongoing') {
-          categoryLabel = '[Ongoing] ';
+          categoryLabel = 'Ongoing';
         } else if (contextCategory === 'predicates') {
-          categoryLabel = '[Predicate Device] ';
+          categoryLabel = 'Predicate Device';
         }
         
-        sections.push(`\n--- ${categoryLabel}${result.entry.metadata.fileName} (Chunk ${result.entry.metadata.chunkIndex + 1}, Similarity: ${similarity}%) ---\n`);
+        sections.push(`\n[${categoryLabel}: ${result.entry.metadata.fileName}]\n`);
         sections.push(result.entry.metadata.content);
         sections.push('\n');
       });
     }
+    
+    sections.push('---\n\n');
+    
+    // Note: TIER 3 (User Task) will be appended by the orchestrator
     
     return sections.join('');
   }
@@ -1635,15 +1731,23 @@ async loadContextFolderStructured(
   /**
    * Build RAG context for LLM prompt with relevance filtering
    * Uses VectorStore for semantic search
+   * 
+   * NOTE: This method is used by the older buildRAGContext flow.
+   * For new prompt-based generation, use retrieveRelevantContext() instead.
    */
   async buildRAGContext(knowledge: KnowledgeCache, promptText?: string, projectPath?: string): Promise<string> {
     const sections: string[] = [];
     const MAX_CHUNKS_PER_SOURCE = 8; // Limit chunks to avoid token overflow
     
-    // Section 1: Primary Context (always include - it's the role definition)
-    sections.push('=== PRIMARY CONTEXT: PHASERGUN AI REGULATORY ENGINEER ===\n');
-    sections.push(yaml.dump(knowledge.primaryContext));
-    sections.push('\n');
+    // TIER 1: Role & Instructions
+    sections.push('=== YOUR ROLE AND CRITICAL INSTRUCTIONS ===\n\n');
+    sections.push('You are PhaserGun AI, an AI regulatory documentation expert.\n\n');
+    sections.push('CRITICAL: Write directly as requested. Do NOT analyze or summarize reference materials.\n');
+    sections.push('Follow the exact format, tone, and length specified in user requests.\n\n');
+    sections.push('---\n\n');
+    
+    // TIER 2: Reference Materials Header
+    sections.push('=== REFERENCE MATERIALS ===\n');
     
     // If no vector store or no prompt, skip retrieval
     if (!this.vectorStore) {

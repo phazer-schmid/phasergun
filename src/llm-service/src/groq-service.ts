@@ -54,6 +54,9 @@ export class GroqLLMService implements LLMService {
       // Extract the text content
       let textContent = response.choices[0]?.message?.content || '';
       
+      // Validate response for corruption BEFORE cleaning
+      this.validateResponseQuality(textContent, enhancedPrompt.length);
+      
       // Clean Llama special tokens from output
       textContent = this.cleanLlamaTokens(textContent);
 
@@ -199,5 +202,106 @@ ${context.sourceMetadata.map(meta => `- ${meta}`).join('\n')}
     cleanedText = cleanedText.trim();
 
     return cleanedText;
+  }
+
+  /**
+   * Validate response quality and detect genuine corruption
+   * Distinguishes between harmful control characters and valid whitespace
+   */
+  private validateResponseQuality(response: string, promptLength: number): void {
+    if (!response || response.length === 0) {
+      throw new Error('LLM returned empty response');
+    }
+
+    // Get character codes for analysis
+    const charCodes = [...response].map(c => c.charCodeAt(0));
+    
+    // VALID control characters (whitespace)
+    const VALID_CONTROL_CHARS = new Set([
+      9,  // Tab
+      10, // Newline (LF)
+      13, // Carriage return (CR)
+    ]);
+
+    // Count HARMFUL control characters (0-31 and 127-159, excluding valid whitespace)
+    let harmfulControlChars = 0;
+    const harmfulCodes: number[] = [];
+    
+    for (let i = 0; i < charCodes.length && harmfulCodes.length < 100; i++) {
+      const code = charCodes[i];
+      
+      // Check if it's a control character (0-31 or 127-159)
+      const isControlChar = (code >= 0 && code <= 31) || (code >= 127 && code <= 159);
+      
+      // Is it HARMFUL (not in valid whitespace set)?
+      if (isControlChar && !VALID_CONTROL_CHARS.has(code)) {
+        harmfulControlChars++;
+        harmfulCodes.push(code);
+      }
+    }
+
+    // Detect repeating pattern corruption (like [4, 20, 4, 20, 4, 20...])
+    const hasRepeatingPattern = this.detectRepeatingPattern(charCodes);
+
+    // Only throw if we have SUBSTANTIAL harmful control characters or repeating patterns
+    // Allow up to 5 stray control chars (might be from encoding issues)
+    if (harmfulControlChars > 5 || hasRepeatingPattern) {
+      console.error(`[GroqLLMService] ❌ Response validation failed!`);
+      console.error(`[GroqLLMService] Harmful control characters: ${harmfulControlChars}`);
+      console.error(`[GroqLLMService] Harmful codes (first 20):`, harmfulCodes.slice(0, 20));
+      console.error(`[GroqLLMService] Repeating pattern: ${hasRepeatingPattern}`);
+      console.error(`[GroqLLMService] Response length: ${response.length} chars`);
+      console.error(`[GroqLLMService] Prompt length: ${promptLength} chars`);
+      
+      throw new Error(
+        `LLM returned corrupted output (${harmfulControlChars} harmful control characters). ` +
+        `Prompt length: ${promptLength} chars. This indicates a Groq API issue or model confusion. ` +
+        `Try: 1) Reducing prompt size, 2) Simplifying prompt format, 3) Using a different model.`
+      );
+    }
+
+    // Log if we detected some control chars but within acceptable range
+    if (harmfulControlChars > 0 && harmfulControlChars <= 5) {
+      console.warn(`[GroqLLMService] ⚠️  Detected ${harmfulControlChars} stray control characters (within acceptable range)`);
+    }
+  }
+
+  /**
+   * Detect repeating patterns that indicate corruption
+   * Example: [4, 20, 4, 20, 4, 20...] repeating for hundreds of chars
+   */
+  private detectRepeatingPattern(charCodes: number[]): boolean {
+    if (charCodes.length < 100) {
+      return false; // Too short to detect pattern
+    }
+
+    // Check for 2-byte repeating pattern
+    let pattern2Count = 0;
+    for (let i = 0; i < Math.min(200, charCodes.length - 3); i += 2) {
+      if (charCodes[i] === charCodes[i + 2] && charCodes[i + 1] === charCodes[i + 3]) {
+        pattern2Count++;
+      }
+    }
+    
+    // If >80% of first 200 chars follow 2-byte pattern, it's corruption
+    if (pattern2Count > 80) {
+      console.warn(`[GroqLLMService] ⚠️  Repeating 2-byte pattern detected (${pattern2Count}/100 matches)`);
+      return true;
+    }
+
+    // Check for single-byte repeating pattern (less common)
+    let pattern1Count = 0;
+    for (let i = 0; i < Math.min(200, charCodes.length - 1); i++) {
+      if (charCodes[i] === charCodes[i + 1]) {
+        pattern1Count++;
+      }
+    }
+    
+    if (pattern1Count > 150) {
+      console.warn(`[GroqLLMService] ⚠️  Repeating 1-byte pattern detected (${pattern1Count}/200 matches)`);
+      return true;
+    }
+
+    return false;
   }
 }
