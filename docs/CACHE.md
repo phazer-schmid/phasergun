@@ -6,7 +6,7 @@ Yes! You can simply delete the cache folder. The cache is stored in your system'
 
 **On macOS/Linux:**
 ```bash
-/tmp/phasergun-cache/
+$TMPDIR/phasergun-cache/
 ```
 
 **On Windows:**
