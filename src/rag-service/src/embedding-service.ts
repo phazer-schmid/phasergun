@@ -213,6 +213,10 @@ export class EmbeddingService {
     }
     
     try {
+      // Ensure cache directory exists before writing (defensive programming)
+      // This handles cases where /tmp is cleaned or directory doesn't exist yet
+      await fs.mkdir(this.cacheDir, { recursive: true });
+      
       const filename = cacheKey.substring(0, 16); // Use first 16 chars as filename
       const embeddingPath = path.join(this.cacheDir, `${filename}.embedding`);
       const metadataPath = path.join(this.cacheDir, `${filename}.meta.json`);
