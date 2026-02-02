@@ -47,6 +47,7 @@ export class GroqLLMService implements LLMService {
         max_tokens: 32000, // Increased to 32K for long-form regulatory documents
         temperature: 0, // Deterministic: same input = same output
         top_p: 1, // Maximum determinism
+        seed: 42, // CRITICAL: Ensures reproducible results across API calls with same input
       });
 
       const duration = Date.now() - startTime;

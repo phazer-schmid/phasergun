@@ -47,6 +47,8 @@ export class AnthropicLLMService implements LLMService {
           role: 'user',
           content: enhancedPrompt
         }]
+        // Note: Anthropic does not support seed parameter as of 2024
+        // Using temperature=0 and top_k=1 provides best available determinism
       });
 
       const duration = Date.now() - startTime;
