@@ -4,10 +4,25 @@ import * as path from 'path';
 import * as yaml from 'js-yaml';
 import * as crypto from 'crypto';
 import * as os from 'os';
+import { Mutex } from 'async-mutex';
 import { ComprehensiveFileParser } from '@fda-compliance/file-parser';
 import { EmbeddingService } from './embedding-service';
 import { VectorStore, VectorEntry, SearchResult } from './vector-store';
 import { GroqLLMService } from '@fda-compliance/llm-service';
+import { LockManager, getLockManager } from './lock-manager';
+
+/**
+ * GLOBAL mutex for cache builds - shared across ALL service instances
+ * This ensures that even if multiple EnhancedRAGService instances are created
+ * (e.g., one per API request), they all coordinate through the same mutex.
+ */
+const globalBuildMutex = new Mutex();
+
+/**
+ * GLOBAL mutex for summary generation - prevents duplicate LLM calls
+ * Separate from cache build mutex to allow parallel operations when possible
+ */
+const globalSummaryMutex = new Mutex();
 
 /**
  * Document chunk with metadata
@@ -45,9 +60,11 @@ export class EnhancedRAGService {
   private embeddingService: EmbeddingService | null = null;
   private vectorStore: VectorStore | null = null;
   private useEmbeddings: boolean = true; // Feature flag
+  private lockManager: LockManager;
   
   constructor() {
     this.fileParser = new ComprehensiveFileParser();
+    this.lockManager = getLockManager();
   }
 
   /**
@@ -1189,7 +1206,96 @@ async loadContextFolderStructured(
   }
 
   /**
+   * Ensure cache is built with mutex protection (CONCURRENCY-SAFE)
+   * Use this method instead of loadKnowledge() to prevent race conditions
+   * when multiple requests arrive simultaneously
+   * 
+   * Uses async-mutex to provide TRUE mutual exclusion - only one request
+   * can execute the cache build logic at a time within this process.
+   */
+  async ensureCacheBuilt(
+    projectPath: string,
+    primaryContextPath: string
+  ): Promise<KnowledgeCache> {
+    console.log('[EnhancedRAG] 🔐 Ensuring cache is built (with GLOBAL mutex protection)...');
+    
+    // Acquire GLOBAL mutex - this BLOCKS until we get exclusive access
+    // Using globalBuildMutex ensures ALL instances (even if multiple created) coordinate
+    const release = await globalBuildMutex.acquire();
+    console.log('[EnhancedRAG] 🔒 GLOBAL Mutex acquired - we have exclusive access');
+    
+    try {
+      // Check cache validity (only ONE request at a time does this)
+      const cacheValid = await this.isCacheValid(projectPath, primaryContextPath);
+      if (cacheValid) {
+        console.log('[EnhancedRAG] ✓ Cache valid, returning immediately (no rebuild needed)');
+        // Load vector store if not already loaded
+        if (!this.vectorStore) {
+          const vectorStorePath = this.getVectorStorePath(projectPath);
+          this.vectorStore = await VectorStore.load(vectorStorePath, projectPath);
+        }
+        return this.cache.get(projectPath)!;
+      }
+      
+      // Cache invalid, proceed with rebuild (only ONE request does this)
+      console.log('[EnhancedRAG] 🏗️  Cache invalid, proceeding with rebuild...');
+      const result = await this.doEnsureCacheBuilt(projectPath, primaryContextPath);
+      return result;
+      
+    } finally {
+      // ALWAYS release mutex so next request can proceed
+      release();
+      console.log('[EnhancedRAG] 🔓 GLOBAL Mutex released - next request can proceed');
+    }
+  }
+
+  /**
+   * Actually build cache with file lock protection (internal)
+   */
+  private async doEnsureCacheBuilt(
+    projectPath: string,
+    primaryContextPath: string
+  ): Promise<KnowledgeCache> {
+    // Acquire lock for cache rebuild (this will wait if another PROCESS has the lock)
+    console.log('[EnhancedRAG] 🔒 Acquiring lock for cache rebuild...');
+    const lock = await this.lockManager.acquireLock(projectPath);
+    
+    try {
+      // Double-check cache validity after acquiring lock
+      // (another process may have built it while we were waiting for the lock)
+      const stillInvalid = !(await this.isCacheValid(projectPath, primaryContextPath));
+      
+      if (!stillInvalid) {
+        console.log('[EnhancedRAG] ✓ Cache was built by another process while waiting for lock, using it');
+        // Load vector store if not already loaded
+        if (!this.vectorStore) {
+          const vectorStorePath = this.getVectorStorePath(projectPath);
+          this.vectorStore = await VectorStore.load(vectorStorePath, projectPath);
+        }
+        return this.cache.get(projectPath)!;
+      }
+      
+      // Cache is still invalid, rebuild it
+      console.log('[EnhancedRAG] 🔄 We have the lock, rebuilding cache...');
+      const result = await this.loadKnowledge(projectPath, primaryContextPath);
+      return result;
+      
+    } finally {
+      // Always release lock
+      try {
+        await lock.release();
+      } catch (error) {
+        // Ignore "already released" errors - this can happen if lock was released elsewhere
+        if (error instanceof Error && !error.message.includes('already released')) {
+          console.error('[EnhancedRAG] Error releasing lock:', error);
+        }
+      }
+    }
+  }
+
+  /**
    * Load all knowledge sources with caching
+   * NOTE: Use ensureCacheBuilt() instead for concurrency safety
    */
   async loadKnowledge(
     projectPath: string,
@@ -1407,12 +1513,16 @@ async loadContextFolderStructured(
     procedureChunks: SearchResult[];
     contextChunks: SearchResult[];
   }> {
-    // 1. Load knowledge (from cache if valid)
-    const knowledge = await this.loadKnowledge(projectPath, primaryContextPath);
+    // 1. Load knowledge with lock protection (prevents concurrent rebuild collisions)
+    const knowledge = await this.ensureCacheBuilt(projectPath, primaryContextPath);
     
-    // 2. Generate SOP summaries if requested
+    // 2. Generate SOP summaries if requested (with GLOBAL mutex protection)
     let sopSummaries = new Map<string, string>();
     if (options.includeSummaries ?? true) {
+      // Acquire GLOBAL summary mutex to prevent duplicate LLM calls
+      const releaseSummary = await globalSummaryMutex.acquire();
+      console.log('[EnhancedRAG] 🔒 Summary mutex acquired - generating summaries...');
+      
       try {
         // Get procedure files
         const proceduresPath = path.join(projectPath, 'Procedures');
@@ -1436,12 +1546,19 @@ async loadContextFolderStructured(
         }
       } catch (error) {
         console.warn('[EnhancedRAG] Failed to generate SOP summaries, continuing without them:', error);
+      } finally {
+        releaseSummary();
+        console.log('[EnhancedRAG] 🔓 Summary mutex released');
       }
     }
 
-    // 2.5. Generate Context file summaries if requested
+    // 2.5. Generate Context file summaries if requested (uses same mutex)
     let contextSummaries = new Map<string, string>();
     if (options.includeSummaries ?? true) {
+      // Acquire GLOBAL summary mutex to prevent duplicate LLM calls
+      const releaseSummary = await globalSummaryMutex.acquire();
+      console.log('[EnhancedRAG] 🔒 Summary mutex acquired - generating context summaries...');
+      
       try {
         // Get context files
         const contextPath = path.join(projectPath, 'Context');
@@ -1465,6 +1582,9 @@ async loadContextFolderStructured(
         }
       } catch (error) {
         console.warn('[EnhancedRAG] Failed to generate Context summaries, continuing without them:', error);
+      } finally {
+        releaseSummary();
+        console.log('[EnhancedRAG] 🔓 Summary mutex released');
       }
     }
     
