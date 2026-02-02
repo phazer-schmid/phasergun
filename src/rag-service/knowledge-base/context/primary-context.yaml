@@ -55,7 +55,7 @@ context_folder_structure:
   
   root_level:
     primary_context_file:
-      filename: "Primary Context.docx"
+      filename: "Project-Context.docx"
       purpose: "PRIMARY SOURCE OF TRUTH for entire project"
       description: "Result of initial project intake containing key answers to defining questions"
       importance: "CRITICAL - Highest priority in all retrieval operations"
