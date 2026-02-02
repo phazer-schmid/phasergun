@@ -203,9 +203,21 @@ export class VectorStore {
       similarity: VectorStore.cosineSimilarity(queryEmbedding, entry.embedding)
     }));
 
-    // Sort by similarity (descending) and take top K
+    // Sort by similarity (descending), then by ID (ascending) for determinism
+    // CRITICAL: When similarities are equal, we need a stable secondary sort key
+    // to ensure consistent ordering across cache rebuilds
     return results
-      .sort((a, b) => b.similarity - a.similarity)
+      .sort((a, b) => {
+        const simDiff = b.similarity - a.similarity;
+        
+        // If similarities are essentially equal (within floating-point precision)
+        // break ties using entry ID for deterministic ordering
+        if (Math.abs(simDiff) < 1e-10) {
+          return a.entry.id.localeCompare(b.entry.id);
+        }
+        
+        return simDiff;
+      })
       .slice(0, topK);
   }
 

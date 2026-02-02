@@ -292,13 +292,15 @@ private async chunkAndEmbedDocument(
 
 /**
  * Process all documents and build vector store
+ * DETERMINISM: Files are sorted alphabetically before processing to ensure
+ * consistent vector entry ordering across cache rebuilds
  */
 private async buildVectorStore(
   proceduresFiles: ParsedDocument[],
   contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[],
   projectPath: string
 ): Promise<void> {
-  console.log('[EnhancedRAG] Building vector store...');
+  console.log('[EnhancedRAG] Building vector store with deterministic ordering...');
   
   // Get embedding service model info
   const embeddingService = await this.getEmbeddingService(projectPath);
@@ -307,20 +309,39 @@ private async buildVectorStore(
   // Create new vector store
   this.vectorStore = new VectorStore(projectPath, modelInfo.version);
   
-  // Process procedures
-  const procedureVectors = await Promise.all(
-    proceduresFiles.map(doc => this.chunkAndEmbedDocument(doc, 'procedure', projectPath))
+  // =========================================================================
+  // DETERMINISM: Sort files alphabetically before processing
+  // This ensures vectors are always added in the same order
+  // =========================================================================
+  
+  // Sort procedures by fileName
+  const sortedProcedures = [...proceduresFiles].sort((a, b) => 
+    a.fileName.localeCompare(b.fileName)
   );
   
-  // Process context files with their categories
-  const contextVectors = await Promise.all(
-    contextFiles.map(({ doc, contextCategory }) => 
-      this.chunkAndEmbedDocument(doc, 'context', projectPath, contextCategory)
-    )
+  // Sort context files by fileName
+  const sortedContext = [...contextFiles].sort((a, b) => 
+    a.doc.fileName.localeCompare(b.doc.fileName)
   );
   
-  // Flatten and add to vector store
-  const allVectors = [...procedureVectors.flat(), ...contextVectors.flat()];
+  console.log('[EnhancedRAG] Processing files in sorted order for determinism...');
+  
+  // Process procedures sequentially (not in parallel) to maintain order
+  const procedureVectors: VectorEntry[] = [];
+  for (const doc of sortedProcedures) {
+    const vectors = await this.chunkAndEmbedDocument(doc, 'procedure', projectPath);
+    procedureVectors.push(...vectors);
+  }
+  
+  // Process context files sequentially (not in parallel) to maintain order
+  const contextVectors: VectorEntry[] = [];
+  for (const { doc, contextCategory } of sortedContext) {
+    const vectors = await this.chunkAndEmbedDocument(doc, 'context', projectPath, contextCategory);
+    contextVectors.push(...vectors);
+  }
+  
+  // Add to vector store in deterministic order: procedures first, then context
+  const allVectors = [...procedureVectors, ...contextVectors];
   allVectors.forEach(entry => this.vectorStore!.addEntry(entry));
   
   // Save to disk only if caching is enabled
@@ -330,7 +351,7 @@ private async buildVectorStore(
     console.log('[EnhancedRAG] ⚠️  Skipping vector store save (caching disabled)');
   }
   
-  console.log(`[EnhancedRAG] ✓ Vector store built: ${allVectors.length} chunks indexed`);
+  console.log(`[EnhancedRAG] ✓ Vector store built: ${allVectors.length} chunks indexed (deterministic order)`);
 }
 
   /**
@@ -1714,6 +1735,9 @@ async loadContextFolderStructured(
    * TIER 1: Role & Behavioral Instructions (WHO you are, HOW to behave)
    * TIER 2: Reference Materials (WHAT you know - for informing your writing)
    * TIER 3: User Task (reserved for orchestrator to append)
+   * 
+   * DETERMINISM: All chunks and summaries are sorted alphabetically to ensure
+   * consistent output across cache rebuilds
    */
   private assembleContext(
     primaryContext: any,
@@ -1724,6 +1748,32 @@ async loadContextFolderStructured(
     options: any
   ): string {
     const sections: string[] = [];
+    
+    // =========================================================================
+    // DETERMINISM: Sort all chunks and summaries for consistent ordering
+    // =========================================================================
+    
+    // Sort procedure chunks by fileName, then chunkIndex
+    const sortedProcedureChunks = [...procedureChunks].sort((a, b) => {
+      const fileCmp = a.entry.metadata.fileName.localeCompare(b.entry.metadata.fileName);
+      if (fileCmp !== 0) return fileCmp;
+      return a.entry.metadata.chunkIndex - b.entry.metadata.chunkIndex;
+    });
+    
+    // Sort context chunks by fileName, then chunkIndex
+    const sortedContextChunks = [...contextChunks].sort((a, b) => {
+      const fileCmp = a.entry.metadata.fileName.localeCompare(b.entry.metadata.fileName);
+      if (fileCmp !== 0) return fileCmp;
+      return a.entry.metadata.chunkIndex - b.entry.metadata.chunkIndex;
+    });
+    
+    // Sort summaries alphabetically by file name
+    const sortedSopSummaries = new Map(
+      [...sopSummaries.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+    );
+    const sortedContextSummaries = new Map(
+      [...contextSummaries.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+    );
     
     // =========================================================================
     // TIER 1: ROLE & BEHAVIORAL INSTRUCTIONS
@@ -1790,10 +1840,10 @@ async loadContextFolderStructured(
     sections.push('Below are materials provided for your reference. Use them to inform your writing,\n');
     sections.push('but remember: your task is to WRITE what the user requests, not to analyze these materials.\n\n');
     
-    // SOP Executive Summaries
-    if (sopSummaries.size > 0) {
+    // SOP Executive Summaries (sorted alphabetically)
+    if (sortedSopSummaries.size > 0) {
       sections.push('--- Company Procedures (SOPs) ---\n');
-      sopSummaries.forEach((summary, fileName) => {
+      sortedSopSummaries.forEach((summary, fileName) => {
         sections.push(`\n[${fileName}]\n`);
         sections.push(summary);
         sections.push('\n');
@@ -1801,10 +1851,10 @@ async loadContextFolderStructured(
       sections.push('\n');
     }
     
-    // Context File Executive Summaries
-    if (contextSummaries.size > 0) {
+    // Context File Executive Summaries (sorted alphabetically)
+    if (sortedContextSummaries.size > 0) {
       sections.push('--- Project Context Summaries ---\n');
-      contextSummaries.forEach((summary, fileName) => {
+      sortedContextSummaries.forEach((summary, fileName) => {
         sections.push(`\n[${fileName}]\n`);
         sections.push(summary);
         sections.push('\n');
@@ -1812,10 +1862,10 @@ async loadContextFolderStructured(
       sections.push('\n');
     }
     
-    // Retrieved Procedure Chunks (detailed sections)
-    if (procedureChunks.length > 0) {
+    // Retrieved Procedure Chunks (sorted by fileName, then chunk index)
+    if (sortedProcedureChunks.length > 0) {
       sections.push('--- Detailed Procedure Sections (Retrieved for Relevance) ---\n');
-      procedureChunks.forEach((result, idx) => {
+      sortedProcedureChunks.forEach((result, idx) => {
         const similarity = (result.similarity * 100).toFixed(1);
         sections.push(`\n[${result.entry.metadata.fileName} - Section ${result.entry.metadata.chunkIndex + 1}]\n`);
         sections.push(result.entry.metadata.content);
@@ -1824,10 +1874,10 @@ async loadContextFolderStructured(
       sections.push('\n');
     }
     
-    // Retrieved Context Chunks
-    if (contextChunks.length > 0) {
+    // Retrieved Context Chunks (sorted by fileName, then chunk index)
+    if (sortedContextChunks.length > 0) {
       sections.push('--- Detailed Project Context (Retrieved for Relevance) ---\n');
-      contextChunks.forEach((result, idx) => {
+      sortedContextChunks.forEach((result, idx) => {
         const similarity = (result.similarity * 100).toFixed(1);
         const contextCategory = result.entry.metadata.contextCategory;
         let categoryLabel = '';
