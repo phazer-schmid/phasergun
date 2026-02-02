@@ -8,7 +8,6 @@ import { Mutex } from 'async-mutex';
 import { ComprehensiveFileParser } from '@fda-compliance/file-parser';
 import { EmbeddingService } from './embedding-service';
 import { VectorStore, VectorEntry, SearchResult } from './vector-store';
-import { GroqLLMService } from '@fda-compliance/llm-service';
 import { LockManager, getLockManager } from './lock-manager';
 
 /**
@@ -150,7 +149,10 @@ export class EnhancedRAGService {
     const MAX_CHUNK_SIZE = 4000; // ~1000 tokens
     
     // Detect section headers: ##, ###, numbered (1., 1.1, etc.)
-    const sectionRegex = /^(#{1,6}\s+.*|\d+\.(\d+\.)*\s+.*)$/gm;
+    // NOTE: /m flag only — do NOT use /g here.  RegExp.prototype.test() with /g
+    // advances lastIndex after each match; calling .test() on successive lines
+    // from a /g regex silently skips any header whose length < the previous lastIndex.
+    const sectionRegex = /^(#{1,6}\s+.*|\d+\.(\d+\.)*\s+.*)$/m;
     const lines = content.split('\n');
     
     let currentChunk = '';
@@ -242,6 +244,22 @@ export class EnhancedRAGService {
     }
     
     return chunks.length > 0 ? chunks : [content];
+  }
+
+  /**
+   * Deterministic extractive summary — first N words of the document.
+   * Replaces the previous LLM-generated summaries.  No API call, no
+   * non-determinism.  The detailed chunks retrieved by vector search
+   * already carry the actual content; the summary is supplementary
+   * context that just needs to convey purpose/scope (almost always at
+   * the top of a regulatory document).
+   */
+  private extractiveSummary(doc: ParsedDocument, summaryWordCount: number = 250): string {
+    const words = doc.content.split(/\s+/).filter(w => w.length > 0);
+    if (words.length <= summaryWordCount) {
+      return doc.content.trim();
+    }
+    return words.slice(0, summaryWordCount).join(' ') + ' ...';
   }
 
 /**
@@ -543,51 +561,13 @@ async loadContextFolder(folderPath: string): Promise<DocumentChunk[]> {
     return crypto.createHash('sha256').update(content).digest('hex');
   }
 
-  /**
-   * Get or create LLM service for summarization
-   */
-  private getLLMService(): GroqLLMService {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) {
-      throw new Error('[EnhancedRAG] GROQ_API_KEY environment variable not set. Required for SOP summarization.');
-    }
-    return new GroqLLMService(apiKey, 'llama-3.1-8b-instant');
-  }
 
-  /**
-   * Generate executive summary for an SOP
-   */
-  private async summarizeSOP(
-    doc: ParsedDocument,
-    llmService: GroqLLMService,
-    summaryWordCount: number = 250
-  ): Promise<string> {
-    const prompt = `You are a regulatory documentation expert. Provide a concise executive summary (${summaryWordCount} words) of the following SOP document. Focus on:
-1. Purpose and scope
-2. Key requirements and steps
-3. Relevant definitions and references
-
-SOP Document:
-${doc.content}
-
-Executive Summary:`;
-
-    try {
-      const response = await llmService.generateText(prompt);
-      return response.generatedText;
-    } catch (error) {
-      console.error(`[EnhancedRAG] Failed to summarize ${doc.fileName}:`, error);
-      // Fallback: return first 500 words
-      return doc.content.split(/\s+/).slice(0, 500).join(' ') + '...';
-    }
-  }
 
   /**
    * Generate and cache summaries for all procedures
    */
   private async generateSOPSummaries(
     proceduresFiles: ParsedDocument[],
-    llmService: GroqLLMService,
     projectPath: string,
     summaryWordCount: number = 250
   ): Promise<Map<string, string>> {
@@ -624,11 +604,8 @@ Executive Summary:`;
     for (const doc of proceduresFiles) {
       if (!summaryCache.has(doc.fileName)) {
         console.log(`[EnhancedRAG] Summarizing ${doc.fileName}...`);
-        const summary = await this.summarizeSOP(doc, llmService, summaryWordCount);
+        const summary = this.extractiveSummary(doc, summaryWordCount);
         summaryCache.set(doc.fileName, summary);
-        
-        // Rate limit: wait 1 second between API calls
-        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
     
@@ -666,63 +643,10 @@ Executive Summary:`;
   }
 
   /**
-   * Generate executive summary for a Context file
-   */
-  private async summarizeContextFile(
-    doc: ParsedDocument,
-    contextCategory: string,
-    llmService: GroqLLMService,
-    summaryWordCount: number = 250
-  ): Promise<string> {
-    // Customize prompt based on context category
-    let focusAreas = '';
-    
-    if (contextCategory === 'predicates') {
-      focusAreas = `1. Predicate device name and regulatory clearance details
-2. Key similarities and differences to our device
-3. Critical design features and performance characteristics
-4. Relevant clinical data or performance testing`;
-    } else if (contextCategory === 'initiation') {
-      focusAreas = `1. Project objectives and scope
-2. Market analysis and competitive landscape
-3. Target users and use cases
-4. Key stakeholders and timeline`;
-    } else if (contextCategory === 'ongoing') {
-      focusAreas = `1. Current project status and milestones
-2. Recent decisions and action items
-3. Open issues or risks
-4. Next steps and deliverables`;
-    } else {
-      focusAreas = `1. Main purpose and scope
-2. Key information and findings
-3. Critical details and requirements
-4. Relevant stakeholders or references`;
-    }
-
-    const prompt = `You are a regulatory documentation expert. Provide a concise executive summary (${summaryWordCount} words) of the following project context document. Focus on:
-${focusAreas}
-
-Context Document:
-${doc.content}
-
-Executive Summary:`;
-
-    try {
-      const response = await llmService.generateText(prompt);
-      return response.generatedText;
-    } catch (error) {
-      console.error(`[EnhancedRAG] Failed to summarize ${doc.fileName}:`, error);
-      // Fallback: return first 500 words
-      return doc.content.split(/\s+/).slice(0, 500).join(' ') + '...';
-    }
-  }
-
-  /**
    * Generate and cache summaries for all context files
    */
   private async generateContextSummaries(
     contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[],
-    llmService: GroqLLMService,
     projectPath: string,
     summaryWordCount: number = 250
   ): Promise<Map<string, string>> {
@@ -759,11 +683,8 @@ Executive Summary:`;
     for (const { doc, contextCategory } of contextFiles) {
       if (!summaryCache.has(doc.fileName)) {
         console.log(`[EnhancedRAG] Summarizing ${doc.fileName}...`);
-        const summary = await this.summarizeContextFile(doc, contextCategory, llmService, summaryWordCount);
+        const summary = this.extractiveSummary(doc, summaryWordCount);
         summaryCache.set(doc.fileName, summary);
-        
-        // Rate limit: wait 1 second between API calls
-        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
     
@@ -1554,7 +1475,6 @@ async loadContextFolderStructured(
       maxTokens?: number;         // Maximum tokens for context (default: 150000)
       includeSummaries?: boolean; // Include SOP summaries (default: true)
       summaryWordCount?: number;  // Summary word count (default: 250)
-      llmService?: GroqLLMService; // Optional LLM service for summarization
     } = {}
   ): Promise<{
     ragContext: string;
@@ -1576,9 +1496,9 @@ async loadContextFolderStructured(
     // 2. Generate SOP summaries if requested (with GLOBAL mutex protection)
     let sopSummaries = new Map<string, string>();
     if (options.includeSummaries ?? true) {
-      // Acquire GLOBAL summary mutex to prevent duplicate LLM calls
+      // Acquire GLOBAL summary mutex to prevent duplicate summary generation
       const releaseSummary = await globalSummaryMutex.acquire();
-      console.log('[EnhancedRAG] 🔒 Summary mutex acquired - generating summaries...');
+      console.log('[EnhancedRAG] 🔒 Summary mutex acquired - generating SOP summaries...');
       
       try {
         // Get procedure files
@@ -1592,11 +1512,8 @@ async loadContextFolderStructured(
         }
         
         if (proceduresFiles.length > 0) {
-          // Use provided LLM service or create one
-          const llmService = options.llmService || this.getLLMService();
           sopSummaries = await this.generateSOPSummaries(
             proceduresFiles,
-            llmService,
             projectPath,
             options.summaryWordCount || 250
           );
@@ -1612,7 +1529,7 @@ async loadContextFolderStructured(
     // 2.5. Generate Context file summaries if requested (uses same mutex)
     let contextSummaries = new Map<string, string>();
     if (options.includeSummaries ?? true) {
-      // Acquire GLOBAL summary mutex to prevent duplicate LLM calls
+      // Acquire GLOBAL summary mutex to prevent duplicate summary generation
       const releaseSummary = await globalSummaryMutex.acquire();
       console.log('[EnhancedRAG] 🔒 Summary mutex acquired - generating context summaries...');
       
@@ -1628,11 +1545,8 @@ async loadContextFolderStructured(
         }
         
         if (contextFilesWithCategory.length > 0) {
-          // Use provided LLM service or create one
-          const llmService = options.llmService || this.getLLMService();
           contextSummaries = await this.generateContextSummaries(
             contextFilesWithCategory,
-            llmService,
             projectPath,
             options.summaryWordCount || 250
           );

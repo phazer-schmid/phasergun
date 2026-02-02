@@ -6,11 +6,21 @@
  * - Caches embeddings to disk for performance
  */
 
-import { pipeline } from '@xenova/transformers';
+import { pipeline, env } from '@xenova/transformers';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import * as os from 'os';
+
+// DETERMINISM: Force ONNX Runtime to single-threaded execution.
+// Multi-threaded float accumulation is non-associative — the order threads
+// sum partial results is non-deterministic, producing different embeddings
+// at the ~1e-6 level across runs.  Single-threaded execution guarantees
+// bit-identical embeddings for the same input on the same machine.
+env.backends.onnx.sessions = {
+  intraOpNumThreads: 1,
+  interOpNumThreads: 1,
+};
 
 /**
  * Embedding cache entry metadata
