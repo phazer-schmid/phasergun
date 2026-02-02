@@ -61,10 +61,19 @@ export class EnhancedRAGService {
   private vectorStore: VectorStore | null = null;
   private useEmbeddings: boolean = true; // Feature flag
   private lockManager: LockManager;
+  private cacheEnabled: boolean;
   
   constructor() {
     this.fileParser = new ComprehensiveFileParser();
     this.lockManager = getLockManager();
+    
+    // Read CACHE_ENABLED from environment (defaults to true for backwards compatibility)
+    const cacheEnvValue = process.env.CACHE_ENABLED?.toLowerCase();
+    this.cacheEnabled = cacheEnvValue !== 'false' && cacheEnvValue !== '0';
+    
+    if (!this.cacheEnabled) {
+      console.log('[EnhancedRAG] ⚠️  CACHING DISABLED - All documents will be processed fresh on every request');
+    }
   }
 
   /**
@@ -314,8 +323,12 @@ private async buildVectorStore(
   const allVectors = [...procedureVectors.flat(), ...contextVectors.flat()];
   allVectors.forEach(entry => this.vectorStore!.addEntry(entry));
   
-  // Save to disk
-  await this.vectorStore.save(this.getVectorStorePath(projectPath));
+  // Save to disk only if caching is enabled
+  if (this.cacheEnabled) {
+    await this.vectorStore.save(this.getVectorStorePath(projectPath));
+  } else {
+    console.log('[EnhancedRAG] ⚠️  Skipping vector store save (caching disabled)');
+  }
   
   console.log(`[EnhancedRAG] ✓ Vector store built: ${allVectors.length} chunks indexed`);
 }
@@ -1029,6 +1042,12 @@ async loadContextFolderStructured(
    * Save cache metadata to disk
    */
   private async saveCacheMetadata(cache: KnowledgeCache): Promise<void> {
+    // Skip saving if caching is disabled
+    if (!this.cacheEnabled) {
+      console.log('[EnhancedRAG] ⚠️  Skipping cache metadata save (caching disabled)');
+      return;
+    }
+    
     const metadataPath = this.getCacheMetadataPath(cache.projectPath);
     
     console.log(`[EnhancedRAG] 💾 [CACHE] Saving cache metadata to: ${metadataPath}`);
@@ -1106,6 +1125,7 @@ async loadContextFolderStructured(
     try {
       const vectorStorePath = this.getVectorStorePath(projectPath);
       const sopSummariesPath = this.getSOPSummariesCachePath(projectPath);
+      const contextSummariesPath = this.getContextSummariesCachePath(projectPath);
       const metadataPath = this.getCacheMetadataPath(projectPath);
       
       // Try to delete vector store
@@ -1130,6 +1150,17 @@ async loadContextFolderStructured(
         }
       }
       
+      // Try to delete Context summaries
+      try {
+        await fs.unlink(contextSummariesPath);
+        console.log('[EnhancedRAG] ✓ Deleted old Context summaries cache');
+      } catch (error) {
+        // File might not exist, which is fine
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          console.log('[EnhancedRAG] ⚠️  Could not delete old Context summaries (continuing anyway)');
+        }
+      }
+      
       // Try to delete cache metadata
       try {
         await fs.unlink(metadataPath);
@@ -1149,6 +1180,11 @@ async loadContextFolderStructured(
    * Check if cache is valid for a project
    */
   async isCacheValid(projectPath: string, primaryContextPath: string): Promise<boolean> {
+    // If caching is disabled, always return false to force rebuild
+    if (!this.cacheEnabled) {
+      return false;
+    }
+    
     console.log('[EnhancedRAG] 🔍 [CACHE] ========================================');
     console.log('[EnhancedRAG] 🔍 [CACHE] Checking cache validity for project');
     console.log(`[EnhancedRAG] 🔍 [CACHE] Project path: ${projectPath}`);
