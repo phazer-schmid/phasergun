@@ -163,3 +163,84 @@ operational_rules:
   primary_source:
     rule: "@knowledge_sources.master_record is the authoritative source for project-specific information"
     action: "Prioritize master record data over other sources"
+
+# Cache system for knowledge base persistence and performance
+cache_system:
+  purpose: "Persist indexed knowledge (vectors, summaries, metadata) across requests and process restarts to avoid expensive re-parsing and re-embedding"
+  
+  toggle:
+    env_variable: "CACHE_ENABLED"
+    default: true
+    disable_values: ["false", "0"]
+    effect_when_disabled: "All documents processed fresh on every request; no disk reads or writes for cache artifacts"
+
+  location:
+    base: "$TMPDIR/phasergun-cache"
+    project_isolation: "MD5 hash of project path, truncated to 8 characters"
+    structure:
+      vector_store: "{base}/vector-store/{project_hash}/vector-store.json"
+      sop_summaries: "{base}/sop-summaries/{project_hash}/sop-summaries.json"
+      context_summaries: "{base}/context-summaries/{project_hash}/context-summaries.json"
+      metadata: "{base}/metadata/{project_hash}/cache-metadata.json"
+      locks: "{base}/locks/{project_hash}/cache-build.lock"
+
+  fingerprinting:
+    algorithm: "SHA-256"
+    inputs:
+      - source: "@knowledge_sources.master_record"
+        signal: "file path, size, mtime"
+      - source: "@knowledge_sources.procedures"
+        signal: "all file paths, sizes, mtimes (sorted, concatenated)"
+      - source: "@knowledge_sources.general and @knowledge_sources.regulatory_strategy context folders"
+        signal: "all file paths, sizes, mtimes (sorted, concatenated)"
+        excludes: ["Context/Prompt"]
+    combined: "SHA-256 of pipe-delimited individual fingerprints"
+    validation: "Current fingerprint compared against cached fingerprint; mismatch triggers full rebuild"
+
+  validation_flow:
+    step_1: "Check in-memory Map for project cache entry (fastest)"
+    step_2: "If not in memory, load cache-metadata.json from disk and restore to memory"
+    step_3: "Compute current fingerprint from @knowledge_sources on disk"
+    step_4: "Compare current fingerprint to cached fingerprint"
+    result_valid: "Load vector-store.json from disk (~100-200ms) and serve"
+    result_invalid: "Clear old cache artifacts, rebuild everything, save new cache to disk and memory"
+
+  rebuild_trigger:
+    - "Any file added, removed, or modified in @knowledge_sources.procedures"
+    - "Any file added, removed, or modified in @knowledge_sources.master_record"
+    - "Any file added, removed, or modified in context folders (Initiation, Ongoing, Predicates, root-level Primary Context)"
+    - "primary-context.yaml itself is modified"
+    - "Cache metadata or vector store file is missing or corrupt"
+    - "CACHE_ENABLED set to false (forces fresh build every request, never saves)"
+
+  excluded_from_cache:
+    - folder: "Context/Prompt"
+      reason: "Prompt files are user-selected per request and parsed on-demand; caching them would serve stale or irrelevant prompt content"
+
+  concurrency_protection:
+    in_process:
+      mechanism: "Global async-mutex (shared across all EnhancedRAGService instances in the same Node process)"
+      behavior: "Only one request acquires the mutex; others block until released, then use the freshly built cache"
+    cross_process:
+      mechanism: "File-based lock via proper-lockfile at {base}/locks/{project_hash}/cache-build.lock"
+      stale_timeout: 60000
+      retries: 10
+      backoff: { min: 500, max: 3000 }
+      behavior: "Second process waits for lock, then double-checks cache validity before deciding to rebuild"
+
+  summaries:
+    type: "Extractive (first N words of document; no LLM call)"
+    default_word_count: 250
+    per_file_hash: "SHA-256 of document content; summary regenerated only when hash changes"
+    cached_artifacts:
+      - "@cache_system.location.structure.sop_summaries"
+      - "@cache_system.location.structure.context_summaries"
+
+  determinism:
+    rule: "All files sorted alphabetically by fileName before chunking, embedding, and vector store insertion"
+    purpose: "Ensures identical vector store content and ordering across cache rebuilds, independent of filesystem enumeration order"
+
+  manual_reset:
+    all_projects: "rm -rf $TMPDIR/phasergun-cache"
+    single_project: "rm -rf $TMPDIR/phasergun-cache/*/{project_hash}"
+    effect: "Next request detects missing cache and triggers full rebuild automatically"
