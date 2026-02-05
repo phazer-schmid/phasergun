@@ -2,311 +2,164 @@
 product:
   name: "PhaserGun (PG)"
   type: "AI-Driven DHF Documentation Engine"
-  purpose: "Generate Phase 1 DHF documents using project context, SOPs, and industry standards"
+  purpose: "Generate DHF documents for 510(k) submissions using industry standards, company operating procedures and project context"
 
-core_function:
-  primary: "Generate compliant Phase 1 DHF documents from scratch using Project-Context.docx as source of truth"
-  differentiation: "Proactive compliance guidance during creation vs. reactive review"
-
-# ============================================================================
-# PROJECT CONTEXT - SINGLE SOURCE OF TRUTH
-# ============================================================================
-
-project_context:
-  definition: "Living document (Project-Context.docx) managed via Google Docs and synced to local system that serves as the single source of truth for all high-level product and project information"
+# Core knowledge sources that PG retrieves from
+knowledge_sources:
+  master_record:
+    id: "master_record"
+    type: "Project Context"
+    description: "Living document with key project and product information"
+    source: "Customer questionnaire at project start"
+    location: "[RAGFolder]/Context/Project-Master-Record.docx"
+    retrieval_priority: "primary"
+    usage: "Primary reference for all content generation prompts"
   
-  location:
-    google_docs: "Managed and edited in Google Docs for easy collaboration"
-    local_sync: "{RAG_FOLDER}/Context/Project-Context.docx"
-    sync_method: "rclone automatic sync from Google Drive"
-    
-  purpose:
-    - "Central reference that DHF documents pull from"
-    - "Ensures consistency across all generated documents"
-    - "Tracks TBD fields that need user input"
-    - "Evolves throughout project lifecycle"
-    - "Enables collaborative editing via Google Docs"
+  compliance:
+    id: "compliance"
+    type: "Regulatory Standards"
+    description: "FDA and ISO standards for medical device documentation"
+    location: "LLM Model"
+    retrieval_priority: "mandatory"
+    standards:
+      - id: "fda_820_30"
+        name: "FDA 21 CFR Part 820.30"
+        scope: "Design Controls"
+      - id: "fda_807"
+        name: "FDA 21 CFR Part 807"
+        scope: "Premarket Notification [510(k)] - Substantial Equivalence"
+      - id: "iso_13485"
+        name: "ISO 13485"
+        scope: "Quality Management Systems"
+      - id: "iso_14971"
+        name: "ISO 14971"
+        scope: "Risk Management"
+    usage: "All generated content must comply with these standards"
   
-  scope:
-    includes:
-      - "Regulatory pathway and intended use"
-      - "Product specifications and descriptions"
-      - "User profiles and use environment"
-      - "Project timeline and team"
-      - "Predicate device information"
-    
-    excludes:
-      - "Detailed test protocols (belongs in DHF documents)"
-      - "Design drawings (belongs in DHF documents)"
-      - "Meeting minutes (belongs in DHF documents)"
+  procedures:
+    id: "procedures"
+    type: "Company SOPs"
+    description: "Company-developed operating procedures"
+    location: "[RAGFolder]/Procedures"
+    retrieval_priority: "high"
+    categories:
+      - id: "quality_manual"
+        name: "Quality Manual"
+      - id: "design_control"
+        name: "Design Control Procedure"
+      - id: "risk_management"
+        name: "Risk Management"
+      - id: "document_control"
+        name: "Document Control Procedure"
+      - id: "production_process"
+        name: "Production and Process Control"
+      - id: "quality_records"
+        name: "Quality Records Procedure"
+    document_types:
+      - {id: "sop", name: "Standard Operating Procedure", acronym: "SOP"}
+      - {id: "qp", name: "Quality Plan", acronym: "QP"}
+      - {id: "qap", name: "Quality Assurance Plan", acronym: "QAP"}
+    usage: "Must adhere when generating content; report conflicts with @compliance"
   
-  access_pattern:
-    structured_references: "Supports references like [Project-Context|Section Name|Field Name]"
-    parsing: "Automatically parsed from .docx format into structured sections and fields"
-    api_access: "GenerationEngine provides programmatic access to sections and fields"
-
-# ============================================================================
-# CONTEXT FOLDER ORGANIZATION
-# ============================================================================
-
-context_folder_structure:
-  description: "Structured organization of customer-provided project documents from Google Drive"
-  location: "{ProjectPath}/Context/"
+  regulatory_strategy:
+    id: "regulatory_strategy"
+    type: "Project Strategy"
+    description: "Predicate devices and regulatory strategy documents"
+    location: "[RAGFolder]/Context/Regulatory Strategy"
+    retrieval_priority: "on_demand"
+    usage: "Only retrieve when explicitly referenced in prompts"
   
-  root_level:
-    primary_context_file:
-      filename: "Project-Context.docx"
-      purpose: "PRIMARY SOURCE OF TRUTH for entire project"
-      description: "Result of initial project intake containing key answers to defining questions"
-      importance: "CRITICAL - Highest priority in all retrieval operations"
-      content_includes:
-        - "High-level product description and definition"
-        - "Key answers to critical questions that define the product"
-        - "Core product identity and specifications"
-        - "Foundational project information"
-      retrieval_priority: "MAXIMUM - Always included first"
-      note: "This file contains the essential 'what' of the project - the definitive description of what is being developed"
+  general:
+    id: "general"
+    type: "Reference Materials"
+    description: "Additional reference documents for content generation"
+    location: "[RAGFolder]/Context/General"
+    retrieval_priority: "on_demand"
+    usage: "Only retrieve when explicitly referenced in prompts"
+
+# How prompts reference documents using bracket notation
+reference_notation:
+  purpose: "Enable explicit document references within prompts"
+  syntax_patterns:
+    procedure:
+      format: "[Procedure|{category_name}]"
+      example: "[Procedure|Design Control Procedure]"
+      retrieval: "References @knowledge_sources.procedures.categories by name"
+      output: "PG cites procedure filename and section used"
+    master_record:
+      format: "[Master Record|{field_name}]"
+      example: "[Master Record|DEVICE_NAME]"
+      retrieval: "References fields in @knowledge_sources.master_record"
+      output: "PG extracts and cites specific field values"
+    context:
+      format: "[Context|{folder}|{filename}]"
+      example: "[Context|Regulatory Strategy|Predicate-Device-Analysis.docx]"
+      retrieval: "References documents in [RAGFolder]/Context/{folder}"
+      output: "PG retrieves and cites specified document"
+
+# Content generation workflow
+generation_workflow:
+  input:
+    prompts:
+      location: "[RAG Folder]/Prompts"
+      interface: "Dropdown list on web page"
+      trigger: "User selects prompt and clicks Generate button"
   
-  subfolders:
-    initiation:
-      path: "{ProjectPath}/Context/Initiation/"
-      purpose: "Documents uploaded when customer starts the project"
-      description: "Foundational documents that establish project direction and scope"
-      examples:
-        - "Market Analysis"
-        - "Competitive Landscape"
-        - "Initial Requirements Documents"
-        - "Stakeholder Needs Assessment"
-        - "Regulatory Strategy Documents"
-      retrieval_priority: "High"
-      timing: "Uploaded at project inception"
-      
-    ongoing:
-      path: "{ProjectPath}/Context/Ongoing/"
-      purpose: "Documents uploaded throughout the project lifecycle"
-      description: "Living documentation that tracks project evolution and decisions"
-      examples:
-        - "Project Memos"
-        - "Meeting Minutes"
-        - "Decision Records"
-        - "Progress Updates"
-        - "Change Requests"
-      retrieval_priority: "High"
-      timing: "Uploaded continuously during project execution"
-      
-    predicates:
-      path: "{ProjectPath}/Context/Predicates/"
-      purpose: "Predicate device documentation for establishing substantial equivalence"
-      description: "REGULATORY DEVICES - Documents related to predicate devices that support 510(k) clearance pathway"
-      
-      what_are_predicates:
-        definition: "Legally marketed devices to which your new device claims substantial equivalence"
-        regulatory_context: "FDA 510(k) pathway - demonstrate your device is as safe and effective as a predicate"
-        key_principle: "Predicates DO NOT dictate what your device IS, but establish what it is SIMILAR TO"
-        strategic_value: "Can significantly reduce testing burden by leveraging predicate's existing safety/efficacy data"
-      
-      examples:
-        - "Predicate Device 510(k) Submissions"
-        - "Predicate Device Technical Specifications"
-        - "ISO Standards (when used to establish equivalence)"
-        - "Comparative Analysis Documents"
-        - "Substantial Equivalence Arguments"
-      
-      retrieval_priority: "High"
-      timing: "Uploaded during regulatory strategy phase"
-      
-      special_handling:
-        note: "While predicates receive same semantic search weight as other context, they serve a unique regulatory purpose"
-        distinction: "Initiation/Ongoing define YOUR device; Predicates define REFERENCE devices for comparison"
-        usage: "Referenced when establishing equivalence, justifying design choices, or reducing testing requirements"
-  
-  retrieval_strategy:
-    semantic_search_weights:
-      primary_context_root: "ALWAYS INCLUDED (Tier 0 - before all other context)"
-      initiation: "Equal weight in semantic similarity search"
-      ongoing: "Equal weight in semantic similarity search"
-      predicates: "Equal weight in semantic similarity search"
-    
-    context_assembly_order:
-      tier_0: "Primary Context.docx from root (if exists)"
-      tier_1: "PhaserGun primary-context.yaml (system role definition)"
-      tier_2: "Company SOP summaries"
-      tier_3: "Semantically retrieved context from all subfolders (Initiation, Ongoing, Predicates)"
-    
-    notes:
-      - "All three subfolders (Initiation, Ongoing, Predicates) participate equally in semantic search"
-      - "Primary Context.docx is ALWAYS included at highest priority before semantic retrieval"
-      - "Metadata tags preserve folder origin for traceability"
-      - "Predicates are conceptually distinct (regulatory comparison devices) but technically equal in retrieval"
-
-# ============================================================================
-# REGULATORY FRAMEWORK
-# ============================================================================
-
-regulatory_framework:
-  standards:
-    - name: "FDA 21 CFR Part 820.30"
-      description: "Design Controls"
-    - name: "FDA 21 CFR Part 807"
-      description: "Premarket Notification [510(k)] - Substantial Equivalence"
-    - name: "ISO 13485"
-      description: "Quality Management Systems"
-    - name: "ISO 14971"
-      description: "Risk Management"
-  
-  predicate_devices:
-    definition: "Legally marketed devices used as comparison basis for 510(k) clearance"
-    purpose: "Establish substantial equivalence to reduce regulatory burden"
-    documentation_location: "Context/Predicates/ folder"
-    key_concept: "Your device must be as safe and effective as the predicate, not identical to it"
-
-# ============================================================================
-# SOP MANAGEMENT
-# ============================================================================
-
-sop_management:
-  purpose: "Understand company-specific procedures without requiring naming standardization"
-  
-  canonical_categories:
-    - id: "quality_manual"
-      name: "Quality Manual"
-      
-    - id: "design_control"
-      name: "Design Control Procedure"
-      
-    - id: "risk_management"
-      name: "Risk Management"
-      
-    - id: "document_control"
-      name: "Document Control Procedure"
-      
-    - id: "production_process"
-      name: "Production and Process Control"
-      
-    - id: "quality_records"
-      name: "Quality Records Procedure"
-  
-  intelligent_classification:
-    description: "AI reads SOP content and maps to canonical category"
-    process:
-      - "User uploads SOP with any filename"
-      - "AI analyzes content to determine purpose"
-      - "AI maps to appropriate canonical category"
-      - "AI extracts company-specific requirements"
-      - "AI references SOP during document generation"
-
-# ============================================================================
-# DEVELOPMENT PHASES
-# ============================================================================
-
-development_phases:
-  reference: "dhf_phase_mapping.yaml"
-  description: "Phase structure and required DHF documents defined in dhf_phase_mapping.yaml"
-  current_focus: "phase_1"
-  
-  notes:
-    - "Phase names and required documents are maintained in dhf_phase_mapping.yaml"
-    - "Project status and phase progression tracked in Project-Context.docx"
-
-# ============================================================================
-# PHASE 1 DHF DOCUMENTS (PRIMARY FOCUS)
-# ============================================================================
-
-phase_1_dhf_documents:
-  - document_id: "DHF_P1_001"
-    name: "Project Plan / Development Plan"
-    pulls_from_project_context:
-      - "[Project-Context|Project|Device Name]"
-      - "[Project-Context|Project|Team]"
-      - "[Project-Context|Project Planning|Timeline]"
-      - "[Project-Context|Regulatory|Pathway]"
-      - "[Project-Context|Regulatory|Intended Use]"
-    
-  - document_id: "DHF_P1_002"
-    name: "Product Specification"
-    pulls_from_project_context:
-      - "[Project-Context|Product|Trade Name]"
-      - "[Project-Context|Product|Description]"
-      - "[Project-Context|Product|Specifications]"
-      - "[Project-Context|Product|Materials]"
-      - "[Project-Context|Regulatory|Intended Use]"
-      - "[Project-Context|Users and Environment|Patient Population]"
-    
-  - document_id: "DHF_P1_003"
-    name: "Traceability Matrix"
-    pulls_from_project_context:
-      - "[Project-Context|Traceability|User Needs]"
-      - "[Project-Context|Traceability|Design Inputs]"
-      - "[Project-Context|Regulatory|Intended Use]"
-    
-  - document_id: "DHF_P1_004"
-    name: "Risk Analysis"
-    standard: "ISO 14971"
-    pulls_from_project_context:
-      - "[Project-Context|Product|Description]"
-      - "[Project-Context|Users and Environment|Patient Population]"
-      - "[Project-Context|Users and Environment|Use Environment]"
-      - "[Project-Context|Regulatory|Intended Use]"
-    
-  - document_id: "DHF_P1_005"
-    name: "Project Feasibility Checklist"
-    pulls_from_project_context:
-      - "[Project-Context|Project Planning|Phase Milestones]"
-      - "[Project-Context|Regulatory|Pathway]"
-      - "[Project-Context|Project|Team]"
-
-# ============================================================================
-# DESIGN CONTROLS FOUNDATION
-# ============================================================================
-
-design_controls:
-  user_needs: "What does the user want"
-  design_inputs: "Engineering specifications (what device must do)"
-  design_outputs: "Drawings, code, schematics (the actual design)"
-  verification: "Did we build it right (outputs vs inputs)"
-  validation: "Did we build the right device (product vs user needs)"
-
-# ============================================================================
-# DOCUMENT GENERATION APPROACH
-# ============================================================================
-
-document_generation:
-  inputs:
-    - "Project-Context.docx (source of truth, synced from Google Docs)"
-    - "Company SOPs (mapped to canonical categories)"
-    - "Industry standards (FDA, ISO)"
-    - "PG templates"
-  
-  process:
-    confidence_based_population:
-      high_confidence: "Auto-populate section (field has definitive value)"
-      medium_confidence: "Suggest content for user approval"
-      low_confidence: "Leave blank, prompt user (field marked TBD or missing)"
-    
-    traceability:
-      - "Include footnotes showing Project-Context.docx source sections"
-      - "Reference specific SOP requirements"
-      - "Cite regulatory standards where applicable"
-    
-    structured_references:
-      - "Support [Project-Context|Section|Field] notation in prompts"
-      - "GenerationEngine resolves references to actual values"
-      - "Enables precise field extraction from document"
+  processing:
+    step_1: "Parse @reference_notation patterns in selected prompt"
+    step_2: "Retrieve referenced documents from @knowledge_sources"
+    step_3: "Validate against @knowledge_sources.compliance.standards"
+    step_4: "Generate content adhering to @knowledge_sources.procedures"
+    step_5: "Track conflicts between sources"
+    step_6: "Calculate confidence rating"
   
   output:
-    - "Downloadable document (docx, pdf)"
-    - "Editable by user"
-    - "Ready for review and approval process"
+    location: "PG web page output panel"
+    sections:
+      generated_content:
+        description: "DHF documentation with inline reference footnotes"
+        format: "Structured text with citation markers"
+      
+      discrepancies:
+        description: "Conflicts found during generation"
+        includes: 
+          - "Procedure vs compliance conflicts"
+          - "Source contradictions"
+          - "Missing required information"
+        example: "SOP-001 Design Control conflicts with FDA 21 CFR 820.30 on design review timing"
+      
+      references:
+        description: "Complete source attribution"
+        includes:
+          - "Document names and locations"
+          - "Specific sections or field values used"
+          - "LLM knowledge base citations"
+          - "How each reference informed the content"
+      
+      confidence:
+        description: "Content accuracy confidence assessment"
+        scale: ["High", "Medium", "Low"]
+        criteria:
+          - "Source agreement level"
+          - "Completeness of information"
+          - "Compliance alignment"
+          - "Procedure adherence"
+        output: "Rating with detailed rationale"
 
-# ============================================================================
-# VALUE PROPOSITION
-# ============================================================================
-
-value_proposition:
-  - "Faster Phase 1 documentation"
-  - "Consistent use of Project-Context.docx across all documents"
-  - "Compliance with company SOPs and regulatory standards"
-  - "Clear identification of missing information (TBD fields)"
-  - "Reduced errors through single source of truth"
-  - "Collaborative editing via Google Docs with automatic sync"
-  - "Structured document parsing for precise field extraction"
+# Core operational rules
+operational_rules:
+  compliance_enforcement:
+    rule: "All content must comply with @knowledge_sources.compliance.standards"
+    action: "Reject or flag non-compliant content"
+  
+  discrepancy_handling:
+    rule: "Report all conflicts between @knowledge_sources.procedures and @knowledge_sources.compliance"
+    action: "Document in @generation_workflow.output.sections.discrepancies"
+  
+  retrieval_scope:
+    rule: "Only retrieve @knowledge_sources.regulatory_strategy and @knowledge_sources.general when explicitly referenced"
+    action: "Prevent unnecessary context loading"
+  
+  primary_source:
+    rule: "@knowledge_sources.master_record is the authoritative source for project-specific information"
+    action: "Prioritize master record data over other sources"
