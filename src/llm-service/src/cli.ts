@@ -7,11 +7,11 @@ async function main() {
   
   const llmService = new MockLLMService();
   
-  const testPrompt = 'Analyze the following DHF documents for FDA 510(k) compliance...';
+  const testPrompt = 'Generate an introduction section that explains the purpose and scope of this technical document, incorporating relevant regulatory guidance...';
   
   const testContext: KnowledgeContext = {
-    ragContext: `FDA 510(k) requires demonstration of substantial equivalence to a predicate device.
-ISO 13485 quality management system documentation is required for medical device manufacturing.`,
+    ragContext: `Regulatory guidance emphasizes clear documentation of design requirements and specifications.
+ISO 13485 quality management systems require thorough technical documentation for medical device development.`,
     metadata: {
       procedureChunksRetrieved: 0,
       contextChunksRetrieved: 2,

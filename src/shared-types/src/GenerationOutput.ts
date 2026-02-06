@@ -7,7 +7,7 @@ export interface GenerationOutput {
   message: string;
   timestamp: string;
 
-  /** The generated DHF content with inline citation markers */
+  /** The generated content with inline citation markers */
   generatedContent?: string;
 
   /** Conflicts found during generation */

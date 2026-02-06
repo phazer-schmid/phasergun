@@ -71,7 +71,7 @@ export interface EnhancedChunk extends ChunkedDocumentPart {
 }
 
 /**
- * Intelligent DHF-Aware Chunker
+ * Intelligent Document Chunker
  * Adapts chunking strategy based on document type and metadata
  */
 export class IntelligentChunker implements Chunker {

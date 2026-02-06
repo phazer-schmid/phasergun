@@ -29,9 +29,9 @@ INPUT DATA:
 - Device information
 
 TASK:
-Generate a Purpose section for a Design History File (DHF) for the medical device described in the primary context. The Purpose section should:
+Generate a Purpose section for a design specification document for the medical device described in the primary context. The Purpose section should:
 - Be 2-3 paragraphs
-- Explain why this DHF exists
+- Explain the purpose and scope of this specification
 - Reference applicable regulatory standards
 - Follow the company's Design Control SOP
 
