@@ -100,13 +100,7 @@ const formData = ref({
   name: '',
   description: '',
   sourceType: 'local' as const,
-  folderPath: '',
-  targetDates: {
-    phase1: '',
-    phase2: '',
-    phase3: '',
-    phase4: ''
-  }
+  folderPath: ''
 });
 
 const handleSubmit = () => {
@@ -114,13 +108,7 @@ const handleSubmit = () => {
     name: formData.value.name,
     description: formData.value.description,
     sourceType: formData.value.sourceType,
-    folderPath: formData.value.folderPath,
-    targetDates: {
-      phase1: formData.value.targetDates.phase1 || undefined,
-      phase2: formData.value.targetDates.phase2 || undefined,
-      phase3: formData.value.targetDates.phase3 || undefined,
-      phase4: formData.value.targetDates.phase4 || undefined
-    }
+    folderPath: formData.value.folderPath
   });
 
   router.push(`/projects/${project.id}`);

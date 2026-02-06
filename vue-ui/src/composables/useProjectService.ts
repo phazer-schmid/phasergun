@@ -1,6 +1,6 @@
-import { Project, DateHistoryEntry } from '../models/project.model';
+import { Project } from '../models/project.model';
 
-const STORAGE_KEY = 'fda_compliance_projects';
+const STORAGE_KEY = 'phasergun_projects';
 
 export function useProjectService() {
   /**
@@ -56,37 +56,6 @@ export function useProjectService() {
       return null;
     }
 
-    const existingProject = projects[index];
-
-    // Track date changes in history
-    if (updates.targetDates) {
-      const dateChanged = hasDateChanged(existingProject.targetDates, updates.targetDates);
-      
-      if (dateChanged && existingProject.targetDates) {
-        const historyEntry: DateHistoryEntry = {
-          changedAt: new Date().toISOString(),
-          previousDates: {
-            phase1: existingProject.targetDates.phase1,
-            phase2: existingProject.targetDates.phase2,
-            phase3: existingProject.targetDates.phase3,
-            phase4: existingProject.targetDates.phase4
-          },
-          newDates: {
-            phase1: updates.targetDates.phase1,
-            phase2: updates.targetDates.phase2,
-            phase3: updates.targetDates.phase3,
-            phase4: updates.targetDates.phase4
-          }
-        };
-
-        const dateHistory = existingProject.dateHistory || [];
-        updates = {
-          ...updates,
-          dateHistory: [...dateHistory, historyEntry]
-        };
-      }
-    }
-
     projects[index] = {
       ...projects[index],
       ...updates,
@@ -96,22 +65,6 @@ export function useProjectService() {
 
     saveProjects(projects);
     return projects[index];
-  };
-
-  /**
-   * Check if target dates have changed
-   */
-  const hasDateChanged = (
-    oldDates: Project['targetDates'], 
-    newDates: Project['targetDates']
-  ): boolean => {
-    if (!oldDates && !newDates) return false;
-    if (!oldDates || !newDates) return true;
-
-    return oldDates.phase1 !== newDates.phase1 ||
-           oldDates.phase2 !== newDates.phase2 ||
-           oldDates.phase3 !== newDates.phase3 ||
-           oldDates.phase4 !== newDates.phase4;
   };
 
   /**
