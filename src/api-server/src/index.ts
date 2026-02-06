@@ -4,7 +4,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
 import { config } from 'dotenv';
-import { PhaseDHFMapping } from '@fda-compliance/shared-types';
+import { PhaseDHFMapping } from '@phasergun/shared-types';
 
 // Load environment variables
 config();

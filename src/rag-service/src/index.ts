@@ -1,4 +1,4 @@
-import { KnowledgeContext, ChunkedDocumentPart } from '@fda-compliance/shared-types';
+import { KnowledgeContext, ChunkedDocumentPart } from '@phasergun/shared-types';
 
 /**
  * RAG Service Interface

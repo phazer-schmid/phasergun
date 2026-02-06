@@ -1,5 +1,5 @@
 {
-  "name": "@fda-compliance/rag-service",
+  "name": "@phasergun/rag-service",
   "version": "1.0.0",
   "description": "Complete DHF validation with 148 checks + RAG",
   "main": "dist/index.js",

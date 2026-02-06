@@ -6,7 +6,7 @@
 
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { ComprehensiveFileParser } from '@fda-compliance/file-parser';
+import { ComprehensiveFileParser } from '@phasergun/file-parser';
 
 export interface SOPMapping {
   category: string;

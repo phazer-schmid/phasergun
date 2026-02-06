@@ -1,4 +1,4 @@
-import { ParsedDocument } from '@fda-compliance/shared-types';
+import { ParsedDocument } from '@phasergun/shared-types';
 import { ComprehensiveFileParser } from './index';
 import * as path from 'path';
 

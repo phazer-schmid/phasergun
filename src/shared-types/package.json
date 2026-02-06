@@ -1,5 +1,5 @@
 {
-  "name": "@fda-compliance/shared-types",
+  "name": "@phasergun/shared-types",
   "version": "0.1.0",
   "description": "Shared TypeScript interfaces for FDA 510(k) compliance application",
   "type": "module",

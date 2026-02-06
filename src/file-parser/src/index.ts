@@ -1,4 +1,4 @@
-import { ParsedDocument } from '@fda-compliance/shared-types';
+import { ParsedDocument } from '@phasergun/shared-types';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';

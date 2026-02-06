@@ -1,4 +1,4 @@
-import { ParsedDocument, ChunkedDocumentPart } from '@fda-compliance/shared-types';
+import { ParsedDocument, ChunkedDocumentPart } from '@phasergun/shared-types';
 import { encode } from 'gpt-tokenizer';
 
 /**

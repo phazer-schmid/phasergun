@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { IntelligentChunker, MockChunker } from './index';
-import { ParsedDocument } from '@fda-compliance/shared-types';
+import { ParsedDocument } from '@phasergun/shared-types';
 
 async function testIntelligentChunker() {
   console.log('╔══════════════════════════════════════════════════════════════════╗');

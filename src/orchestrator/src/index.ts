@@ -1,8 +1,8 @@
-import { SourceFolderInput, AppStatusOutput } from '@fda-compliance/shared-types';
-import { FileParser } from '@fda-compliance/file-parser';
-import { Chunker } from '@fda-compliance/chunker';
-import { EnhancedRAGService, FootnoteTracker, SourceReference } from '@fda-compliance/rag-service';
-import { LLMService } from '@fda-compliance/llm-service';
+import { SourceFolderInput, AppStatusOutput } from '@phasergun/shared-types';
+import { FileParser } from '@phasergun/file-parser';
+import { Chunker } from '@phasergun/chunker';
+import { EnhancedRAGService, FootnoteTracker, SourceReference } from '@phasergun/rag-service';
+import { LLMService } from '@phasergun/llm-service';
 
 /**
  * Orchestrator Interface

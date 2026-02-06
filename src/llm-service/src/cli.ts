@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { MockLLMService } from './index';
-import { KnowledgeContext } from '@fda-compliance/shared-types';
+import { KnowledgeContext } from '@phasergun/shared-types';
 
 async function main() {
   console.log('=== LLM Service CLI Test ===\n');

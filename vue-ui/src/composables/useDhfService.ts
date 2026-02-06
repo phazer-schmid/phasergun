@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { DHFFile, PhaseDHFMapping } from '@fda-compliance/shared-types';
+import { DHFFile, PhaseDHFMapping } from '@phasergun/shared-types';
 import { getApiUrl } from '../config/api';
 
 interface ScanResponse {

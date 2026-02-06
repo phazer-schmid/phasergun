@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { LLMResponse, KnowledgeContext, ChunkedDocumentPart } from '@fda-compliance/shared-types';
+import { LLMResponse, KnowledgeContext, ChunkedDocumentPart } from '@phasergun/shared-types';
 import { LLMService } from './index';
 
 /**

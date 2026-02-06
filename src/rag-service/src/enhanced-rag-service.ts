@@ -1,11 +1,11 @@
-import { KnowledgeContext, ChunkedDocumentPart, ParsedDocument } from '@fda-compliance/shared-types';
+import { KnowledgeContext, ChunkedDocumentPart, ParsedDocument } from '@phasergun/shared-types';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
 import * as crypto from 'crypto';
 import * as os from 'os';
 import { Mutex } from 'async-mutex';
-import { ComprehensiveFileParser } from '@fda-compliance/file-parser';
+import { ComprehensiveFileParser } from '@phasergun/file-parser';
 import { EmbeddingService } from './embedding-service';
 import { VectorStore, VectorEntry, SearchResult } from './vector-store';
 import { LockManager, getLockManager } from './lock-manager';
