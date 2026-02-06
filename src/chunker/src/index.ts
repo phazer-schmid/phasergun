@@ -172,9 +172,9 @@ export class IntelligentChunker implements Chunker {
     const metadata = doc.metadata;
     
     // Strategy 1: Handle OCR documents with quality-based approach
-    if (metadata.isOCRExtracted) {
-      const ocrConfidence = metadata.ocrQuality?.averageConfidence || 
-                           metadata.ocrConfidence || 
+    if (metadata?.isOCRExtracted) {
+      const ocrConfidence = metadata?.ocrQuality?.averageConfidence || 
+                           metadata?.ocrConfidence || 
                            0.5;
       
       if (ocrConfidence < 0.7) {
@@ -191,7 +191,7 @@ export class IntelligentChunker implements Chunker {
     }
     
     // Strategy 2: Document type specific strategies
-    const docType = metadata.documentType;
+    const docType = metadata?.documentType;
     
     if (docType === 'risk-analysis') {
       return {
@@ -215,7 +215,7 @@ export class IntelligentChunker implements Chunker {
     }
     
     // Strategy 3: Documents with clear section structure
-    if (metadata.sections && Array.isArray(metadata.sections) && metadata.sections.length > 3) {
+    if (metadata?.sections && Array.isArray(metadata.sections) && metadata.sections.length > 3) {
       return {
         ...this.strategies.get('section-based')!,
         reason: `Document has ${metadata.sections.length} sections`
@@ -223,15 +223,15 @@ export class IntelligentChunker implements Chunker {
     }
     
     // Strategy 4: Large PDFs optimized for search
-    if (doc.mimeType === 'application/pdf' && (metadata.pageCount || 0) > 50) {
+    if (doc.mimeType === 'application/pdf' && (metadata?.pageCount || 0) > 50) {
       return {
         ...this.strategies.get('search-optimized')!,
-        reason: `Large PDF (${metadata.pageCount} pages)`
+        reason: `Large PDF (${metadata?.pageCount} pages)`
       };
     }
     
     // Strategy 5: Documents with low conversion quality
-    if (metadata.conversionQuality?.score && metadata.conversionQuality.score < 0.7) {
+    if (metadata?.conversionQuality?.score && metadata.conversionQuality.score < 0.7) {
       return {
         ...this.strategies.get('ocr-standard')!,
         reason: `Low conversion quality (${(metadata.conversionQuality.score * 100).toFixed(0)}%)`
@@ -419,28 +419,28 @@ export class IntelligentChunker implements Chunker {
       
       // Determine page number if available
       let pageNumber: number | undefined;
-      if (doc.metadata.pageBreaks && Array.isArray(doc.metadata.pageBreaks)) {
+      if (doc.metadata?.pageBreaks && Array.isArray(doc.metadata.pageBreaks)) {
         pageNumber = this.findPageNumber(startIndex, doc.metadata.pageBreaks);
       }
       
       // Determine section if available
       let section: string | undefined;
-      if (doc.metadata.sections && Array.isArray(doc.metadata.sections)) {
+      if (doc.metadata?.sections && Array.isArray(doc.metadata.sections)) {
         section = this.findSection(startIndex, doc.metadata.sections);
       }
       
       // Extract IDs present in this chunk
       const requirementIds = this.extractIdsInChunk(
         chunkText,
-        doc.metadata.requirementIds || []
+        doc.metadata?.requirementIds || []
       );
       const riskIds = this.extractIdsInChunk(
         chunkText,
-        doc.metadata.riskIds || []
+        doc.metadata?.riskIds || []
       );
       const testCaseIds = this.extractIdsInChunk(
         chunkText,
-        doc.metadata.testCaseIds || []
+        doc.metadata?.testCaseIds || []
       );
       
       return {
@@ -459,9 +459,9 @@ export class IntelligentChunker implements Chunker {
           sourcePath: doc.filePath,
           
           // Document classification
-          documentType: doc.metadata.documentType,
-          phase: doc.metadata.phase,
-          category: doc.metadata.category,
+          documentType: doc.metadata?.documentType,
+          phase: doc.metadata?.phase,
+          category: doc.metadata?.category,
           
           // Position tracking
           pageNumber,
@@ -471,12 +471,12 @@ export class IntelligentChunker implements Chunker {
           requirementIds,
           riskIds,
           testCaseIds,
-          standards: doc.metadata.standards,
+          standards: doc.metadata?.standards,
           
           // Quality indicators
-          isOCRExtracted: doc.metadata.isOCRExtracted,
-          qualityScore: doc.metadata.conversionQuality?.score,
-          ocrConfidence: doc.metadata.ocrQuality?.averageConfidence || doc.metadata.ocrConfidence,
+          isOCRExtracted: doc.metadata?.isOCRExtracted,
+          qualityScore: doc.metadata?.conversionQuality?.score,
+          ocrConfidence: doc.metadata?.ocrQuality?.averageConfidence || doc.metadata?.ocrConfidence,
           
           // Chunking metadata
           chunkStrategy: strategy.name,

@@ -45,8 +45,8 @@ Severity: 10, Occurrence: 1, Detection: 6, RPN: 60`,
   
   const riskChunks = chunker.chunkDocuments([riskDoc]);
   console.log(`✓ Created ${riskChunks.length} chunks`);
-  console.log(`  Strategy: ${riskChunks[0].metadata.chunkStrategy}`);
-  console.log(`  Risk IDs tracked: ${riskChunks[0].metadata.riskIds?.join(', ')}\n`);
+  console.log(`  Strategy: ${riskChunks[0]?.metadata?.chunkStrategy}`);
+  console.log(`  Risk IDs tracked: ${riskChunks[0]?.metadata?.riskIds?.join(', ')}\n`);
   
   // Test 2: Requirements Document
   console.log('TEST 2: Requirements Document');
@@ -82,8 +82,8 @@ Standard: IEC 60601-1`,
   
   const reqChunks = chunker.chunkDocuments([reqDoc]);
   console.log(`✓ Created ${reqChunks.length} chunks`);
-  console.log(`  Strategy: ${reqChunks[0].metadata.chunkStrategy}`);
-  console.log(`  Requirements tracked: ${reqChunks[0].metadata.requirementIds?.join(', ')}\n`);
+  console.log(`  Strategy: ${reqChunks[0]?.metadata?.chunkStrategy}`);
+  console.log(`  Requirements tracked: ${reqChunks[0]?.metadata?.requirementIds?.join(', ')}\n`);
   
   // Test 3: OCR Extracted Document (Low Confidence)
   console.log('TEST 3: OCR Document (Low Confidence)');
@@ -125,9 +125,9 @@ Note: S0me OCR err0rs may be present in this document.`,
   
   const ocrChunks = chunker.chunkDocuments([ocrDoc]);
   console.log(`✓ Created ${ocrChunks.length} chunks`);
-  console.log(`  Strategy: ${ocrChunks[0].metadata.chunkStrategy}`);
-  console.log(`  OCR Confidence: ${(ocrChunks[0].metadata.ocrConfidence! * 100).toFixed(0)}%`);
-  console.log(`  Token size: ${ocrChunks[0].metadata.tokenCount} tokens (larger chunks for OCR)\n`);
+  console.log(`  Strategy: ${ocrChunks[0]?.metadata?.chunkStrategy}`);
+  console.log(`  OCR Confidence: ${((ocrChunks[0]?.metadata?.ocrConfidence || 0) * 100).toFixed(0)}%`);
+  console.log(`  Token size: ${ocrChunks[0]?.metadata?.tokenCount} tokens (larger chunks for OCR)\n`);
   
   // Test 4: Large PDF with Sections
   console.log('TEST 4: Large Structured PDF');
@@ -170,9 +170,9 @@ Housing, assembly, and component specifications.`.repeat(5),  // Simulate larger
   
   const largeChunks = chunker.chunkDocuments([largeDoc]);
   console.log(`✓ Created ${largeChunks.length} chunks`);
-  console.log(`  Strategy: ${largeChunks[0].metadata.chunkStrategy}`);
-  console.log(`  Document has ${largeDoc.metadata.sections!.length} sections`);
-  console.log(`  First chunk in section: "${largeChunks[0].metadata.section}"\n`);
+  console.log(`  Strategy: ${largeChunks[0]?.metadata?.chunkStrategy}`);
+  console.log(`  Document has ${largeDoc.metadata?.sections?.length} sections`);
+  console.log(`  First chunk in section: "${largeChunks[0]?.metadata?.section}"\n`);
   
   // Test 5: Batch Processing Multiple Documents
   console.log('TEST 5: Batch Processing Multiple Document Types');
@@ -186,8 +186,10 @@ Housing, assembly, and component specifications.`.repeat(5),  // Simulate larger
   // Show strategy distribution
   const strategyCount: {[key: string]: number} = {};
   allChunks.forEach(chunk => {
-    const strategy = chunk.metadata.chunkStrategy;
-    strategyCount[strategy] = (strategyCount[strategy] || 0) + 1;
+    const strategy = chunk.metadata?.chunkStrategy;
+    if (strategy) {
+      strategyCount[strategy] = (strategyCount[strategy] || 0) + 1;
+    }
   });
   
   console.log('\n  Strategy Distribution:');
