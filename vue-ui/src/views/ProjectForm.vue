@@ -50,7 +50,7 @@
           <!-- Folder Path -->
           <div class="mb-6">
             <label for="folderPath" class="block text-sm font-medium text-gray-700 mb-2">
-              Folder Path <span class="text-red-500">*</span>
+              RAG <span class="text-red-500">*</span>
             </label>
             <input
               id="folderPath"
@@ -61,7 +61,7 @@
               placeholder="/path/to/dhf/folder"
             />
             <p class="mt-1 text-sm text-gray-500">
-              Enter the absolute path to your DHF folder
+              Enter the absolute path to your RAG folder
             </p>
           </div>
 
