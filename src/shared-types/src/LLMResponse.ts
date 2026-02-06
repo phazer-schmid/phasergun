@@ -1,8 +1,7 @@
-import type { ChunkedDocumentPart } from './ChunkedDocumentPart';
 import type { KnowledgeContext } from './KnowledgeContext';
 
 /**
- * Represents the response from an LLM API call
+ * Response from an LLM API call
  */
 export interface LLMResponse {
   generatedText: string;
@@ -17,5 +16,4 @@ export interface LLMResponse {
  */
 export interface LLMService {
   generateText(prompt: string, context?: KnowledgeContext): Promise<LLMResponse>;
-  assessDocument(doc: ChunkedDocumentPart[], guidelines: string): Promise<LLMResponse>;
 }
