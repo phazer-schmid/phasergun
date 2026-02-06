@@ -43,19 +43,25 @@ export class OrchestratorService {
       console.log(`[Orchestrator]   - Context documents:`, references.contextDocs);
       
       // Step 2: Retrieve relevant context using intelligent filtering
+      const hasProcedureRefs = references.procedures.length > 0;
+      const hasContextRefs = references.masterRecordFields.length > 0 || references.contextDocs.length > 0;
+      const hasAnyRefs = hasProcedureRefs || hasContextRefs;
+
       const { ragContext, metadata, procedureChunks, contextChunks } = 
         await this.ragService.retrieveRelevantContext(
           input.projectPath,
           input.primaryContextPath,
           input.prompt,
           {
-            // Use parsed references to guide retrieval
-            procedureChunks: references.procedures.length > 0 ? (input.options?.topKProcedures ?? 3) : 0,
-            contextChunks: references.masterRecordFields.length > 0 || references.contextDocs.length > 0 
-              ? (input.options?.topKContext ?? 2) 
-              : 0,
+            // Use parsed references to boost retrieval, but always retrieve baseline chunks
+            procedureChunks: hasProcedureRefs 
+              ? (input.options?.topKProcedures ?? 5)
+              : (input.options?.topKProcedures ?? 3),
+            contextChunks: hasContextRefs
+              ? (input.options?.topKContext ?? 5)
+              : (input.options?.topKContext ?? 2),
             includeFullPrimary: true,  // Always include primary context YAML
-            includeSummaries: references.procedures.length > 0,  // Only include SOP summaries if procedures requested
+            includeSummaries: true,  // Always include SOP summaries
           }
         );
       
@@ -66,12 +72,13 @@ export class OrchestratorService {
       // Add regulatory standards mentioned in the prompt (if any)
       this.addRegulatoryStandardsToTracker(input.prompt, footnoteTracker);
       
-      console.log(`[Orchestrator] Context assembled:`);
-      console.log(`  - Primary context: included`);
-      console.log(`  - Procedures: ${metadata.procedureChunksRetrieved} chunks`);
-      console.log(`  - Context files: ${metadata.contextChunksRetrieved} chunks`);
-      console.log(`  - Footnotes tracked: ${footnoteTracker.getSourceCount()} sources`);
-      console.log(`  - Estimated tokens: ${metadata.totalTokensEstimate}`);
+      console.log('[Orchestrator] Context assembled:');
+      console.log('  - Retrieval mode: ' + (hasAnyRefs ? 'bracket notation (boosted)' : 'semantic search (baseline)'));
+      console.log('  - Primary context: included');
+      console.log('  - Procedures: ' + metadata.procedureChunksRetrieved + ' chunks' + (hasProcedureRefs ? ' (boosted for: ' + references.procedures.join(', ') + ')' : ''));
+      console.log('  - Context files: ' + metadata.contextChunksRetrieved + ' chunks' + (hasContextRefs ? ' (boosted for explicit refs)' : ''));
+      console.log('  - Footnotes tracked: ' + footnoteTracker.getSourceCount() + ' sources');
+      console.log('  - Estimated tokens: ' + metadata.totalTokensEstimate);
       
       // Step 4: Build the LLM prompt with enforcement rules
       const fullPrompt = this.buildLLMPrompt(ragContext, input.prompt);
