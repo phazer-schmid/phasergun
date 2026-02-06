@@ -1,7 +1,7 @@
 /**
  * Generation Engine
- * Provides structured access to project context from Google Docs synced .docx file
- * Supports references like [Project-Context|Section Name|Field Name]
+ * Provides structured access to project master record from synced .docx file
+ * Supports references like [Master Record|Section Name|Field Name]
  */
 
 import { readFileSync } from 'fs';
@@ -29,7 +29,7 @@ export class GenerationEngine {
   private constructor(projectContextPath?: string) {
     // Default path for backward compatibility, but should be provided from RAG folder config
     this.projectContextPath = projectContextPath || 
-      join(__dirname, '../../../RAG/Context/Project-Context.docx');
+      join(__dirname, '../../../RAG/Context/Project-Master-Record.docx');
     
     this.sections = new Map();
     this.rawContent = '';
@@ -58,7 +58,7 @@ export class GenerationEngine {
   }
 
   /**
-   * Load project context from .docx file
+   * Load project master record from .docx file
    * Parses the document and extracts structured sections and fields
    */
   private async loadProjectContext(): Promise<void> {
@@ -68,12 +68,15 @@ export class GenerationEngine {
       // Parse the .docx file
       const parsedDocs = await parser.scanAndParseFolder(join(this.projectContextPath, '..'));
       const projectContextDoc = parsedDocs.find(doc => 
+        doc.fileName === 'Project-Master-Record.docx' || 
+        doc.fileName.toLowerCase().includes('project-master-record') ||
+        // Backwards compatibility
         doc.fileName === 'Project-Context.docx' || 
         doc.fileName.toLowerCase().includes('project-context')
       );
       
       if (!projectContextDoc) {
-        console.error('[GenerationEngine] Project-Context.docx not found');
+        console.error('[GenerationEngine] Project-Master-Record.docx not found');
         this.projectContext = { company_sops: {} };
         return;
       }
@@ -86,10 +89,10 @@ export class GenerationEngine {
       // Build legacy projectContext object for backward compatibility
       this.projectContext = this.buildLegacyContextObject();
       
-      console.log('[GenerationEngine] Project context loaded successfully from .docx');
+      console.log('[GenerationEngine] Project master record loaded successfully from .docx');
       console.log(`[GenerationEngine] Parsed ${this.sections.size} sections`);
     } catch (error) {
-      console.error('[GenerationEngine] Error loading project context:', error);
+      console.error('[GenerationEngine] Error loading project master record:', error);
       this.projectContext = { company_sops: {} };
     }
   }
@@ -286,7 +289,7 @@ export class GenerationEngine {
   }
 
   /**
-   * Reload project context (useful if the file has been updated)
+   * Reload project master record (useful if the file has been updated)
    */
   async reload(): Promise<void> {
     await this.loadProjectContext();
@@ -298,7 +301,7 @@ let generationEngineInstance: GenerationEngine | null = null;
 
 /**
  * Get or create the GenerationEngine singleton instance
- * @param projectContextPath - Optional path to the project context file
+ * @param projectContextPath - Optional path to the project master record file
  * @returns Initialized GenerationEngine instance
  */
 export async function getGenerationEngine(projectContextPath?: string): Promise<GenerationEngine> {
