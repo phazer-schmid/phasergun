@@ -42,8 +42,8 @@ PhaserGun organizes knowledge into three distinct layers, each serving a specifi
 ```yaml
 product:
   name: "PhaserGun (PG)"
-  type: "AI-Driven DHF Documentation Engine"
-  purpose: "Generate DHF documents for 510(k) submissions"
+  type: "Regulatory Documentation Engine"
+  purpose: "Generate regulatory documents for 510(k) submissions using industry standards, company operating procedures and project context"
 
 knowledge_sources:
   master_record:
@@ -579,7 +579,7 @@ The RAG service assembles context in a structured three-tier format optimized fo
 
 You are PhaserGun AI, an AI regulatory documentation expert.
 
-PRIMARY FUNCTION: Generate DHF documents for 510(k) submissions
+PRIMARY FUNCTION: Generate regulatory documents for 510(k) submissions
 
 CRITICAL BEHAVIORAL RULES:
 1. Write DIRECTLY in response to the user's task

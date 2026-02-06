@@ -14,7 +14,7 @@ The PhaserGun API is a RESTful HTTP API built with Express.js that provides docu
 
 ### 1. POST /api/generate
 
-Generate DHF documentation from a prompt file using RAG-enhanced LLM generation.
+Generate regulatory documentation from a prompt file using RAG-enhanced LLM generation.
 
 #### Request
 

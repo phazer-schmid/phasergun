@@ -1,8 +1,8 @@
 # PhaserGun Primary Context - Core Essence
 product:
   name: "PhaserGun (PG)"
-  type: "AI-Driven DHF Documentation Engine"
-  purpose: "Generate DHF documents for 510(k) submissions using industry standards, company operating procedures and project context"
+  type: "Regulatory Documentation Engine"
+  purpose: "Generate regulatory documents for 510(k) submissions using industry standards, company operating procedures and project context"
 
 # Core knowledge sources that PG retrieves from
 knowledge_sources:
