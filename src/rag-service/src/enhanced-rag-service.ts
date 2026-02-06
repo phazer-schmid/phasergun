@@ -47,8 +47,8 @@ interface KnowledgeCache {
 }
 
 /**
- * Enhanced RAG Service for DHF Document Generation
- * Combines three knowledge sources:
+ * Enhanced RAG Service for Content Generation
+ * Retrieves context from multiple knowledge sources to inform LLM generation:
  * 1. Static: primary-context.yaml (PhaserGun role, regulatory framework)
  * 2. Dynamic: Files in /Procedures folder (SOPs, company guidelines)
  * 3. Dynamic: Files in /Context folder (project-specific information)
@@ -270,7 +270,7 @@ private async chunkAndEmbedDocument(
   doc: ParsedDocument,
   category: 'procedure' | 'context',
   projectPath: string,
-  contextCategory?: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates'
+  contextCategory?: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general'
 ): Promise<VectorEntry[]> {
   // 1. Intelligent chunking based on category
   const contentChunks = category === 'procedure'
@@ -315,7 +315,7 @@ private async chunkAndEmbedDocument(
  */
 private async buildVectorStore(
   proceduresFiles: ParsedDocument[],
-  contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[],
+  contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general' }[],
   projectPath: string
 ): Promise<void> {
   console.log('[EnhancedRAG] Building vector store with deterministic ordering...');
@@ -646,7 +646,7 @@ async loadContextFolder(folderPath: string): Promise<DocumentChunk[]> {
    * Generate and cache summaries for all context files
    */
   private async generateContextSummaries(
-    contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[],
+    contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general' }[],
     projectPath: string,
     summaryWordCount: number = 250
   ): Promise<Map<string, string>> {
@@ -823,11 +823,11 @@ async loadContextFolder(folderPath: string): Promise<DocumentChunk[]> {
  */
 async loadContextFolderStructured(
   folderPath: string
-): Promise<{ doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[]> {
+): Promise<{ doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general' }[]> {
   console.log('[EnhancedRAG] 📂 Loading Context folder with subfolder structure:', folderPath);
   console.log('[EnhancedRAG] NOTE: Context/Prompt folder is excluded (never cached, parsed on-demand)');
   
-  const contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[] = [];
+  const contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general' }[] = [];
   
   try {
     await fs.access(folderPath);
@@ -913,6 +913,36 @@ async loadContextFolderStructured(
     console.log(`[EnhancedRAG] ✓ Total from Predicates/: ${predicatesDocs.length} files`);
   } catch {
     console.log('[EnhancedRAG] Context/Predicates/ not found or empty');
+  }
+  
+  // 5. Load Regulatory Strategy subfolder (on_demand priority)
+  const regulatoryStrategyPath = path.join(folderPath, 'Regulatory Strategy');
+  console.log('[EnhancedRAG] Scanning Context/Regulatory Strategy/...');
+  try {
+    await fs.access(regulatoryStrategyPath);
+    const regulatoryStrategyDocs = await this.fileParser.scanAndParseFolder(regulatoryStrategyPath);
+    regulatoryStrategyDocs.forEach(doc => {
+      contextFiles.push({ doc, contextCategory: 'regulatory-strategy' });
+      console.log(`[EnhancedRAG] ✓ Loaded and will cache: Regulatory Strategy/${doc.fileName} (${doc.content.length} chars)`);
+    });
+    console.log(`[EnhancedRAG] ✓ Total from Regulatory Strategy/: ${regulatoryStrategyDocs.length} files`);
+  } catch {
+    console.log('[EnhancedRAG] Context/Regulatory Strategy/ not found or empty');
+  }
+  
+  // 6. Load General subfolder (on_demand priority)
+  const generalPath = path.join(folderPath, 'General');
+  console.log('[EnhancedRAG] Scanning Context/General/...');
+  try {
+    await fs.access(generalPath);
+    const generalDocs = await this.fileParser.scanAndParseFolder(generalPath);
+    generalDocs.forEach(doc => {
+      contextFiles.push({ doc, contextCategory: 'general' });
+      console.log(`[EnhancedRAG] ✓ Loaded and will cache: General/${doc.fileName} (${doc.content.length} chars)`);
+    });
+    console.log(`[EnhancedRAG] ✓ Total from General/: ${generalDocs.length} files`);
+  } catch {
+    console.log('[EnhancedRAG] Context/General/ not found or empty');
   }
   
   // NOTE: Context/Prompt is intentionally NOT scanned here - those files are parsed on-demand
@@ -1314,7 +1344,7 @@ async loadContextFolderStructured(
     const contextPath = path.join(projectPath, 'Context');
     
     let proceduresFiles: ParsedDocument[] = [];
-    let contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[] = [];
+    let contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general' }[] = [];
     
     try {
       await fs.access(proceduresPath);
@@ -1536,7 +1566,7 @@ async loadContextFolderStructured(
       try {
         // Get context files
         const contextPath = path.join(projectPath, 'Context');
-        let contextFilesWithCategory: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' }[] = [];
+        let contextFilesWithCategory: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general' }[] = [];
         try {
           await fs.access(contextPath);
           contextFilesWithCategory = await this.loadContextFolderStructured(contextPath);
@@ -1804,6 +1834,10 @@ async loadContextFolderStructured(
           categoryLabel = 'Ongoing';
         } else if (contextCategory === 'predicates') {
           categoryLabel = 'Predicate Device';
+        } else if (contextCategory === 'regulatory-strategy') {
+          categoryLabel = 'Regulatory Strategy';
+        } else if (contextCategory === 'general') {
+          categoryLabel = 'General Reference';
         }
         
         sections.push(`\n[${categoryLabel}: ${result.entry.metadata.fileName}]\n`);

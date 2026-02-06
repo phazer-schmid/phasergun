@@ -22,7 +22,7 @@ export interface VectorEntry {
     chunkIndex: number;          // Chunk position in document
     content: string;             // Original text content
     contentHash: string;         // SHA256 of content
-    contextCategory?: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates';  // Context subfolder category
+    contextCategory?: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general';  // Context subfolder category
   };
 }
 
@@ -484,7 +484,7 @@ export class VectorStore {
       filePath: string;
       category: 'procedure' | 'context';
       chunkIndex: number;
-      contextCategory?: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates';
+      contextCategory?: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general';
     }
   ): VectorEntry {
     const contentHash = VectorStore.computeContentHash(content);
