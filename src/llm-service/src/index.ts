@@ -36,34 +36,34 @@ export class MockLLMService implements LLMService {
     await new Promise(resolve => setTimeout(resolve, 400));
     
     const response: LLMResponse = {
-      generatedText: `FDA 510(k) COMPLIANCE ANALYSIS REPORT
+      generatedText: `GENERATED DHF DOCUMENT CONTENT
 
 EXECUTIVE SUMMARY:
-Your Design History File (DHF) has been analyzed across all four phases of the Product Development Process (PDP). The system has successfully traversed through file parsing, document chunking, knowledge retrieval, and AI analysis.
+This is a mock-generated DHF document created by the PhaserGun system. The generation pipeline has successfully processed your project through file parsing, document chunking, knowledge retrieval, and AI text generation.
 
-PHASE ANALYSIS:
-✓ Planning Phase: Design inputs identified and documented
-✓ Design Phase: Risk analysis completed per ISO 14971
-✓ Development Phase: Implementation documented
-✓ Testing Phase: Verification and validation protocols established
+DOCUMENT OVERVIEW:
+The system has analyzed your procedural documents and contextual knowledge to generate this compliant DHF content. Key sections have been structured according to regulatory requirements and industry best practices.
 
-KEY FINDINGS:
-• Documents are properly structured for 510(k) submission
-• Risk management documentation aligns with ISO 14971
-• Design controls follow FDA guidance
+KEY SECTIONS GENERATED:
+• Introduction and Purpose
+• Scope and Applicability  
+• Requirements and Specifications
+• Verification and Validation Approach
+• Risk Management Considerations
+• Traceability Matrix
 
-RECOMMENDATIONS:
-1. Ensure all design inputs are traceable to requirements
-2. Complete verification testing for all identified risks
-3. Document any design changes in Design History File
-
-COMPLIANCE STATUS: On track for successful 510(k) submission
+CONTENT QUALITY:
+This generated document incorporates:
+- Regulatory requirements from context documents
+- Procedural guidance from your knowledge base
+- Industry standard formatting and structure
+- Appropriate technical terminology
 
 --- 
-This analysis was generated using:
-- ${context?.metadata.sources.length || 0} knowledge sources
-- Primary thinking document guidance
-- FDA 510(k) regulatory framework`,
+Generation Metadata:
+- Knowledge sources used: ${context?.metadata.sources.length || 0}
+- Prompt-based generation with RAG context
+- Enhanced with domain-specific knowledge`,
       usageStats: {
         tokensUsed: 1250,
         cost: 0.0125
