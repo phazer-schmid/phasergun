@@ -239,7 +239,7 @@ export class GenerationEngine {
   }
 
   /**
-   * Get value by reference path: [Project-Context|Section Name|Field Name]
+   * Get value by reference path: [Master Record|Section Name|Field Name]
    * @param sectionName - The section heading
    * @param fieldName - The field name within the section
    * @returns The field value or null if not found
