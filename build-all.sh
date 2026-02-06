@@ -4,6 +4,15 @@
 echo "🔨 Building all TypeScript modules..."
 echo ""
 
+# Install/update dependencies first to ensure all workspaces have proper dependencies
+# This is especially important for platform-specific optional dependencies (e.g., rollup native bindings)
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📦 Installing/updating dependencies..."
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+npm install
+echo "  ✓ Dependencies installed"
+echo ""
+
 # Define modules in dependency order
 modules=(
   "shared-types"
