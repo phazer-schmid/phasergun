@@ -1,58 +1,95 @@
 #!/usr/bin/env node
 import { OrchestratorService } from './index';
-import { MockFileParser } from '@phasergun/file-parser';
-import { MockChunker } from '@phasergun/chunker';
 import { EnhancedRAGService } from '@phasergun/rag-service';
 import { MockLLMService } from '@phasergun/llm-service';
+import * as path from 'path';
+import * as fs from 'fs';
 
 async function main() {
   console.log('╔═══════════════════════════════════════════════════════╗');
-  console.log('║   FDA 510(k) Compliance Analysis - Orchestrator Test  ║');
+  console.log('║   PhaserGun Orchestrator - Generation Test            ║');
   console.log('╚═══════════════════════════════════════════════════════╝');
   console.log('');
   
-  // Initialize orchestrator with all services
+  // Initialize orchestrator with simplified dependencies
   const orchestrator = new OrchestratorService(
-    new MockFileParser(),
-    new MockChunker(),
     new EnhancedRAGService(),
     new MockLLMService()
   );
   
-  const testFolder = process.argv[2] || require('path').join(__dirname, '../test-project');
+  const testProject = process.argv[2] || path.join(__dirname, '../test-project');
+  const primaryContextPath = process.env.PRIMARY_CONTEXT_PATH || 
+    path.join(__dirname, '../../rag-service/knowledge-base/context/primary-context.yaml');
   
-  console.log(`Test Input: ${testFolder}`);
+  // Sample test prompt
+  const testPrompt = `
+INPUT DATA:
+- SOP for Design Control
+- Primary Context
+- Device information
+
+TASK:
+Generate a Purpose section for a Design History File (DHF) for the medical device described in the primary context. The Purpose section should:
+- Be 2-3 paragraphs
+- Explain why this DHF exists
+- Reference applicable regulatory standards
+- Follow the company's Design Control SOP
+
+OUTPUT FORMAT: Paragraph text only, no bullets.
+`;
+  
+  console.log(`Test Project: ${testProject}`);
+  console.log(`Primary Context: ${primaryContextPath}`);
   console.log('');
   console.log('─'.repeat(60));
   console.log('');
   
-  // Run full analysis
-  const result = await orchestrator.runAnalysis({ folderPath: testFolder });
+  // Run generation
+  const result = await orchestrator.generateFromPrompt({
+    projectPath: testProject,
+    primaryContextPath,
+    prompt: testPrompt
+  });
   
   console.log('─'.repeat(60));
   console.log('');
-  console.log('=== FINAL RESULTS ===');
+  console.log('=== GENERATION RESULTS ===');
   console.log('');
   console.log(`Status: ${result.status.toUpperCase()}`);
   console.log(`Message: ${result.message}`);
   console.log(`Timestamp: ${result.timestamp}`);
   
-  if (result.detailedReport) {
+  if (result.generatedContent) {
     console.log('');
-    console.log('=== DETAILED REPORT ===');
+    console.log('=== GENERATED CONTENT ===');
     console.log('');
-    console.log(result.detailedReport);
+    console.log(result.generatedContent);
+  }
+  
+  if (result.confidence) {
+    console.log('');
+    console.log('=== CONFIDENCE RATING ===');
+    console.log(`Level: ${result.confidence.level}`);
+    console.log(`Rationale: ${result.confidence.rationale}`);
+  }
+  
+  if (result.references && result.references.length > 0) {
+    console.log('');
+    console.log('=== REFERENCES ===');
+    result.references.forEach(ref => {
+      console.log(`[${ref.id}] ${ref.category}: ${ref.fileName}`);
+    });
   }
   
   console.log('');
   
   // Exit with appropriate code based on result
   if (result.status === 'complete') {
-    console.log('✓ Orchestration test PASSED - Analysis completed successfully');
+    console.log('✓ Orchestration test PASSED - Generation completed successfully');
     console.log('');
     process.exit(0);
   } else {
-    console.log('✗ Orchestration test FAILED - Analysis returned error status');
+    console.log('✗ Orchestration test FAILED - Generation returned error status');
     console.log('');
     process.exit(1);
   }

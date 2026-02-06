@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { OrchestratorService } from '@phasergun/orchestrator';
 import { ComprehensiveFileParser } from '@phasergun/file-parser';
-import { IntelligentChunker } from '@phasergun/chunker';
 import { EnhancedRAGService } from '@phasergun/rag-service';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -23,9 +22,6 @@ router.post('/generate', async (req, res) => {
       });
     }
     
-    // Initialize file parser early (needed for .docx prompt files)
-    const fileParser = new ComprehensiveFileParser();
-    
     // Read prompt file content
     // Support both text files (.txt, .md) and Word documents (.docx)
     let prompt: string;
@@ -35,8 +31,9 @@ router.post('/generate', async (req, res) => {
       if (ext === '.docx') {
         // Use file parser for Word documents
         console.log('[API /generate] Parsing Word document prompt...');
+        const fileParser = new ComprehensiveFileParser();
         const parsedDocs = await fileParser.scanAndParseFolder(path.dirname(promptFilePath));
-        const promptDoc = parsedDocs.find(doc => doc.filePath === promptFilePath);
+        const promptDoc = parsedDocs.find((doc: any) => doc.filePath === promptFilePath);
         
         if (!promptDoc) {
           throw new Error('Failed to parse .docx prompt file');
@@ -67,8 +64,7 @@ router.post('/generate', async (req, res) => {
     console.log(`[API /generate] Primary context: ${primaryContextPath}`);
     console.log(`[API /generate] ========================================\n`);
     
-    // Initialize remaining services
-    const chunker = new IntelligentChunker();
+    // Initialize services
     const enhancedRAGService = new EnhancedRAGService();
     
     // Choose LLM service based on environment
@@ -109,10 +105,8 @@ router.post('/generate', async (req, res) => {
       llmService = new MockLLMService();
     }
     
-    // Create orchestrator
+    // Create orchestrator with simplified dependencies
     const orchestrator = new OrchestratorService(
-      fileParser,
-      chunker,
       enhancedRAGService,
       llmService
     );
@@ -127,49 +121,39 @@ router.post('/generate', async (req, res) => {
     
     console.log(`[API /generate] ========================================`);
     console.log(`[API /generate] Generation complete`);
-    console.log(`[API /generate] Sources: ${result.sources.length}`);
-    console.log(`[API /generate] Tokens: ${result.usageStats.tokensUsed}`);
-    console.log(`[API /generate] Generated text length: ${result.generatedText?.length || 0} chars`);
-    console.log(`[API /generate] Generated text preview: ${result.generatedText?.substring(0, 200) || '(empty)'}`);
+    console.log(`[API /generate] Status: ${result.status}`);
+    console.log(`[API /generate] References: ${result.references?.length || 0}`);
+    console.log(`[API /generate] Confidence: ${result.confidence?.level || 'N/A'}`);
+    console.log(`[API /generate] Tokens: ${result.usageStats?.tokensUsed || 0}`);
+    console.log(`[API /generate] Generated text length: ${result.generatedContent?.length || 0} chars`);
+    console.log(`[API /generate] Generated text preview: ${result.generatedContent?.substring(0, 200) || '(empty)'}`);
     console.log(`[API /generate] ========================================\n`);
     
+    // Check if generation was successful
+    if (result.status === 'error') {
+      console.error('[API /generate] ❌ ERROR: Generation failed');
+      return res.status(500).json(result);
+    }
+    
     // Validate that we have generated text
-    if (!result.generatedText || result.generatedText.trim().length === 0) {
+    if (!result.generatedContent || result.generatedContent.trim().length === 0) {
       console.error('[API /generate] ❌ ERROR: Generated text is empty or missing!');
       console.error('[API /generate] Full result object:', JSON.stringify(result, null, 2));
       return res.status(500).json({
         status: 'error',
-        error: 'Generated text is empty. This may indicate an issue with the LLM service.',
-        details: {
-          sources: result.sources.length,
-          tokensUsed: result.usageStats?.tokensUsed || 0
-        }
+        message: 'Generated text is empty. This may indicate an issue with the LLM service.',
+        timestamp: new Date().toISOString(),
+        usageStats: result.usageStats
       });
     }
     
     // Trim leading whitespace from generated text to ensure it displays properly
-    const cleanedText = result.generatedText.trimStart();
+    const cleanedText = result.generatedContent.trimStart();
     
-    // Return in GenerationOutput format (aligns with primary-context.yaml generation_workflow.output)
-    const response: any = {
-      status: 'complete',
-      message: 'Content generated successfully',
-      timestamp: new Date().toISOString(),
-      generatedContent: cleanedText,
-      
-      // Placeholder fields - will be populated by orchestrator in next iteration
-      discrepancies: (result as any).discrepancies || [],
-      references: (result as any).references || result.sources || [],
-      confidence: (result as any).confidence || undefined,
-      
-      // Token usage
-      usageStats: result.usageStats,
-      
-      // Additional metadata (footnotes, etc.)
-      metadata: {
-        footnotes: result.footnotes,
-        footnotesMap: result.footnotesMap
-      }
+    // Return the complete GenerationOutput (orchestrator now provides all fields)
+    const response = {
+      ...result,
+      generatedContent: cleanedText
     };
     
     res.json(response);
