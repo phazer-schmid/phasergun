@@ -50,7 +50,7 @@
           <!-- Folder Path -->
           <div class="mb-6">
             <label for="folderPath" class="block text-sm font-medium text-gray-700 mb-2">
-              RAG <span class="text-red-500">*</span>
+              RAG Folder Path <span class="text-red-500">*</span>
             </label>
             <input
               id="folderPath"
@@ -58,10 +58,10 @@
               type="text"
               required
               class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-              placeholder="/path/to/dhf/folder"
+              placeholder="/path/to/project/rag-folder"
             />
             <p class="mt-1 text-sm text-gray-500">
-              Enter the absolute path to your RAG folder
+              Absolute path to the RAG folder on the server
             </p>
           </div>
 
