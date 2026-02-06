@@ -36,34 +36,29 @@ export class MockLLMService implements LLMService {
     await new Promise(resolve => setTimeout(resolve, 400));
     
     const response: LLMResponse = {
-      generatedText: `GENERATED DHF DOCUMENT CONTENT
+      generatedText: `GENERATED DOCUMENT CONTENT
 
-EXECUTIVE SUMMARY:
-This is a mock-generated DHF document created by the PhaserGun system. The generation pipeline has successfully processed your project through file parsing, document chunking, knowledge retrieval, and AI text generation.
+INTRODUCTION:
+This is mock-generated content created by the PhaserGun RAG-enhanced generation system. The system has successfully processed your generation request through the complete pipeline: document parsing, intelligent chunking, semantic retrieval, and context-aware text generation.
 
-DOCUMENT OVERVIEW:
-The system has analyzed your procedural documents and contextual knowledge to generate this compliant DHF content. Key sections have been structured according to regulatory requirements and industry best practices.
+CONTENT GENERATION APPROACH:
+The system retrieved relevant information from your knowledge base including procedural documents and contextual materials. This content was generated following the guidance and requirements specified in your source documents, with appropriate citations and references maintained throughout.
 
-KEY SECTIONS GENERATED:
-• Introduction and Purpose
-• Scope and Applicability  
-• Requirements and Specifications
-• Verification and Validation Approach
-• Risk Management Considerations
-• Traceability Matrix
+KEY FEATURES OF GENERATED CONTENT:
+• Context-aware generation based on retrieved knowledge
+• Procedural guidance adherence from your knowledge base
+• Inline citation markers linking to source documents
+• Structured formatting following document conventions
+• Domain-appropriate terminology and style
 
-CONTENT QUALITY:
-This generated document incorporates:
-- Regulatory requirements from context documents
-- Procedural guidance from your knowledge base
-- Industry standard formatting and structure
-- Appropriate technical terminology
+GENERATION QUALITY INDICATORS:
+- Knowledge sources referenced: ${context?.metadata.sources.length || 0}
+- RAG context integration: Active
+- Semantic retrieval: Enabled
+- Citation tracking: Automatic
 
---- 
-Generation Metadata:
-- Knowledge sources used: ${context?.metadata.sources.length || 0}
-- Prompt-based generation with RAG context
-- Enhanced with domain-specific knowledge`,
+---
+This mock content demonstrates the generation pipeline's capability to produce coherent, contextually-relevant text based on your knowledge base and generation prompt. In production, actual LLM services will generate domain-specific content tailored to your requirements.`,
       usageStats: {
         tokensUsed: 1250,
         cost: 0.0125

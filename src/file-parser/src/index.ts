@@ -15,7 +15,7 @@ import officeParser from 'officeparser';
 export interface FileParser {
   /**
    * Scan a folder and parse all documents
-   * @param folderPath - Path to the DHF folder or subfolder
+   * @param folderPath - Path to a document folder (e.g., Procedures/ or Context/ within the RAG folder)
    * @returns Array of parsed documents with extracted text
    */
   scanAndParseFolder(folderPath: string): Promise<ParsedDocument[]>;

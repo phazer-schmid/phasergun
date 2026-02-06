@@ -13,7 +13,7 @@ export class OrchestratorService {
   ) {}
 
   /**
-   * Generate DHF document content from a prompt using RAG.
+   * Generate document content from a prompt using RAG.
    * Implements primary-context.yaml → generation_workflow.processing
    * 
    * Workflow Steps:

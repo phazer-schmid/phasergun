@@ -4,7 +4,7 @@ import { ParsedDocument } from '@phasergun/shared-types';
 
 async function testIntelligentChunker() {
   console.log('╔══════════════════════════════════════════════════════════════════╗');
-  console.log('║       INTELLIGENT DHF CHUNKER - COMPREHENSIVE TEST SUITE        ║');
+  console.log('║    INTELLIGENT DOCUMENT CHUNKER - COMPREHENSIVE TEST SUITE      ║');
   console.log('╚══════════════════════════════════════════════════════════════════╝\n');
   
   const chunker = new IntelligentChunker();
