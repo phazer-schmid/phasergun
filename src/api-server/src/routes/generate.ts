@@ -150,19 +150,29 @@ router.post('/generate', async (req, res) => {
     // Trim leading whitespace from generated text to ensure it displays properly
     const cleanedText = result.generatedText.trimStart();
     
-    // Return in format expected by frontend
-    res.json({
+    // Return in GenerationOutput format (aligns with primary-context.yaml generation_workflow.output)
+    const response: any = {
       status: 'complete',
       message: 'Content generated successfully',
-      generatedContent: cleanedText,
       timestamp: new Date().toISOString(),
+      generatedContent: cleanedText,
+      
+      // Placeholder fields - will be populated by orchestrator in next iteration
+      discrepancies: (result as any).discrepancies || [],
+      references: (result as any).references || result.sources || [],
+      confidence: (result as any).confidence || undefined,
+      
+      // Token usage
+      usageStats: result.usageStats,
+      
+      // Additional metadata (footnotes, etc.)
       metadata: {
-        sources: result.sources,
-        usageStats: result.usageStats,
         footnotes: result.footnotes,
         footnotesMap: result.footnotesMap
       }
-    });
+    };
+    
+    res.json(response);
     
   } catch (error) {
     console.error('[API /generate] ❌ CAUGHT ERROR:', error);
