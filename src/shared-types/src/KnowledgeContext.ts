@@ -1,19 +1,18 @@
 /**
- * Represents relevant context retrieved from the knowledge base
- * Used to augment LLM prompts with domain-specific information
+ * Context assembled from knowledge_sources for LLM prompt augmentation.
+ * Maps to primary-context.yaml → knowledge_sources
  */
 export interface KnowledgeContext {
-  contextSnippets: string[];
-  sourceMetadata: {
-    sourceName: string;
-    path: string;
-  }[];
+  /** Assembled RAG context string ready for LLM prompt */
+  ragContext: string;
+  /** Metadata about what was retrieved */
+  metadata: RetrievalMetadata;
 }
 
-/**
- * Interface contract for the RAG Service module
- */
-export interface RAGService {
-  initializeKnowledgeBase(): Promise<void>;
-  retrieveContext(query: string): Promise<KnowledgeContext>;
+export interface RetrievalMetadata {
+  procedureChunksRetrieved: number;
+  contextChunksRetrieved: number;
+  totalTokensEstimate: number;
+  sources: string[];
+  primaryContextIncluded: boolean;
 }

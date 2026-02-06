@@ -2,9 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as yaml from 'js-yaml';
 import { config } from 'dotenv';
-import { PhaseDHFMapping } from '@phasergun/shared-types';
 
 // Load environment variables
 config();
@@ -15,48 +13,6 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors());
 app.use(express.json());
-
-// Global DHF mapping cache
-let dhfMapping: PhaseDHFMapping[] = [];
-
-/**
- * Load DHF phase mapping from YAML file
- */
-async function loadDHFMapping(): Promise<void> {
-  try {
-    const yamlPath = path.join(__dirname, '../../rag-service/knowledge-base/context/dhf-phase-mapping.yaml');
-    const fileContents = await fs.readFile(yamlPath, 'utf8');
-    const data = yaml.load(fileContents) as any;
-    
-    // Parse the YAML structure
-    const phaseMapping = data.dhf_phase_mapping;
-    const phases = [
-      { id: 1, ...phaseMapping.phase_1 },
-      { id: 2, ...phaseMapping.phase_2 },
-      { id: 3, ...phaseMapping.phase_3 },
-      { id: 4, ...phaseMapping.phase_4 }
-    ];
-    
-    dhfMapping = phases.map((phase: any) => ({
-      phaseId: phase.id,
-      phaseName: phase.name,
-      dhfFiles: (phase.required_documents || []).map((dhfFile: any) => ({
-        id: dhfFile.id || 'unknown',
-        name: dhfFile.name || 'Unknown Document',
-        documentReference: dhfFile.document_reference || dhfFile.id || 'N/A',
-        submissionSection: dhfFile.submission_section || 'General',
-        required: dhfFile.required !== undefined ? dhfFile.required : true,
-        status: 'missing' as const,
-        documents: []
-      }))
-    }));
-    
-    // Silently load - no startup logging needed
-  } catch (error) {
-    console.error('[API] Warning: Could not load DHF mapping config:', error);
-    // Non-fatal - continue server startup
-  }
-}
 
 /**
  * Health check endpoint - simplified for generation-focused app
@@ -113,17 +69,6 @@ app.get('/api/health', async (_req: Request, res: Response) => {
       services: checks
     });
   }
-});
-
-/**
- * GET /api/dhf-mapping
- * Get the current DHF phase mapping (optional - can be used for phase context)
- */
-app.get('/api/dhf-mapping', (_req: Request, res: Response) => {
-  res.json({
-    phases: dhfMapping,
-    totalFiles: dhfMapping.reduce((sum, p) => sum + p.dhfFiles.length, 0)
-  });
 });
 
 /**
@@ -194,9 +139,6 @@ app.post('/api/list-files', async (req: Request, res: Response) => {
  */
 async function startServer() {
   try {
-    // Load configurations (non-fatal if they fail)
-    await loadDHFMapping();
-    
     // Mount generate router BEFORE starting server
     try {
       const generateRouterModule = await import('./routes/generate');
@@ -232,9 +174,9 @@ async function startServer() {
       console.log(`Server running on http://localhost:${PORT}`);
       console.log(``);
       console.log(`API Endpoints:`);
-      console.log(`  • POST /api/generate     - Semantic text generation with RAG`);
-      console.log(`  • GET  /api/health       - System health check`);
-      console.log(`  • GET  /api/dhf-mapping  - DHF phase mapping (optional)`);
+      console.log(`  • POST /api/generate    - Content generation with RAG`);
+      console.log(`  • POST /api/list-files  - File/directory listing`);
+      console.log(`  • GET  /api/health      - System health check`);
       console.log(``);
       console.log(`LLM Provider: ${llmProvider} (${llmModel})`);
       console.log(`Services: ✓ RAG  ✓ Generation Engine  ✓ Context/Procedures Integration`);

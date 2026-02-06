@@ -200,13 +200,12 @@
 
               <!-- Fallback to raw report if structured data not available -->
               <div v-if="!hasStructuredData()" class="narrative-text">
-                <pre>{{ analysisResult.detailedReport }}</pre>
+                <pre>{{ analysisResult.generatedContent }}</pre>
               </div>
             </div>
 
             <div v-if="analysisResult?.status === 'error'" class="analysis-error">
               <p><strong>Error:</strong> {{ analysisResult.message }}</p>
-              <p class="error-details">{{ analysisResult.detailedReport }}</p>
             </div>
           </div>
         </div>
@@ -220,7 +219,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useProjectService } from '../composables/useProjectService';
 import { Project } from '../models/project.model';
-import { AppStatusOutput } from '@fda-compliance/shared-types';
+import { GenerationOutput } from '@phasergun/shared-types';
 import { getApiEndpoint } from '../config/api';
 
 const router = useRouter();
@@ -230,7 +229,7 @@ const projectService = useProjectService();
 const project = ref<Project | null>(null);
 const isScanning = ref(false);
 const scanError = ref<string | null>(null);
-const analysisResult = ref<AppStatusOutput | null>(null);
+const analysisResult = ref<GenerationOutput | null>(null);
 
 // Sidebar files state
 const proceduresFiles = ref<any[]>([]);
@@ -456,7 +455,7 @@ async function analyzeSelectedDocument() {
       analysisResult.value = {
         status: 'complete',
         message: result.message,
-        detailedReport: result.generatedContent,
+        generatedContent: result.generatedContent,
         timestamp: result.timestamp,
         metadata: result.metadata
       };
@@ -491,9 +490,9 @@ function editProject() {
 
 // Helper functions for structured analysis display
 function hasStructuredData(): boolean {
-  if (!analysisResult.value?.detailedReport) return false;
+  if (!analysisResult.value?.generatedContent) return false;
   try {
-    const parsed = JSON.parse(analysisResult.value.detailedReport);
+    const parsed = JSON.parse(analysisResult.value.generatedContent);
     return !!(parsed.document_name || parsed.issues || parsed.strengths);
   } catch {
     return false;
@@ -501,9 +500,9 @@ function hasStructuredData(): boolean {
 }
 
 function getStructuredData(): any {
-  if (!analysisResult.value?.detailedReport) return null;
+  if (!analysisResult.value?.generatedContent) return null;
   try {
-    return JSON.parse(analysisResult.value.detailedReport);
+    return JSON.parse(analysisResult.value.generatedContent);
   } catch {
     return null;
   }

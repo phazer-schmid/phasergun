@@ -1,4 +1,4 @@
-import { SourceFolderInput, AppStatusOutput } from '@phasergun/shared-types';
+import { GenerationInput, GenerationOutput } from '@phasergun/shared-types';
 import { FileParser } from '@phasergun/file-parser';
 import { Chunker } from '@phasergun/chunker';
 import { EnhancedRAGService, FootnoteTracker, SourceReference } from '@phasergun/rag-service';
@@ -6,10 +6,10 @@ import { LLMService } from '@phasergun/llm-service';
 
 /**
  * Orchestrator Interface
- * Coordinates the complete analysis workflow
+ * Coordinates the complete generation workflow
  */
 export interface Orchestrator {
-  runAnalysis(input: SourceFolderInput): Promise<AppStatusOutput>;
+  generate(input: GenerationInput): Promise<GenerationOutput>;
 }
 
 /**
@@ -24,58 +24,46 @@ export class OrchestratorService implements Orchestrator {
     private llmService: LLMService
   ) {}
 
-  async runAnalysis(input: SourceFolderInput): Promise<AppStatusOutput> {
+  /**
+   * Main generation method conforming to Orchestrator interface
+   */
+  async generate(input: GenerationInput): Promise<GenerationOutput> {
+    console.log('=== Orchestrator: Generate ===');
+    console.log(`Project: ${input.projectPath}`);
+    console.log(`Prompt: ${input.promptFilePath}`);
+    
     try {
-      console.log('=== Orchestrator: Starting Analysis ===');
-      console.log(`Input folder: ${input.folderPath}`);
-      console.log(`Source type: ${input.sourceType || 'local'}`);
-      console.log('');
-
-      // Step 1: Parse documents from folder
-      console.log('[Step 1/5] Calling File Parser Module...');
-      const parsedDocuments = await this.fileParser.scanAndParseFolder(input.folderPath);
-      console.log(`✓ Parsed ${parsedDocuments.length} documents\n`);
-
-      // Step 2: Chunk documents
-      console.log('[Step 2/5] Calling Chunker Module...');
-      const chunks = this.chunker.chunkDocuments(parsedDocuments);
-      console.log(`✓ Created ${chunks.length} chunks\n`);
-
-      // Step 3: Load knowledge base (using enhanced RAG service)
-      console.log('[Step 3/5] Loading Knowledge Base...');
+      // Read the prompt file
+      const fs = require('fs');
+      const prompt = fs.readFileSync(input.promptFilePath, 'utf-8');
+      
+      // Determine primaryContextPath
       const primaryContextPath = process.env.PRIMARY_CONTEXT_PATH || 
         require('path').join(__dirname, '../../rag-service/knowledge-base/context/primary-context.yaml');
-      await this.enhancedRAGService.loadKnowledge(input.folderPath, primaryContextPath);
-      console.log('✓ Knowledge base ready\n');
-
-      // Step 4: Retrieve relevant context using semantic search
-      console.log('[Step 4/5] Retrieving Knowledge Context with Semantic Search...');
-      const query = `Analyze documents for FDA 510(k) compliance across PDP phases`;
-      const { ragContext } = await this.enhancedRAGService.retrieveRelevantContext(
-        input.folderPath,
+      
+      // Use generateFromPrompt to do the actual work
+      const result = await this.generateFromPrompt({
+        projectPath: input.projectPath,
         primaryContextPath,
-        query
-      );
-      console.log('✓ Retrieved semantic context\n');
-
-      // Step 5: Generate LLM response
-      console.log('[Step 5/5] Calling LLM Service Module...');
-      const prompt = `${ragContext}\n\nAnalyze the following ${chunks.length} document chunks for FDA 510(k) compliance across all PDP phases.`;
-      const llmResponse = await this.llmService.generateText(prompt);
-      console.log(`✓ Generated response (${llmResponse.usageStats.tokensUsed} tokens used)\n`);
-
-      console.log('=== Orchestrator: Analysis Complete ===\n');
-
+        prompt,
+        options: input.options
+      });
+      
       return {
         status: 'complete',
-        message: 'Analysis completed successfully - Full path traversed through all modules',
-        detailedReport: llmResponse.generatedText,
-        timestamp: new Date().toISOString()
+        message: 'Content generated successfully',
+        timestamp: new Date().toISOString(),
+        generatedContent: result.generatedText,
+        usageStats: result.usageStats,
+        metadata: {
+          sources: result.sources,
+          footnotes: result.footnotes,
+          footnotesMap: result.footnotesMap
+        }
       };
-
-    } catch (error) {
-      console.error('Orchestrator error:', error);
       
+    } catch (error) {
+      console.error('[Orchestrator] Error:', error);
       return {
         status: 'error',
         message: error instanceof Error ? error.message : 'Unknown error occurred',
