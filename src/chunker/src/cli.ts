@@ -14,7 +14,7 @@ async function testIntelligentChunker() {
   console.log('═'.repeat(70));
   const riskDoc: ParsedDocument = {
     id: 'risk-001',
-    filePath: '/dhf/risk/fmea_analysis.pdf',
+    filePath: '/project/rag/procedures/fmea_analysis.pdf',
     fileName: 'fmea_analysis.pdf',
     content: `FAILURE MODE AND EFFECTS ANALYSIS
     
@@ -53,7 +53,7 @@ Severity: 10, Occurrence: 1, Detection: 6, RPN: 60`,
   console.log('═'.repeat(70));
   const reqDoc: ParsedDocument = {
     id: 'req-001',
-    filePath: '/dhf/design/requirements.docx',
+    filePath: '/project/rag/procedures/requirements.docx',
     fileName: 'requirements.docx',
     content: `DESIGN INPUT REQUIREMENTS
 
@@ -90,7 +90,7 @@ Standard: IEC 60601-1`,
   console.log('═'.repeat(70));
   const ocrDoc: ParsedDocument = {
     id: 'ocr-001',
-    filePath: '/dhf/scanned/old_protocol.jpg',
+    filePath: '/project/rag/context/old_protocol.jpg',
     fileName: 'old_protocol.jpg',
     content: `Test Prot0col - Electrical Safety
     
@@ -134,7 +134,7 @@ Note: S0me OCR err0rs may be present in this document.`,
   console.log('═'.repeat(70));
   const largeDoc: ParsedDocument = {
     id: 'spec-001',
-    filePath: '/dhf/design/design_specification.pdf',
+    filePath: '/project/rag/procedures/design_specification.pdf',
     fileName: 'design_specification.pdf',
     content: `DESIGN SPECIFICATION
     

@@ -2,7 +2,7 @@
 
 ## Overview
 
-**PhaserGun** is an AI-Driven DHF (Design History File) Documentation Engine designed specifically for FDA 510(k) submissions. It combines Retrieval-Augmented Generation (RAG) with multi-provider LLM support to generate compliant medical device documentation from company procedures, project context, and regulatory knowledge.
+**PhaserGun** is a Regulatory Documentation Engine designed for FDA 510(k) submissions. It combines Retrieval-Augmented Generation (RAG) with multi-provider LLM support to generate compliant medical device documentation from company procedures, project context, and regulatory knowledge.
 
 ### Key Capabilities
 - **Intelligent Context Retrieval**: Semantic search across SOPs and project documentation
@@ -23,7 +23,7 @@ PhaserGun uses an npm workspaces monorepo with packages under `src/` and `vue-ui
 **Purpose**: Express REST API server providing generation, file listing, and health check endpoints.
 
 - **Routes**:
-  - `POST /api/generate` - Generate DHF content from prompts with RAG context
+  - `POST /api/generate` - Generate regulatory document content from prompts with RAG context
   - `POST /api/list-files` - List files/directories for UI (Procedures, Context, Prompts)
   - `GET /api/health` - Health check with LLM and RAG status
 - **Responsibilities**: HTTP server, request validation, orchestrator coordination, LLM provider selection

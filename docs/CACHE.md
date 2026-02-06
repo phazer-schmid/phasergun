@@ -440,7 +440,7 @@ Cache validation metadata.
   "primaryContext": {
     "product": {
       "name": "PhaserGun",
-      "type": "AI-Driven DHF Documentation Engine"
+      "type": "Regulatory Documentation Engine"
     },
     "knowledge_sources": { /* ... */ }
   },

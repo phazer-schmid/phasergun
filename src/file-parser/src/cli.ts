@@ -5,7 +5,7 @@ async function main() {
   console.log('=== File Parser CLI Test ===\n');
   
   const parser = new MockFileParser();
-  const testPath = process.argv[2] || '/test/dhf/folder';
+  const testPath = process.argv[2] || '/test/rag/folder';
   
   console.log(`Testing with folder: ${testPath}\n`);
   
