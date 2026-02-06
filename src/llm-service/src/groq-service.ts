@@ -1,5 +1,5 @@
 import Groq from 'groq-sdk';
-import { LLMResponse, KnowledgeContext, ChunkedDocumentPart } from '@phasergun/shared-types';
+import { LLMResponse, KnowledgeContext } from '@phasergun/shared-types';
 import { LLMService } from './index';
 
 /**
@@ -20,7 +20,7 @@ export class GroqLLMService implements LLMService {
     console.log(`[GroqLLMService] Generating text with prompt length: ${prompt.length}`);
     
     if (context) {
-      console.log(`[GroqLLMService] Using ${context.contextSnippets.length} context snippets`);
+      console.log(`[GroqLLMService] Using knowledge context with ${context.metadata.sources.length} sources`);
     }
 
     // Construct the enhanced prompt with context
@@ -128,47 +128,20 @@ export class GroqLLMService implements LLMService {
     }
   }
 
-  async assessDocument(docs: ChunkedDocumentPart[], guidelines: string): Promise<LLMResponse> {
-    console.log(`[GroqLLMService] Assessing ${docs.length} document chunks against guidelines`);
-    
-    const prompt = `You are an expert FDA regulatory compliance analyst. Assess the following medical device documentation against the provided guidelines.
-
-GUIDELINES:
-${guidelines}
-
-DOCUMENTS TO ASSESS:
-${docs.map((doc, idx) => `
-Document ${idx + 1}:
-${doc.chunk}
-`).join('\n---\n')}
-
-Please provide a detailed compliance assessment including:
-1. Overall compliance status
-2. Strengths of the documentation
-3. Areas needing improvement
-4. Specific regulatory gaps
-5. Actionable recommendations`;
-
-    return this.generateText(prompt);
-  }
-
   private constructPromptWithContext(prompt: string, context?: KnowledgeContext): string {
-    if (!context || context.contextSnippets.length === 0) {
+    if (!context || !context.ragContext) {
       return prompt;
     }
 
-    // Build context section
+    // Build context section using the ragContext string
     const contextSection = `
 REGULATORY KNOWLEDGE BASE CONTEXT:
-The following regulatory information has been retrieved from FDA guidelines and standards:
+The following regulatory information has been retrieved from the knowledge base:
 
-${context.contextSnippets.map((snippet, idx) => `
-[Context ${idx + 1}]
-${snippet}
-`).join('\n')}
+${context.ragContext}
 
 SOURCE DOCUMENTS:
-${context.sourceMetadata.map(meta => `- ${meta}`).join('\n')}
+${context.metadata.sources.map(source => `- ${source}`).join('\n')}
 
 ---
 

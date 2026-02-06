@@ -10,18 +10,19 @@ async function main() {
   const testPrompt = 'Analyze the following DHF documents for FDA 510(k) compliance...';
   
   const testContext: KnowledgeContext = {
-    contextSnippets: [
-      'FDA 510(k) requires demonstration of substantial equivalence',
-      'ISO 13485 quality management system documentation required'
-    ],
-    sourceMetadata: [
-      { sourceName: 'FDA Guidance', path: '/kb/fda-510k.pdf' },
-      { sourceName: 'ISO 13485', path: '/kb/iso-13485.pdf' }
-    ]
+    ragContext: `FDA 510(k) requires demonstration of substantial equivalence to a predicate device.
+ISO 13485 quality management system documentation is required for medical device manufacturing.`,
+    metadata: {
+      procedureChunksRetrieved: 0,
+      contextChunksRetrieved: 2,
+      totalTokensEstimate: 50,
+      sources: ['FDA Guidance', 'ISO 13485'],
+      primaryContextIncluded: true
+    }
   };
   
   console.log(`Prompt: "${testPrompt}"\n`);
-  console.log(`Context sources: ${testContext.sourceMetadata.length}\n`);
+  console.log(`Context sources: ${testContext.metadata.sources.length}\n`);
   
   const response = await llmService.generateText(testPrompt, testContext);
   
