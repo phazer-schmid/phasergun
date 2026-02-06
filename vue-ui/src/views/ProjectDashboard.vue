@@ -139,68 +139,84 @@
             </div>
 
             <div v-if="analysisResult?.status === 'complete'" class="analysis-narrative">
-              <!-- Document Name Header -->
-              <div v-if="getDocumentName()" class="document-header">
-                <h3 class="document-name">📄 {{ getDocumentName() }}</h3>
-              </div>
-              
-              <!-- Issues Section -->
-              <div v-if="hasIssues()" class="issues-section">
-                <h4 class="section-heading">⚠️ Issues Identified</h4>
-                
-                <div v-for="(issue, idx) in getIssues()" :key="idx" class="issue-card">
-                  <div class="issue-header">
-                    <span class="issue-number">#{{ idx + 1 }}</span>
-                    <span class="severity-badge" :class="getSeverityClass(issue.severity)">
-                      {{ issue.severity?.toUpperCase() }}
+              <!-- Confidence Rating Section (Always at top) -->
+              <div v-if="analysisResult.confidence" class="confidence-section">
+                <div class="confidence-header">
+                  <h4 class="confidence-title">📊 Confidence Assessment</h4>
+                  <span class="confidence-badge" :class="getConfidenceLevelClass(analysisResult.confidence.level)">
+                    {{ analysisResult.confidence.level }}
+                  </span>
+                </div>
+                <p class="confidence-rationale">{{ analysisResult.confidence.rationale }}</p>
+                <div class="confidence-criteria">
+                  <div class="criterion">
+                    <span class="criterion-label">Source Agreement:</span>
+                    <span class="criterion-value" :class="getCriterionClass(analysisResult.confidence.criteria.sourceAgreement)">
+                      {{ analysisResult.confidence.criteria.sourceAgreement }}
                     </span>
                   </div>
-                  
-                  <div class="issue-body">
-                    <div v-if="issue.location" class="issue-location">
-                      <strong>Location:</strong> {{ issue.location }}
-                    </div>
-                    
-                    <div v-if="issue.description" class="issue-description">
-                      <strong>Issue:</strong> {{ issue.description }}
-                    </div>
-                    
-                    <div v-if="issue.quoted_text" class="issue-quote">
-                      <strong>Problematic Text:</strong>
-                      <blockquote>"{{ issue.quoted_text }}"</blockquote>
-                    </div>
-                    
-                    <div v-if="issue.severity_rationale" class="issue-rationale">
-                      <strong>Why {{ issue.severity }}:</strong> {{ issue.severity_rationale }}
-                    </div>
-                    
-                    <div v-if="issue.recommendation" class="issue-recommendation">
-                      <strong>💡 Recommendation:</strong> {{ issue.recommendation }}
-                    </div>
-                    
-                    <div v-if="issue.suggested_text" class="issue-suggested">
-                      <strong>Suggested Text:</strong>
-                      <blockquote class="suggested-quote">"{{ issue.suggested_text }}"</blockquote>
-                    </div>
-                    
-                    <div v-if="issue.regulatory_reference" class="issue-reference">
-                      <strong>Regulatory Reference:</strong> {{ issue.regulatory_reference }}
-                    </div>
+                  <div class="criterion">
+                    <span class="criterion-label">Completeness:</span>
+                    <span class="criterion-value" :class="getCriterionClass(analysisResult.confidence.criteria.completeness)">
+                      {{ analysisResult.confidence.criteria.completeness }}
+                    </span>
+                  </div>
+                  <div class="criterion">
+                    <span class="criterion-label">Compliance Alignment:</span>
+                    <span class="criterion-value" :class="getCriterionClass(analysisResult.confidence.criteria.complianceAlignment)">
+                      {{ analysisResult.confidence.criteria.complianceAlignment }}
+                    </span>
+                  </div>
+                  <div class="criterion">
+                    <span class="criterion-label">Procedure Adherence:</span>
+                    <span class="criterion-value" :class="getCriterionClass(analysisResult.confidence.criteria.procedureAdherence)">
+                      {{ analysisResult.confidence.criteria.procedureAdherence }}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <!-- Strengths Section -->
-              <div v-if="hasStrengths()" class="strengths-section">
-                <h4 class="section-heading">✅ Strengths</h4>
-                <ul class="strengths-list">
-                  <li v-for="(strength, idx) in getStrengths()" :key="idx">{{ strength }}</li>
-                </ul>
+              <!-- Generated Content Section -->
+              <div class="generated-content-section">
+                <h4 class="section-heading">📝 Generated Content</h4>
+                <div class="narrative-text">
+                  <pre>{{ analysisResult.generatedContent }}</pre>
+                </div>
               </div>
 
-              <!-- Fallback to raw report if structured data not available -->
-              <div v-if="!hasStructuredData()" class="narrative-text">
-                <pre>{{ analysisResult.generatedContent }}</pre>
+              <!-- Discrepancies Section -->
+              <div v-if="analysisResult.discrepancies && analysisResult.discrepancies.length > 0" class="discrepancies-section">
+                <h4 class="section-heading">⚠️ Discrepancies Found</h4>
+                <div v-for="(discrepancy, idx) in analysisResult.discrepancies" :key="idx" class="discrepancy-card">
+                  <div class="discrepancy-header">
+                    <span class="discrepancy-type">{{ formatDiscrepancyType(discrepancy.type) }}</span>
+                  </div>
+                  <p class="discrepancy-description">{{ discrepancy.description }}</p>
+                  <p v-if="discrepancy.location" class="discrepancy-location">
+                    <strong>Location:</strong> {{ discrepancy.location }}
+                  </p>
+                </div>
+              </div>
+              <div v-else class="no-discrepancies">
+                <p>✅ No discrepancies found between sources</p>
+              </div>
+
+              <!-- References Section -->
+              <div v-if="analysisResult.references && analysisResult.references.length > 0" class="references-section">
+                <h4 class="section-heading">📚 Source References</h4>
+                <div class="references-list">
+                  <div v-for="(reference, idx) in analysisResult.references" :key="idx" class="reference-item">
+                    <div class="reference-header">
+                      <span class="reference-id">[{{ reference.id }}]</span>
+                      <span class="reference-category" :class="getCategoryClass(reference.category)">
+                        {{ formatCategoryName(reference.category) }}
+                      </span>
+                    </div>
+                    <p class="reference-filename">{{ reference.fileName }}</p>
+                    <p v-if="reference.section" class="reference-section">{{ reference.section }}</p>
+                    <p v-if="reference.usage" class="reference-usage">{{ reference.usage }}</p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -451,16 +467,23 @@ async function analyzeSelectedDocument() {
         return;
       }
       
-      // Map the response to match the expected structure
+      // Map the COMPLETE response including all GenerationOutput fields
       analysisResult.value = {
         status: 'complete',
         message: result.message,
         generatedContent: result.generatedContent,
         timestamp: result.timestamp,
+        references: result.references,           // ✓ Include references
+        discrepancies: result.discrepancies,     // ✓ Include discrepancies
+        confidence: result.confidence,           // ✓ Include confidence
+        usageStats: result.usageStats,
         metadata: result.metadata
       };
       
       console.log('[Dashboard] Content successfully displayed:', result.generatedContent.substring(0, 100));
+      console.log('[Dashboard] References:', result.references?.length || 0);
+      console.log('[Dashboard] Discrepancies:', result.discrepancies?.length || 0);
+      console.log('[Dashboard] Confidence:', result.confidence?.level || 'N/A');
     } else if (result.status === 'error') {
       scanError.value = result.error || result.message || 'Content generation failed';
       console.error('[Dashboard] Generation error:', result);
@@ -488,55 +511,37 @@ function editProject() {
   }
 }
 
-// Helper functions for structured analysis display
-function hasStructuredData(): boolean {
-  if (!analysisResult.value?.generatedContent) return false;
-  try {
-    const parsed = JSON.parse(analysisResult.value.generatedContent);
-    return !!(parsed.document_name || parsed.issues || parsed.strengths);
-  } catch {
-    return false;
-  }
-}
-
-function getStructuredData(): any {
-  if (!analysisResult.value?.generatedContent) return null;
-  try {
-    return JSON.parse(analysisResult.value.generatedContent);
-  } catch {
-    return null;
-  }
-}
-
-function getDocumentName(): string {
-  const data = getStructuredData();
-  return data?.document_name || '';
-}
-
-function hasIssues(): boolean {
-  const data = getStructuredData();
-  return Array.isArray(data?.issues) && data.issues.length > 0;
-}
-
-function getIssues(): any[] {
-  const data = getStructuredData();
-  return data?.issues || [];
-}
-
-function getSeverityClass(severity: string): string {
-  if (severity === 'high') return 'severity-high';
-  if (severity === 'moderate') return 'severity-moderate';
+// Helper functions for new output sections
+function getConfidenceLevelClass(level: string): string {
+  if (level === 'High') return 'confidence-high';
+  if (level === 'Medium') return 'confidence-medium';
+  if (level === 'Low') return 'confidence-low';
   return '';
 }
 
-function hasStrengths(): boolean {
-  const data = getStructuredData();
-  return Array.isArray(data?.strengths) && data.strengths.length > 0;
+function getCriterionClass(value: string): string {
+  if (value === 'High') return 'criterion-high';
+  if (value === 'Medium') return 'criterion-medium';
+  if (value === 'Low') return 'criterion-low';
+  return '';
 }
 
-function getStrengths(): string[] {
-  const data = getStructuredData();
-  return data?.strengths || [];
+function formatDiscrepancyType(type: string): string {
+  return type
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function getCategoryClass(category: string): string {
+  if (category === 'procedure') return 'category-procedure';
+  if (category === 'context') return 'category-context';
+  if (category === 'compliance') return 'category-compliance';
+  return 'category-general';
+}
+
+function formatCategoryName(category: string): string {
+  return category.charAt(0).toUpperCase() + category.slice(1);
 }
 </script>
 
@@ -1465,6 +1470,257 @@ function getStrengths(): string[] {
 
 .strengths-list li {
   margin-bottom: var(--spacing-sm);
+  line-height: var(--line-height-relaxed);
+}
+
+/* NEW SECTIONS: Confidence, Generated Content, Discrepancies, References */
+
+/* Confidence Section */
+.confidence-section {
+  padding: var(--spacing-lg);
+  background: linear-gradient(135deg, #F8F9FF 0%, #F0F2FF 100%);
+  border: 1px solid #D4D8FF;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--spacing-xl);
+}
+
+.confidence-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.confidence-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-dark);
+  margin: 0;
+}
+
+.confidence-badge {
+  padding: 6px 16px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.confidence-high {
+  background: #D4EDDA;
+  color: #155724;
+}
+
+.confidence-medium {
+  background: #FFF3CD;
+  color: #856404;
+}
+
+.confidence-low {
+  background: #F8D7DA;
+  color: #721C24;
+}
+
+.confidence-rationale {
+  font-size: var(--font-size-sm);
+  color: var(--text-dark);
+  line-height: var(--line-height-relaxed);
+  margin: 0 0 var(--spacing-md) 0;
+}
+
+.confidence-criteria {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.criterion {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: white;
+  border-radius: var(--radius-sm);
+}
+
+.criterion-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-gray);
+  font-weight: var(--font-weight-medium);
+}
+
+.criterion-value {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.criterion-high {
+  background: #D4EDDA;
+  color: #155724;
+}
+
+.criterion-medium {
+  background: #FFF3CD;
+  color: #856404;
+}
+
+.criterion-low {
+  background: #F8D7DA;
+  color: #721C24;
+}
+
+/* Generated Content Section */
+.generated-content-section {
+  margin-bottom: var(--spacing-xl);
+  padding: var(--spacing-lg);
+  background: white;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+}
+
+/* Discrepancies Section */
+.discrepancies-section {
+  margin-bottom: var(--spacing-xl);
+}
+
+.discrepancy-card {
+  background: #FFF5F5;
+  border: 1px solid #FED7D7;
+  border-left: 4px solid #FC8181;
+  border-radius: var(--radius-md);
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+}
+
+.discrepancy-header {
+  margin-bottom: var(--spacing-sm);
+}
+
+.discrepancy-type {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: #C53030;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.discrepancy-description {
+  font-size: var(--font-size-sm);
+  color: var(--text-dark);
+  line-height: var(--line-height-relaxed);
+  margin: var(--spacing-sm) 0;
+}
+
+.discrepancy-location {
+  font-size: var(--font-size-xs);
+  color: var(--text-gray);
+  margin: var(--spacing-sm) 0 0 0;
+  font-style: italic;
+}
+
+.no-discrepancies {
+  padding: var(--spacing-md);
+  background: #F0FFF4;
+  border: 1px solid #C6F6D5;
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.no-discrepancies p {
+  margin: 0;
+  color: #22543D;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+/* References Section */
+.references-section {
+  margin-bottom: var(--spacing-xl);
+}
+
+.references-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.reference-item {
+  background: white;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  transition: all var(--transition-fast);
+}
+
+.reference-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: var(--primary-purple);
+}
+
+.reference-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-sm);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.reference-id {
+  font-family: monospace;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  color: var(--primary-purple);
+}
+
+.reference-category {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.category-procedure {
+  background: #E6FFFA;
+  color: #234E52;
+}
+
+.category-context {
+  background: #FEF5E7;
+  color: #7D6608;
+}
+
+.category-compliance {
+  background: #EBF8FF;
+  color: #2C5282;
+}
+
+.category-general {
+  background: #F7FAFC;
+  color: #4A5568;
+}
+
+.reference-filename {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-dark);
+  margin: var(--spacing-sm) 0;
+  word-break: break-word;
+}
+
+.reference-section {
+  font-size: var(--font-size-xs);
+  color: var(--text-gray);
+  margin: 2px 0;
+  font-style: italic;
+}
+
+.reference-usage {
+  font-size: var(--font-size-xs);
+  color: var(--text-gray);
+  margin: var(--spacing-sm) 0 0 0;
   line-height: var(--line-height-relaxed);
 }
 
