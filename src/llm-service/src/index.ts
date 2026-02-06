@@ -1,4 +1,4 @@
-import { LLMResponse, KnowledgeContext, ChunkedDocumentPart } from '@phasergun/shared-types';
+import { LLMResponse, KnowledgeContext } from '@phasergun/shared-types';
 
 /**
  * LLM Service Interface
@@ -12,14 +12,6 @@ export interface LLMService {
    * @returns LLM response with generated text and usage stats
    */
   generateText(prompt: string, context?: KnowledgeContext): Promise<LLMResponse>;
-  
-  /**
-   * Assess document compliance against guidelines
-   * @param docs - Document chunks to assess
-   * @param guidelines - Compliance guidelines
-   * @returns Assessment results
-   */
-  assessDocument(docs: ChunkedDocumentPart[], guidelines: string): Promise<LLMResponse>;
 }
 
 // Export the real LLM services
@@ -37,7 +29,7 @@ export class MockLLMService implements LLMService {
     console.log(`[MockLLMService] Generating text with prompt length: ${prompt.length}`);
     
     if (context) {
-      console.log(`[MockLLMService] Using ${context.contextSnippets.length} context snippets`);
+      console.log(`[MockLLMService] Using knowledge context with ${context.metadata.sources.length} sources`);
     }
     
     // Simulate LLM processing time
@@ -69,7 +61,7 @@ COMPLIANCE STATUS: On track for successful 510(k) submission
 
 --- 
 This analysis was generated using:
-- ${context?.sourceMetadata.length || 0} knowledge sources
+- ${context?.metadata.sources.length || 0} knowledge sources
 - Primary thinking document guidance
 - FDA 510(k) regulatory framework`,
       usageStats: {
@@ -82,19 +74,5 @@ This analysis was generated using:
     console.log(`[MockLLMService] Tokens used: ${response.usageStats.tokensUsed}`);
     
     return response;
-  }
-  
-  async assessDocument(docs: ChunkedDocumentPart[], guidelines: string): Promise<LLMResponse> {
-    console.log(`[MockLLMService] Assessing ${docs.length} document chunks against guidelines`);
-    
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    return {
-      generatedText: `Document assessment complete. Analyzed ${docs.length} chunks against compliance guidelines.`,
-      usageStats: {
-        tokensUsed: 800,
-        cost: 0.008
-      }
-    };
   }
 }
