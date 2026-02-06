@@ -1726,7 +1726,7 @@ async loadContextFolderStructured(
     
     // Extract key behavioral information from primary context
     const role = primaryContext?.product?.name || 'PhaserGun AI';
-    const purpose = primaryContext?.product?.purpose || 'Generate Phase 1 DHF documents';
+    const purpose = primaryContext?.product?.purpose || 'Generate regulatory documents';
     
     sections.push(`You are ${role}, an AI regulatory documentation expert.\n\n`);
     sections.push(`PRIMARY FUNCTION: ${purpose}\n\n`);
