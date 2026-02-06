@@ -1,4 +1,4 @@
-import { LLMResponse, KnowledgeContext, ChunkedDocumentPart } from '@fda-compliance/shared-types';
+import { LLMResponse, KnowledgeContext, ChunkedDocumentPart } from '@phasergun/shared-types';
 
 /**
  * LLM Service Interface

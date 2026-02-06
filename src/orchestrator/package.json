@@ -1,5 +1,5 @@
 {
-  "name": "@fda-compliance/orchestrator",
+  "name": "@phasergun/orchestrator",
   "version": "0.1.0",
   "description": "Orchestration module coordinating the analysis workflow",
   "main": "dist/index.js",
@@ -10,11 +10,11 @@
     "dev": "tsc && node dist/cli.js"
   },
   "dependencies": {
-    "@fda-compliance/shared-types": "file:../shared-types",
-    "@fda-compliance/file-parser": "file:../file-parser",
-    "@fda-compliance/chunker": "file:../chunker",
-    "@fda-compliance/rag-service": "file:../rag-service",
-    "@fda-compliance/llm-service": "file:../llm-service"
+    "@phasergun/shared-types": "file:../shared-types",
+    "@phasergun/file-parser": "file:../file-parser",
+    "@phasergun/chunker": "file:../chunker",
+    "@phasergun/rag-service": "file:../rag-service",
+    "@phasergun/llm-service": "file:../llm-service"
   },
   "devDependencies": {
     "typescript": "~5.9.0",

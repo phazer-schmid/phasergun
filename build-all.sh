@@ -13,7 +13,6 @@ modules=(
   "file-source"
   "orchestrator"
   "rag-service"
-  "dhf-scanner"
   "api-server"
 )
 

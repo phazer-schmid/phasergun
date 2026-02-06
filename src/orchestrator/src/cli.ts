@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { OrchestratorService } from './index';
-import { MockFileParser } from '@fda-compliance/file-parser';
-import { MockChunker } from '@fda-compliance/chunker';
-import { EnhancedRAGService } from '@fda-compliance/rag-service';
-import { MockLLMService } from '@fda-compliance/llm-service';
+import { MockFileParser } from '@phasergun/file-parser';
+import { MockChunker } from '@phasergun/chunker';
+import { EnhancedRAGService } from '@phasergun/rag-service';
+import { MockLLMService } from '@phasergun/llm-service';
 
 async function main() {
   console.log('╔═══════════════════════════════════════════════════════╗');

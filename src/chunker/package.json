@@ -1,16 +1,16 @@
 {
-  "name": "@fda-compliance/chunker",
+  "name": "@phasergun/chunker",
   "version": "0.2.0",
-  "description": "Intelligent document chunking module for DHF RAG processing",
+  "description": "Intelligent document chunking service for RAG systems",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "node dist/cli.js",
+    "test": "tsc && node dist/cli.js",
     "dev": "tsc && node dist/cli.js"
   },
   "dependencies": {
-    "@fda-compliance/shared-types": "file:../shared-types",
+    "@phasergun/shared-types": "file:../shared-types",
     "gpt-tokenizer": "^2.1.1"
   },
   "devDependencies": {

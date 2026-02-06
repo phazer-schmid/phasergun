@@ -1,7 +1,7 @@
 {
-  "name": "@fda-compliance/file-parser",
+  "name": "@phasergun/file-parser",
   "version": "0.2.0",
-  "description": "File parsing module for DHF document analysis with comprehensive format support",
+  "description": "Comprehensive file parser for multiple document formats",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -10,7 +10,7 @@
     "dev": "tsc && node dist/cli.js"
   },
   "dependencies": {
-    "@fda-compliance/shared-types": "file:../shared-types",
+    "@phasergun/shared-types": "file:../shared-types",
     "mammoth": "^1.8.0",
     "pdf-parse": "^1.1.1",
     "tesseract.js": "^5.1.1",

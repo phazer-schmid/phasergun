@@ -1,7 +1,7 @@
 {
-  "name": "@fda-compliance/llm-service",
+  "name": "@phasergun/llm-service",
   "version": "0.1.0",
-  "description": "LLM integration service for AI-powered analysis",
+  "description": "LLM Service supporting multiple providers",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.3",
-    "@fda-compliance/shared-types": "file:../shared-types",
+    "@phasergun/shared-types": "file:../shared-types",
     "@mistralai/mistralai": "^1.10.0",
     "groq-sdk": "^0.3.2"
   },

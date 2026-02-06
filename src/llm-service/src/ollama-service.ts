@@ -1,4 +1,4 @@
-import { LLMResponse, KnowledgeContext } from '@fda-compliance/shared-types';
+import { LLMResponse, KnowledgeContext } from '@phasergun/shared-types';
 
 interface OllamaConfig {
   baseUrl?: string;

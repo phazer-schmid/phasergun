@@ -1,5 +1,5 @@
 {
-  "name": "fda-510k-compliance-vue",
+  "name": "@phasergun/vue-ui",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
   },
   "private": true,
   "dependencies": {
-    "@fda-compliance/shared-types": "file:../src/shared-types",
+    "@phasergun/shared-types": "file:../src/shared-types",
     "axios": "^1.6.2",
     "vue": "^3.4.0",
     "vue-router": "^4.2.5"
