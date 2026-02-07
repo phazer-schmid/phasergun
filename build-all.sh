@@ -1,6 +1,10 @@
 #!/bin/bash
 # Note: Not using 'set -e' because TypeScript may error but still generate .js files
 
+# Get the absolute path to the script's directory (project root)
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR"
+
 echo "🔨 Building all TypeScript modules..."
 echo ""
 
@@ -17,9 +21,7 @@ echo ""
 modules=(
   "shared-types"
   "file-parser"
-  "chunker"
   "llm-service"
-  "file-source"
   "orchestrator"
   "rag-service"
   "api-server"
@@ -53,7 +55,7 @@ for module in "${modules[@]}"; do
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo "📦 Building src/$module"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-  cd "src/$module"
+  cd "$SCRIPT_DIR/src/$module"
   
   if [ -f "tsconfig.json" ]; then
     # Use --skipLibCheck to ignore type errors in example/demo files
@@ -65,7 +67,6 @@ for module in "${modules[@]}"; do
     echo "⚠️  No tsconfig.json found, skipping..."
   fi
   
-  cd ../..
   echo ""
 done
 
@@ -73,9 +74,8 @@ done
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🎨 Building vue-ui"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-cd vue-ui
+cd "$SCRIPT_DIR/vue-ui"
 npm run build
-cd ..
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
