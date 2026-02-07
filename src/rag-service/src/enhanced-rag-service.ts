@@ -1491,7 +1491,33 @@ async loadContextFolderStructured(
   }
 
   /**
+   * Parse explicit context references from prompt to determine which on-demand folders are requested
+   * Returns set of context categories that were explicitly referenced
+   */
+  private parseExplicitContextReferences(prompt: string): Set<'regulatory-strategy' | 'general'> {
+    const referenced = new Set<'regulatory-strategy' | 'general'>();
+    
+    // Pattern: [Context|{folder}|{filename}]
+    const contextPattern = /\[Context\|([^|\]]+)\|[^\]]+\]/gi;
+    let match;
+    
+    while ((match = contextPattern.exec(prompt)) !== null) {
+      const folder = match[1].trim().toLowerCase();
+      
+      if (folder === 'regulatory strategy' || folder === 'regulatory-strategy') {
+        referenced.add('regulatory-strategy');
+      } else if (folder === 'general') {
+        referenced.add('general');
+      }
+    }
+    
+    return referenced;
+  }
+
+  /**
    * Retrieve relevant context for a prompt using semantic search
+   * Enforces retrieval_priority rules from primary-context.yaml:
+   * - regulatory_strategy and general are ONLY included if explicitly referenced
    */
   async retrieveRelevantContext(
     projectPath: string,
@@ -1520,10 +1546,28 @@ async loadContextFolderStructured(
     procedureChunks: SearchResult[];
     contextChunks: SearchResult[];
   }> {
-    // 1. Load knowledge with lock protection (prevents concurrent rebuild collisions)
+    // 1. Parse prompt for explicit on-demand references (regulatory-strategy, general)
+    const explicitlyReferencedCategories = this.parseExplicitContextReferences(prompt);
+    const excludeGeneral = !explicitlyReferencedCategories.has('general');
+    const excludeRegStrategy = !explicitlyReferencedCategories.has('regulatory-strategy');
+    
+    console.log('[EnhancedRAG] 🔒 RETRIEVAL POLICY ENFORCEMENT:');
+    if (excludeGeneral) {
+      console.log('[EnhancedRAG]    ⛔ Context/General/ EXCLUDED (not explicitly referenced in prompt)');
+    } else {
+      console.log('[EnhancedRAG]    ✅ Context/General/ INCLUDED (explicitly referenced in prompt)');
+    }
+    if (excludeRegStrategy) {
+      console.log('[EnhancedRAG]    ⛔ Context/Regulatory Strategy/ EXCLUDED (not explicitly referenced in prompt)');
+    } else {
+      console.log('[EnhancedRAG]    ✅ Context/Regulatory Strategy/ INCLUDED (explicitly referenced in prompt)');
+    }
+    
+    // 2. Load knowledge with lock protection (prevents concurrent rebuild collisions)
     const knowledge = await this.ensureCacheBuilt(projectPath, primaryContextPath);
     
-    // 2. Generate SOP summaries if requested (with GLOBAL mutex protection)
+    // 3. Generate SOP summaries if requested (with GLOBAL mutex protection)
+    // 3. Generate SOP summaries if requested (with GLOBAL mutex protection)
     let sopSummaries = new Map<string, string>();
     if (options.includeSummaries ?? true) {
       // Acquire GLOBAL summary mutex to prevent duplicate summary generation
@@ -1556,7 +1600,8 @@ async loadContextFolderStructured(
       }
     }
 
-    // 2.5. Generate Context file summaries if requested (uses same mutex)
+    // 4. Generate Context file summaries if requested (uses same mutex)
+    // BUT: Filter out on-demand categories that weren't explicitly referenced
     let contextSummaries = new Map<string, string>();
     if (options.includeSummaries ?? true) {
       // Acquire GLOBAL summary mutex to prevent duplicate summary generation
@@ -1575,8 +1620,21 @@ async loadContextFolderStructured(
         }
         
         if (contextFilesWithCategory.length > 0) {
+          // Filter out on-demand categories that weren't explicitly referenced
+          const filteredContextFiles = contextFilesWithCategory.filter(cf => {
+            if (cf.contextCategory === 'general' && excludeGeneral) {
+              console.log(`[EnhancedRAG] ⏭️  Excluding summary for ${cf.doc.fileName} (General folder, not referenced)`);
+              return false;
+            }
+            if (cf.contextCategory === 'regulatory-strategy' && excludeRegStrategy) {
+              console.log(`[EnhancedRAG] ⏭️  Excluding summary for ${cf.doc.fileName} (Regulatory Strategy folder, not referenced)`);
+              return false;
+            }
+            return true;
+          });
+          
           contextSummaries = await this.generateContextSummaries(
-            contextFilesWithCategory,
+            filteredContextFiles,
             projectPath,
             options.summaryWordCount || 250
           );
@@ -1589,12 +1647,12 @@ async loadContextFolderStructured(
       }
     }
     
-    // 3. Embed the prompt
+    // 5. Embed the prompt
     const embeddingService = await this.getEmbeddingService(projectPath);
     const promptEmbedding = await embeddingService.embedText(prompt);
     const promptEmbeddingArray = VectorStore.float32ArrayToNumbers(promptEmbedding);
     
-    // 4. Search procedures
+    // 6. Search procedures
     // CRITICAL: Use explicit undefined check so 0 is respected (0 || 5 would give 5!)
     const procedureChunksToRetrieve = options.procedureChunks !== undefined ? options.procedureChunks : 5;
     console.log(`[EnhancedRAG] 🔍 Searching for top ${procedureChunksToRetrieve} procedure chunks...`);
@@ -1614,14 +1672,36 @@ async loadContextFolderStructured(
       console.log(`[EnhancedRAG] ℹ️  No procedure chunks requested (procedureChunks=0)`);
     }
     
-    // 5. Search context files
+    // 7. Search context files with on-demand filtering
     // CRITICAL: Use explicit undefined check so 0 is respected
     const contextChunksToRetrieve = options.contextChunks !== undefined ? options.contextChunks : 5;
     console.log(`[EnhancedRAG] 🔍 Searching for top ${contextChunksToRetrieve} context chunks...`);
     
-    const contextResults = contextChunksToRetrieve > 0
+    let contextResults = contextChunksToRetrieve > 0
       ? this.vectorStore!.search(promptEmbeddingArray, contextChunksToRetrieve, 'context')
       : [];
+    
+    // ENFORCE RETRIEVAL POLICY: Filter out on-demand categories
+    const originalContextCount = contextResults.length;
+    contextResults = contextResults.filter(result => {
+      const category = result.entry.metadata.contextCategory;
+      
+      if (category === 'general' && excludeGeneral) {
+        console.log(`[EnhancedRAG] ⏭️  Filtered out: ${result.entry.metadata.fileName} (General folder, not referenced)`);
+        return false;
+      }
+      
+      if (category === 'regulatory-strategy' && excludeRegStrategy) {
+        console.log(`[EnhancedRAG] ⏭️  Filtered out: ${result.entry.metadata.fileName} (Regulatory Strategy folder, not referenced)`);
+        return false;
+      }
+      
+      return true;
+    });
+    
+    if (originalContextCount !== contextResults.length) {
+      console.log(`[EnhancedRAG] 🔒 FILTERING APPLIED: ${originalContextCount - contextResults.length} context chunks excluded due to retrieval_priority="on_demand"`);
+    }
     
     if (contextResults.length > 0) {
       console.log(`[EnhancedRAG] 📄 Context files included in prompt:`);
@@ -1635,7 +1715,7 @@ async loadContextFolderStructured(
       console.log(`[EnhancedRAG] ℹ️  No context chunks requested (contextChunks=0)`);
     }
     
-    // 6. Assemble tiered context
+    // 8. Assemble tiered context
     let ragContext = this.assembleContext(
       knowledge.primaryContext,
       procedureResults,
@@ -1645,11 +1725,11 @@ async loadContextFolderStructured(
       options
     );
     
-    // 7. Enforce token limits if needed
+    // 9. Enforce token limits if needed
     const maxTokens = options.maxTokens || 150000;
     ragContext = await this.enforceTokenLimit(ragContext, maxTokens);
     
-    // 8. Build metadata
+    // 10. Build metadata
     const sources = new Set<string>();
     procedureResults.forEach(r => sources.add(r.entry.metadata.fileName));
     contextResults.forEach(r => sources.add(r.entry.metadata.fileName));

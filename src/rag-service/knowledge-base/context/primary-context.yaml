@@ -67,7 +67,7 @@ knowledge_sources:
     description: "Predicate devices and regulatory strategy documents"
     location: "[RAGFolder]/Context/Regulatory Strategy"
     retrieval_priority: "on_demand"
-    usage: "Only retrieve when explicitly referenced in prompts"
+    usage: "Only use in content generation if explicitly referenced in the prompts (@generation_workflow.input.prompts)"
   
   general:
     id: "general"
@@ -75,7 +75,7 @@ knowledge_sources:
     description: "Additional reference documents for content generation"
     location: "[RAGFolder]/Context/General"
     retrieval_priority: "on_demand"
-    usage: "Only retrieve when explicitly referenced in prompts"
+    usage: "Only use in content generation if explicitly referenced in the prompts (@generation_workflow.input.prompts)"
 
 # How prompts reference documents using bracket notation
 reference_notation:
@@ -157,8 +157,8 @@ operational_rules:
     action: "Document in @generation_workflow.output.sections.discrepancies"
   
   retrieval_scope:
-    rule: "Only retrieve @knowledge_sources.regulatory_strategy and @knowledge_sources.general when explicitly referenced"
-    action: "Prevent unnecessary context loading"
+    rule: "Only retrieve @knowledge_sources.regulatory_strategy and @knowledge_sources.general when explicitly referenced via @reference_notation.context"
+    action: "Exclude from semantic search unless [Context|Regulatory Strategy|...] or [Context|General|...] pattern detected in prompt"
   
   primary_source:
     rule: "@knowledge_sources.master_record is the authoritative source for project-specific information"
