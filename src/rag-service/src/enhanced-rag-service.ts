@@ -15,6 +15,8 @@ import { ContextRetriever } from './retrieval/context-retriever';
 import { parseExplicitContextReferences, logRetrievalPolicy, filterContextResults } from './reference-parser';
 import { assembleContext, estimateTokens, enforceTokenLimit } from './context-assembler';
 import { buildVectorStore as buildVectorStoreImpl } from './vector-builder';
+import { chunkSectionAware, chunkWithOverlap } from './chunking-strategy';
+import { generateSOPSummaries as generateSOPSummariesOrch, generateContextSummaries as generateContextSummariesOrch } from './summary-orchestrator';
 
 /**
  * GLOBAL mutex for cache builds - shared across ALL service instances
@@ -78,113 +80,6 @@ export class EnhancedRAGService {
   }
 
 
-  /**
-   * Chunk SOPs with section-aware splitting
-   * Detects headers (##, ###, numbered sections) and keeps sections together
-   */
-  private chunkSectionAware(content: string, fileName: string, filePath: string): string[] {
-    const chunks: string[] = [];
-    const MIN_CHUNK_SIZE = 2000; // ~500 tokens
-    const MAX_CHUNK_SIZE = 4000; // ~1000 tokens
-    
-    // Detect section headers: ##, ###, numbered (1., 1.1, etc.)
-    // NOTE: /m flag only — do NOT use /g here.  RegExp.prototype.test() with /g
-    // advances lastIndex after each match; calling .test() on successive lines
-    // from a /g regex silently skips any header whose length < the previous lastIndex.
-    const sectionRegex = /^(#{1,6}\s+.*|\d+\.(\d+\.)*\s+.*)$/m;
-    const lines = content.split('\n');
-    
-    let currentChunk = '';
-    let currentSection = '';
-    
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const isHeader = sectionRegex.test(line.trim());
-      
-      if (isHeader && currentChunk.length > MIN_CHUNK_SIZE) {
-        // Save current chunk and start new one
-        if (currentChunk.trim()) {
-          chunks.push(currentChunk.trim());
-        }
-        currentChunk = line + '\n';
-      } else if (currentChunk.length + line.length > MAX_CHUNK_SIZE && currentChunk.length > MIN_CHUNK_SIZE) {
-        // Chunk is getting too large, split here
-        if (currentChunk.trim()) {
-          chunks.push(currentChunk.trim());
-        }
-        currentChunk = line + '\n';
-      } else {
-        currentChunk += line + '\n';
-      }
-    }
-    
-    // Add final chunk
-    if (currentChunk.trim()) {
-      chunks.push(currentChunk.trim());
-    }
-    
-    // If no sections detected, fall back to paragraph chunking
-    if (chunks.length === 0 || (chunks.length === 1 && chunks[0].length > MAX_CHUNK_SIZE)) {
-      return this.chunkWithOverlap(content, fileName, filePath);
-    }
-    
-    return chunks;
-  }
-
-  /**
-   * Chunk context files with paragraph-based splitting and overlap
-   * Chunk size: 500-1000 tokens (~2000-4000 chars)
-   * Overlap: 100 tokens (~400 chars)
-   */
-  private chunkWithOverlap(content: string, fileName: string, filePath: string): string[] {
-    const chunks: string[] = [];
-    const TARGET_CHUNK_SIZE = 3000; // ~750 tokens
-    const MAX_CHUNK_SIZE = 4000; // ~1000 tokens
-    const OVERLAP_SIZE = 400; // ~100 tokens
-    
-    // Split by paragraphs
-    const paragraphs = content.split(/\n\n+/).filter(p => p.trim());
-    
-    let currentChunk = '';
-    let previousOverlap = '';
-    
-    for (const paragraph of paragraphs) {
-      const trimmed = paragraph.trim();
-      if (!trimmed) continue;
-      
-      // Start new chunk with overlap from previous
-      if (currentChunk.length === 0 && previousOverlap) {
-        currentChunk = previousOverlap + '\n\n';
-      }
-      
-      // Check if adding this paragraph would exceed max size
-      if (currentChunk.length > 0 && (currentChunk.length + trimmed.length) > MAX_CHUNK_SIZE) {
-        // Save current chunk
-        chunks.push(currentChunk.trim());
-        
-        // Extract overlap (last OVERLAP_SIZE characters)
-        previousOverlap = currentChunk.substring(Math.max(0, currentChunk.length - OVERLAP_SIZE)).trim();
-        
-        // Start new chunk with overlap
-        currentChunk = previousOverlap + '\n\n' + trimmed;
-      } else {
-        // Add paragraph to current chunk
-        if (currentChunk.length > 0) {
-          currentChunk += '\n\n' + trimmed;
-        } else {
-          currentChunk = trimmed;
-        }
-      }
-    }
-    
-    // Add final chunk
-    if (currentChunk.trim()) {
-      chunks.push(currentChunk.trim());
-    }
-    
-    return chunks.length > 0 ? chunks : [content];
-  }
-
 /**
  * Chunk and embed a parsed document
  * Returns VectorEntry objects ready for storage
@@ -197,8 +92,8 @@ private async chunkAndEmbedDocument(
 ): Promise<VectorEntry[]> {
   // 1. Intelligent chunking based on category
   const contentChunks = category === 'procedure'
-    ? this.chunkSectionAware(doc.content, doc.fileName, doc.filePath)
-    : this.chunkWithOverlap(doc.content, doc.fileName, doc.filePath);
+    ? chunkSectionAware(doc.content, doc.fileName, doc.filePath)
+    : chunkWithOverlap(doc.content, doc.fileName, doc.filePath);
   
   console.log(`[EnhancedRAG] Chunked ${doc.fileName}: ${contentChunks.length} chunks`);
   
@@ -214,7 +109,7 @@ private async chunkAndEmbedDocument(
   );
   
   // 3. Create VectorEntry objects
-  const vectorEntries: VectorEntry[] = contentChunks.map((content, chunkIndex) => {
+  const vectorEntries: VectorEntry[] = contentChunks.map((content: string, chunkIndex: number) => {
     return VectorStore.createEntry(
       content,
       embeddings[chunkIndex],
@@ -295,123 +190,9 @@ private async buildVectorStore(
   console.log(`[EnhancedRAG] ✓ Vector store built: ${allVectors.length} chunks indexed (deterministic order)`);
 }
 
-  /**
-   * Chunk a document into semantic segments (delegates to DocumentChunker)
-   */
-  private chunkDocument(doc: ParsedDocument): DocumentChunk[] {
-    return this.chunker.chunkDocument(doc);
-  }
-
-
-  /**
-   * Detect what changed in the cache
-   */
-  private async detectCacheChanges(
-    projectPath: string,
-    primaryContextPath: string,
-    cachedFingerprint: string
-  ): Promise<{
-    changed: boolean;
-    primaryContextChanged: boolean;
-    proceduresChanged: boolean;
-    contextChanged: boolean;
-    details: string[];
-  }> {
-    const proceduresPath = path.join(projectPath, 'Procedures');
-    const contextPath = path.join(projectPath, 'Context');
-    
-    // Get current fingerprints
-    const currentFingerprint = await this.cacheManager.computeCacheFingerprint(projectPath, primaryContextPath);
-    
-    // Compare
-    const changed = cachedFingerprint !== currentFingerprint;
-    const details: string[] = [];
-    
-    if (!changed) {
-      return { changed: false, primaryContextChanged: false, proceduresChanged: false, contextChanged: false, details: [] };
-    }
-    
-    // Detect what changed by comparing individual components
-    try {
-      // Check if files exist and count them
-      const proceduresFiles = await this.cacheManager.getAllFiles(proceduresPath).catch(() => []);
-      const contextFiles = await this.cacheManager.getAllFiles(contextPath, ['Prompt']).catch(() => []);
-      
-      details.push(`Current state: ${proceduresFiles.length} procedure files, ${contextFiles.length} context files`);
-    } catch {
-      details.push('Unable to determine specific changes');
-    }
-    
-    return {
-      changed: true,
-      primaryContextChanged: false, // We can't determine this without storing old fingerprints
-      proceduresChanged: false,
-      contextChanged: false,
-      details
-    };
-  }
-
-  /**
-   * Save cache metadata to disk
-   */
-  private async saveCacheMetadata(cache: KnowledgeCache): Promise<void> {
-    await this.cacheManager.saveCacheMetadata(cache);
-  }
-
-  /**
-   * Load cache metadata from disk
-   */
-  private async loadCacheMetadata(projectPath: string): Promise<KnowledgeCache | null> {
-    return await this.cacheManager.loadCacheMetadata(projectPath);
-  }
-
-  /**
-   * Clear old cache files for a project
-   */
-  private async clearOldCache(projectPath: string): Promise<void> {
-    await this.cacheManager.clearOldCache(projectPath);
-  }
-
-  /**
-   * Check if cache is valid for a project
-   */
+  // Cache operations delegate to cacheManager
   async isCacheValid(projectPath: string, primaryContextPath: string): Promise<boolean> {
     return await this.cacheManager.isCacheValid(projectPath, primaryContextPath, this.cache);
-  }
-
-  /**
-   * Compute cache fingerprint - delegates to cacheManager
-   */
-  private async computeCacheFingerprint(projectPath: string, primaryContextPath: string): Promise<string> {
-    return await this.cacheManager.computeCacheFingerprint(projectPath, primaryContextPath);
-  }
-
-  /**
-   * Get vector store path - delegates to cacheManager
-   */
-  private getVectorStorePath(projectPath: string): string {
-    return this.cacheManager.getVectorStorePath(projectPath);
-  }
-
-  /**
-   * Get SOP summaries cache path - delegates to cacheManager
-   */
-  private getSOPSummariesCachePath(projectPath: string): string {
-    return this.cacheManager.getSOPSummariesCachePath(projectPath);
-  }
-
-  /**
-   * Get context summaries cache path - delegates to cacheManager
-   */
-  private getContextSummariesCachePath(projectPath: string): string {
-    return this.cacheManager.getContextSummariesCachePath(projectPath);
-  }
-
-  /**
-   * Get cache metadata path - delegates to cacheManager
-   */
-  private getCacheMetadataPath(projectPath: string): string {
-    return this.cacheManager.getCacheMetadataPath(projectPath);
   }
 
   /**
@@ -440,7 +221,7 @@ private async buildVectorStore(
         console.log('[EnhancedRAG] ✓ Cache valid, returning immediately (no rebuild needed)');
         // Load vector store if not already loaded
         if (!this.vectorStore) {
-          const vectorStorePath = this.getVectorStorePath(projectPath);
+          const vectorStorePath = this.cacheManager.getVectorStorePath(projectPath);
           this.vectorStore = await VectorStore.load(vectorStorePath, projectPath);
         }
         return this.cache.get(projectPath)!;
@@ -478,7 +259,7 @@ private async buildVectorStore(
         console.log('[EnhancedRAG] ✓ Cache was built by another process while waiting for lock, using it');
         // Load vector store if not already loaded
         if (!this.vectorStore) {
-          const vectorStorePath = this.getVectorStorePath(projectPath);
+          const vectorStorePath = this.cacheManager.getVectorStorePath(projectPath);
           this.vectorStore = await VectorStore.load(vectorStorePath, projectPath);
         }
         return this.cache.get(projectPath)!;
@@ -520,7 +301,7 @@ private async buildVectorStore(
     if (cacheValid) {
       console.log('[EnhancedRAG] ✓ Cache is valid, using cached knowledge\n');
       // Load vector store from disk
-      const vectorStorePath = this.getVectorStorePath(projectPath);
+      const vectorStorePath = this.cacheManager.getVectorStorePath(projectPath);
       this.vectorStore = await VectorStore.load(vectorStorePath, projectPath);
       
       const cached = this.cache.get(projectPath)!;
@@ -535,7 +316,7 @@ private async buildVectorStore(
     console.log('[EnhancedRAG] 🔄 Cache invalid or missing - regenerating...\n');
     
     // Clear old cache files before rebuilding
-    await this.clearOldCache(projectPath);
+    await this.cacheManager.clearOldCache(projectPath);
     
     // Load primary context
     const primaryContext = await this.documentLoader.loadPrimaryContext(primaryContextPath);
@@ -580,11 +361,11 @@ private async buildVectorStore(
       const modelInfo = embeddingService.getModelInfo();
       this.vectorStore = new VectorStore(projectPath, modelInfo.version);
       // Save empty vector store
-      await this.vectorStore.save(this.getVectorStorePath(projectPath));
+      await this.vectorStore.save(this.cacheManager.getVectorStorePath(projectPath));
     }
     
     // Compute fingerprint including vector store
-    const fingerprint = await this.computeCacheFingerprint(projectPath, primaryContextPath);
+    const fingerprint = await this.cacheManager.computeCacheFingerprint(projectPath, primaryContextPath);
     const vectorStoreFingerprint = this.vectorStore?.getFingerprint() || 'empty';
     
     // Create cache entry
@@ -600,10 +381,10 @@ private async buildVectorStore(
     this.cache.set(projectPath, knowledgeCache);
     
     // Save cache metadata to disk for persistence across restarts
-    await this.saveCacheMetadata(knowledgeCache);
+    await this.cacheManager.saveCacheMetadata(knowledgeCache);
     
     const stats = this.vectorStore!.getStats();
-    const vectorStorePath = this.getVectorStorePath(projectPath);
+    const vectorStorePath = this.cacheManager.getVectorStorePath(projectPath);
     
     console.log('[EnhancedRAG] ========================================');
     console.log('[EnhancedRAG] ✅ Knowledge Base Regeneration Complete');
@@ -744,85 +525,26 @@ private async buildVectorStore(
     // 2. Load knowledge with lock protection (prevents concurrent rebuild collisions)
     const knowledge = await this.ensureCacheBuilt(projectPath, primaryContextPath);
     
-    // 3. Generate SOP summaries if requested (with GLOBAL mutex protection)
-    // 3. Generate SOP summaries if requested (with GLOBAL mutex protection)
+    // 3 & 4. Generate summaries if requested (delegated to summary orchestrator)
     let sopSummaries = new Map<string, string>();
-    if (options.includeSummaries ?? true) {
-      // Acquire GLOBAL summary mutex to prevent duplicate summary generation
-      const releaseSummary = await globalSummaryMutex.acquire();
-      console.log('[EnhancedRAG] 🔒 Summary mutex acquired - generating SOP summaries...');
-      
-      try {
-        // Get procedure files
-        const proceduresPath = path.join(projectPath, 'Procedures');
-        let proceduresFiles: ParsedDocument[] = [];
-        try {
-          await fs.access(proceduresPath);
-          proceduresFiles = await this.documentLoader.loadProceduresFolder(proceduresPath);
-        } catch {
-          // No procedures folder
-        }
-        
-        if (proceduresFiles.length > 0) {
-          sopSummaries = await this.summaryGenerator.generateSOPSummaries(
-            proceduresFiles,
-            projectPath,
-            options.summaryWordCount || 250
-          );
-        }
-      } catch (error) {
-        console.warn('[EnhancedRAG] Failed to generate SOP summaries, continuing without them:', error);
-      } finally {
-        releaseSummary();
-        console.log('[EnhancedRAG] 🔓 Summary mutex released');
-      }
-    }
-
-    // 4. Generate Context file summaries if requested (uses same mutex)
-    // BUT: Filter out on-demand categories that weren't explicitly referenced
     let contextSummaries = new Map<string, string>();
+    
     if (options.includeSummaries ?? true) {
-      // Acquire GLOBAL summary mutex to prevent duplicate summary generation
-      const releaseSummary = await globalSummaryMutex.acquire();
-      console.log('[EnhancedRAG] 🔒 Summary mutex acquired - generating context summaries...');
+      sopSummaries = await generateSOPSummariesOrch(
+        projectPath,
+        options.summaryWordCount || 250,
+        this.documentLoader,
+        this.summaryGenerator
+      );
       
-      try {
-        // Get context files
-        const contextPath = path.join(projectPath, 'Context');
-        let contextFilesWithCategory: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general' }[] = [];
-        try {
-          await fs.access(contextPath);
-          contextFilesWithCategory = await this.documentLoader.loadContextFolderStructured(contextPath);
-        } catch {
-          // No context folder
-        }
-        
-        if (contextFilesWithCategory.length > 0) {
-          // Filter out on-demand categories that weren't explicitly referenced
-          const filteredContextFiles = contextFilesWithCategory.filter(cf => {
-            if (cf.contextCategory === 'general' && excludeGeneral) {
-              console.log(`[EnhancedRAG] ⏭️  Excluding summary for ${cf.doc.fileName} (General folder, not referenced)`);
-              return false;
-            }
-            if (cf.contextCategory === 'regulatory-strategy' && excludeRegStrategy) {
-              console.log(`[EnhancedRAG] ⏭️  Excluding summary for ${cf.doc.fileName} (Regulatory Strategy folder, not referenced)`);
-              return false;
-            }
-            return true;
-          });
-          
-          contextSummaries = await this.summaryGenerator.generateContextSummaries(
-            filteredContextFiles,
-            projectPath,
-            options.summaryWordCount || 250
-          );
-        }
-      } catch (error) {
-        console.warn('[EnhancedRAG] Failed to generate Context summaries, continuing without them:', error);
-      } finally {
-        releaseSummary();
-        console.log('[EnhancedRAG] 🔓 Summary mutex released');
-      }
+      contextSummaries = await generateContextSummariesOrch(
+        projectPath,
+        options.summaryWordCount || 250,
+        excludeGeneral,
+        excludeRegStrategy,
+        this.documentLoader,
+        this.summaryGenerator
+      );
     }
     
     // 5. Embed the prompt
