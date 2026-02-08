@@ -1,17 +1,16 @@
 import { KnowledgeContext, ChunkedDocumentPart, ParsedDocument } from '@phasergun/shared-types';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as yaml from 'js-yaml';
 import * as crypto from 'crypto';
 import * as os from 'os';
 import { Mutex } from 'async-mutex';
-import { ComprehensiveFileParser } from '@phasergun/file-parser';
 import { EmbeddingService } from './embedding-service';
 import { VectorStore, VectorEntry, SearchResult } from './vector-store';
 import { LockManager, getLockManager } from './lock-manager';
 import { DocumentChunker, DocumentChunk } from './chunking/document-chunker';
 import { SummaryGenerator } from './summarization/summary-generator';
 import { CacheManager, KnowledgeCache } from './cache/cache-manager';
+import { DocumentLoader, CategorizedContextFile } from './loading/document-loader';
 
 /**
  * GLOBAL mutex for cache builds - shared across ALL service instances
@@ -35,7 +34,7 @@ const globalSummaryMutex = new Mutex();
  */
 export class EnhancedRAGService {
   private cache: Map<string, KnowledgeCache> = new Map();
-  private fileParser: ComprehensiveFileParser;
+  private documentLoader: DocumentLoader;
   private embeddingService: EmbeddingService | null = null;
   private vectorStore: VectorStore | null = null;
   private useEmbeddings: boolean = true; // Feature flag
@@ -46,7 +45,7 @@ export class EnhancedRAGService {
   private cacheManager: CacheManager;
   
   constructor() {
-    this.fileParser = new ComprehensiveFileParser();
+    this.documentLoader = new DocumentLoader();
     this.lockManager = getLockManager();
     this.chunker = new DocumentChunker();
     this.summaryGenerator = new SummaryGenerator();
@@ -72,18 +71,6 @@ export class EnhancedRAGService {
     return this.embeddingService;
   }
 
-  /**
-   * Load primary context from YAML file
-   */
-  async loadPrimaryContext(yamlPath: string): Promise<any> {
-    console.log('[EnhancedRAG] Loading primary context from:', yamlPath);
-    
-    const fileContents = await fs.readFile(yamlPath, 'utf8');
-    const primaryContext = yaml.load(fileContents) as any;
-    
-    console.log('[EnhancedRAG] Primary context loaded successfully');
-    return primaryContext;
-  }
 
   /**
    * Chunk SOPs with section-aware splitting
@@ -309,205 +296,6 @@ private async buildVectorStore(
     return this.chunker.chunkDocument(doc);
   }
 
-  /**
-   * Load and chunk all files from Procedures folder
-   */
-  async loadProceduresFolder(folderPath: string): Promise<DocumentChunk[]> {
-    console.log('[EnhancedRAG] Loading Procedures folder:', folderPath);
-    
-    try {
-      await fs.access(folderPath);
-      const documents = await this.fileParser.scanAndParseFolder(folderPath);
-      console.log(`[EnhancedRAG] Loaded ${documents.length} files from Procedures folder`);
-      
-      // Chunk all documents
-      const allChunks: DocumentChunk[] = [];
-      for (const doc of documents) {
-        const chunks = this.chunkDocument(doc);
-        allChunks.push(...chunks);
-      }
-      
-      console.log(`[EnhancedRAG] Created ${allChunks.length} chunks from Procedures`);
-      return allChunks;
-    } catch (error) {
-      console.warn('[EnhancedRAG] Procedures folder not found or empty:', folderPath);
-      return [];
-    }
-  }
-
-/**
- * Load and chunk all files from Context folder (DEPRECATED - use loadContextFolderStructured)
- */
-async loadContextFolder(folderPath: string): Promise<DocumentChunk[]> {
-  console.log('[EnhancedRAG] Loading Context folder:', folderPath);
-  
-  try {
-    await fs.access(folderPath);
-    const documents = await this.fileParser.scanAndParseFolder(folderPath);
-    console.log(`[EnhancedRAG] Loaded ${documents.length} files from Context folder`);
-    
-    // Chunk all documents
-    const allChunks: DocumentChunk[] = [];
-    for (const doc of documents) {
-      const chunks = this.chunkDocument(doc);
-      allChunks.push(...chunks);
-    }
-    
-    console.log(`[EnhancedRAG] Created ${allChunks.length} chunks from Context`);
-    return allChunks;
-  } catch (error) {
-    console.warn('[EnhancedRAG] Context folder not found or empty:', folderPath);
-    return [];
-  }
-}
-
-/**
- * Load and organize files from Context folder with subfolder structure
- * Returns documents tagged with their context category
- * 
- * IMPORTANT: This method excludes the Context/Prompt folder completely.
- * Prompt files are NEVER cached and should be parsed on-demand each time.
- */
-async loadContextFolderStructured(
-  folderPath: string
-): Promise<{ doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general' }[]> {
-  console.log('[EnhancedRAG] 📂 Loading Context folder with subfolder structure:', folderPath);
-  console.log('[EnhancedRAG] NOTE: Context/Prompt folder is excluded (never cached, parsed on-demand)');
-  
-  const contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general' }[] = [];
-  
-  try {
-    await fs.access(folderPath);
-  } catch {
-    console.warn('[EnhancedRAG] ⚠️  Context folder not found:', folderPath);
-    return [];
-  }
-  
-  // 1. Check for root-level files (e.g., "Primary Context.docx")
-  // Only scan root level, not recursive
-  console.log('[EnhancedRAG] Scanning root level of Context/ for Primary Context.docx...');
-  try {
-    const rootEntries = await fs.readdir(folderPath, { withFileTypes: true });
-    const rootFiles = rootEntries.filter(e => e.isFile()).map(e => e.name);
-    
-    if (rootFiles.length > 0) {
-      console.log(`[EnhancedRAG] Found ${rootFiles.length} file(s) at root: ${rootFiles.join(', ')}`);
-      
-      // Parse only root-level files that match Primary Context
-      for (const fileName of rootFiles) {
-        if (fileName === 'Primary Context.docx' || fileName.toLowerCase().includes('primary')) {
-          const filePath = path.join(folderPath, fileName);
-          try {
-            // Use scanAndParseFolder on the containing directory and filter
-            const allDocs = await this.fileParser.scanAndParseFolder(folderPath);
-            const doc = allDocs.find(d => d.fileName === fileName);
-            if (doc) {
-              contextFiles.push({ doc, contextCategory: 'primary-context-root' });
-              console.log(`[EnhancedRAG] ✓ Loaded and will cache: ${fileName} (${doc.content.length} chars)`);
-            }
-          } catch (err) {
-            console.warn(`[EnhancedRAG] Failed to parse ${fileName}:`, err);
-          }
-        }
-      }
-    } else {
-      console.log('[EnhancedRAG] No files found at root level of Context/');
-    }
-  } catch (err) {
-    console.warn('[EnhancedRAG] Error scanning root level:', err);
-  }
-  
-  // 2. Load Initiation subfolder
-  const initiationPath = path.join(folderPath, 'Initiation');
-  console.log('[EnhancedRAG] Scanning Context/Initiation/...');
-  try {
-    await fs.access(initiationPath);
-    const initiationDocs = await this.fileParser.scanAndParseFolder(initiationPath);
-    initiationDocs.forEach(doc => {
-      contextFiles.push({ doc, contextCategory: 'initiation' });
-      console.log(`[EnhancedRAG] ✓ Loaded and will cache: Initiation/${doc.fileName} (${doc.content.length} chars)`);
-    });
-    console.log(`[EnhancedRAG] ✓ Total from Initiation/: ${initiationDocs.length} files`);
-  } catch {
-    console.log('[EnhancedRAG] Context/Initiation/ not found or empty');
-  }
-  
-  // 3. Load Ongoing subfolder
-  const ongoingPath = path.join(folderPath, 'Ongoing');
-  console.log('[EnhancedRAG] Scanning Context/Ongoing/...');
-  try {
-    await fs.access(ongoingPath);
-    const ongoingDocs = await this.fileParser.scanAndParseFolder(ongoingPath);
-    ongoingDocs.forEach(doc => {
-      contextFiles.push({ doc, contextCategory: 'ongoing' });
-      console.log(`[EnhancedRAG] ✓ Loaded and will cache: Ongoing/${doc.fileName} (${doc.content.length} chars)`);
-    });
-    console.log(`[EnhancedRAG] ✓ Total from Ongoing/: ${ongoingDocs.length} files`);
-  } catch {
-    console.log('[EnhancedRAG] Context/Ongoing/ not found or empty');
-  }
-  
-  // 4. Load Predicates subfolder
-  const predicatesPath = path.join(folderPath, 'Predicates');
-  console.log('[EnhancedRAG] Scanning Context/Predicates/...');
-  try {
-    await fs.access(predicatesPath);
-    const predicatesDocs = await this.fileParser.scanAndParseFolder(predicatesPath);
-    predicatesDocs.forEach(doc => {
-      contextFiles.push({ doc, contextCategory: 'predicates' });
-      console.log(`[EnhancedRAG] ✓ Loaded and will cache: Predicates/${doc.fileName} (${doc.content.length} chars)`);
-    });
-    console.log(`[EnhancedRAG] ✓ Total from Predicates/: ${predicatesDocs.length} files`);
-  } catch {
-    console.log('[EnhancedRAG] Context/Predicates/ not found or empty');
-  }
-  
-  // 5. Load Regulatory Strategy subfolder (on_demand priority)
-  const regulatoryStrategyPath = path.join(folderPath, 'Regulatory Strategy');
-  console.log('[EnhancedRAG] Scanning Context/Regulatory Strategy/...');
-  try {
-    await fs.access(regulatoryStrategyPath);
-    const regulatoryStrategyDocs = await this.fileParser.scanAndParseFolder(regulatoryStrategyPath);
-    regulatoryStrategyDocs.forEach(doc => {
-      contextFiles.push({ doc, contextCategory: 'regulatory-strategy' });
-      console.log(`[EnhancedRAG] ✓ Loaded and will cache: Regulatory Strategy/${doc.fileName} (${doc.content.length} chars)`);
-    });
-    console.log(`[EnhancedRAG] ✓ Total from Regulatory Strategy/: ${regulatoryStrategyDocs.length} files`);
-  } catch {
-    console.log('[EnhancedRAG] Context/Regulatory Strategy/ not found or empty');
-  }
-  
-  // 6. Load General subfolder (on_demand priority)
-  const generalPath = path.join(folderPath, 'General');
-  console.log('[EnhancedRAG] Scanning Context/General/...');
-  try {
-    await fs.access(generalPath);
-    const generalDocs = await this.fileParser.scanAndParseFolder(generalPath);
-    generalDocs.forEach(doc => {
-      contextFiles.push({ doc, contextCategory: 'general' });
-      console.log(`[EnhancedRAG] ✓ Loaded and will cache: General/${doc.fileName} (${doc.content.length} chars)`);
-    });
-    console.log(`[EnhancedRAG] ✓ Total from General/: ${generalDocs.length} files`);
-  } catch {
-    console.log('[EnhancedRAG] Context/General/ not found or empty');
-  }
-  
-  // NOTE: Context/Prompt is intentionally NOT scanned here - those files are parsed on-demand
-  
-  console.log(`[EnhancedRAG] 📊 TOTAL context files to cache: ${contextFiles.length}`);
-  if (contextFiles.length > 0) {
-    console.log('[EnhancedRAG] Files breakdown:');
-    const byCategory = contextFiles.reduce((acc, cf) => {
-      acc[cf.contextCategory] = (acc[cf.contextCategory] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    Object.entries(byCategory).forEach(([cat, count]) => {
-      console.log(`[EnhancedRAG]   - ${cat}: ${count} file(s)`);
-    });
-  }
-  
-  return contextFiles;
-}
 
   /**
    * Detect what changed in the cache
@@ -744,7 +532,7 @@ async loadContextFolderStructured(
     await this.clearOldCache(projectPath);
     
     // Load primary context
-    const primaryContext = await this.loadPrimaryContext(primaryContextPath);
+    const primaryContext = await this.documentLoader.loadPrimaryContext(primaryContextPath);
     
     // Load and parse documents
     const proceduresPath = path.join(projectPath, 'Procedures');
@@ -755,7 +543,7 @@ async loadContextFolderStructured(
     
     try {
       await fs.access(proceduresPath);
-      proceduresFiles = await this.fileParser.scanAndParseFolder(proceduresPath);
+      proceduresFiles = await this.documentLoader.loadProceduresFolder(proceduresPath);
       console.log(`[EnhancedRAG] Loaded ${proceduresFiles.length} files from Procedures folder`);
     } catch (error) {
       console.warn('[EnhancedRAG] Procedures folder not found or empty');
@@ -763,7 +551,7 @@ async loadContextFolderStructured(
     
     try {
       await fs.access(contextPath);
-      contextFiles = await this.loadContextFolderStructured(contextPath);
+      contextFiles = await this.documentLoader.loadContextFolderStructured(contextPath);
       console.log(`[EnhancedRAG] Loaded ${contextFiles.length} files from Context folder (with subfolder structure)`);
     } catch (error) {
       console.warn('[EnhancedRAG] Context folder not found or empty');
@@ -987,7 +775,7 @@ async loadContextFolderStructured(
         let proceduresFiles: ParsedDocument[] = [];
         try {
           await fs.access(proceduresPath);
-          proceduresFiles = await this.fileParser.scanAndParseFolder(proceduresPath);
+          proceduresFiles = await this.documentLoader.loadProceduresFolder(proceduresPath);
         } catch {
           // No procedures folder
         }
@@ -1021,7 +809,7 @@ async loadContextFolderStructured(
         let contextFilesWithCategory: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general' }[] = [];
         try {
           await fs.access(contextPath);
-          contextFilesWithCategory = await this.loadContextFolderStructured(contextPath);
+          contextFilesWithCategory = await this.documentLoader.loadContextFolderStructured(contextPath);
         } catch {
           // No context folder
         }
