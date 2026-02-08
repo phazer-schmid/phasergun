@@ -11,6 +11,7 @@ import { VectorStore, VectorEntry, SearchResult } from './vector-store';
 import { LockManager, getLockManager } from './lock-manager';
 import { DocumentChunker, DocumentChunk } from './chunking/document-chunker';
 import { SummaryGenerator } from './summarization/summary-generator';
+import { CacheManager, KnowledgeCache } from './cache/cache-manager';
 
 /**
  * GLOBAL mutex for cache builds - shared across ALL service instances
@@ -24,17 +25,6 @@ const globalBuildMutex = new Mutex();
  * Separate from cache build mutex to allow parallel operations when possible
  */
 const globalSummaryMutex = new Mutex();
-
-/**
- * Knowledge cache entry
- */
-interface KnowledgeCache {
-  projectPath: string;
-  fingerprint: string;
-  primaryContext: any;
-  indexedAt: string;
-  vectorStoreFingerprint: string;
-}
 
 /**
  * Enhanced RAG Service for Content Generation
@@ -53,6 +43,7 @@ export class EnhancedRAGService {
   private cacheEnabled: boolean;
   private chunker: DocumentChunker;
   private summaryGenerator: SummaryGenerator;
+  private cacheManager: CacheManager;
   
   constructor() {
     this.fileParser = new ComprehensiveFileParser();
@@ -63,50 +54,11 @@ export class EnhancedRAGService {
     // Read CACHE_ENABLED from environment (defaults to true for backwards compatibility)
     const cacheEnvValue = process.env.CACHE_ENABLED?.toLowerCase();
     this.cacheEnabled = cacheEnvValue !== 'false' && cacheEnvValue !== '0';
+    this.cacheManager = new CacheManager(this.cacheEnabled);
     
     if (!this.cacheEnabled) {
       console.log('[EnhancedRAG] ⚠️  CACHING DISABLED - All documents will be processed fresh on every request');
     }
-  }
-
-  /**
-   * Get vector store path for a project
-   * Uses system temp directory to avoid permission issues
-   */
-  private getVectorStorePath(projectPath: string): string {
-    const tempBase = os.tmpdir();
-    const cacheBaseName = crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8);
-    return path.join(tempBase, 'phasergun-cache', 'vector-store', cacheBaseName, 'vector-store.json');
-  }
-
-  /**
-   * Get SOP summaries cache path for a project
-   * Uses system temp directory to avoid permission issues
-   */
-  private getSOPSummariesCachePath(projectPath: string): string {
-    const tempBase = os.tmpdir();
-    const cacheBaseName = crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8);
-    return path.join(tempBase, 'phasergun-cache', 'sop-summaries', cacheBaseName, 'sop-summaries.json');
-  }
-
-  /**
-   * Get Context summaries cache path for a project
-   * Uses system temp directory to avoid permission issues
-   */
-  private getContextSummariesCachePath(projectPath: string): string {
-    const tempBase = os.tmpdir();
-    const cacheBaseName = crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8);
-    return path.join(tempBase, 'phasergun-cache', 'context-summaries', cacheBaseName, 'context-summaries.json');
-  }
-
-  /**
-   * Get cache metadata path for a project
-   * Uses system temp directory to avoid permission issues
-   */
-  private getCacheMetadataPath(projectPath: string): string {
-    const tempBase = os.tmpdir();
-    const cacheBaseName = crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8);
-    return path.join(tempBase, 'phasergun-cache', 'metadata', cacheBaseName, 'cache-metadata.json');
   }
 
   /**
@@ -342,7 +294,7 @@ private async buildVectorStore(
   
   // Save to disk only if caching is enabled
   if (this.cacheEnabled) {
-    await this.vectorStore.save(this.getVectorStorePath(projectPath));
+    await this.vectorStore.save(this.cacheManager.getVectorStorePath(projectPath));
   } else {
     console.log('[EnhancedRAG] ⚠️  Skipping vector store save (caching disabled)');
   }
@@ -408,99 +360,6 @@ async loadContextFolder(folderPath: string): Promise<DocumentChunk[]> {
     return [];
   }
 }
-
-  /**
-   * Recursively get all files from a directory
-   * @param dirPath - Directory to scan
-   * @param excludeDirs - Directory names to skip (e.g., ['Prompt', 'node_modules'])
-   */
-  private async getAllFiles(dirPath: string, excludeDirs: string[] = []): Promise<string[]> {
-    const files: string[] = [];
-    
-    try {
-      const entries = await fs.readdir(dirPath, { withFileTypes: true });
-      
-      for (const entry of entries) {
-        const fullPath = path.join(dirPath, entry.name);
-        
-        if (entry.isDirectory()) {
-          // Skip excluded directories (like Prompt folder)
-          if (excludeDirs.includes(entry.name)) {
-            console.log(`[EnhancedRAG] ⏭️  Skipping excluded directory: ${entry.name} (not cached)`);
-            continue;
-          }
-          const subFiles = await this.getAllFiles(fullPath, excludeDirs);
-          files.push(...subFiles);
-        } else if (entry.isFile()) {
-          files.push(fullPath);
-        }
-      }
-    } catch (error) {
-      console.error(`Error reading directory ${dirPath}:`, error);
-    }
-    
-    return files;
-  }
-
-  /**
-   * Compute fingerprint for a folder (all file paths, sizes, and mtimes)
-   * @param folderPath - Folder to fingerprint
-   * @param excludeDirs - Directory names to exclude from fingerprint (e.g., 'Prompt')
-   */
-  private async computeFolderFingerprint(folderPath: string, excludeDirs: string[] = []): Promise<string> {
-    try {
-      await fs.access(folderPath);
-      
-      const files = await this.getAllFiles(folderPath, excludeDirs);
-      
-      if (files.length === 0) {
-        console.log(`[EnhancedRAG] No files found in ${folderPath} for fingerprinting`);
-      } else {
-        console.log(`[EnhancedRAG] Computing fingerprint for ${files.length} files in ${path.basename(folderPath)}/`);
-      }
-      
-      const fileInfos = await Promise.all(
-        files.map(async (filePath) => {
-          const stats = await fs.stat(filePath);
-          return `${filePath}:${stats.size}:${stats.mtimeMs}`;
-        })
-      );
-      
-      const combined = fileInfos.sort().join('|');
-      return crypto.createHash('sha256').update(combined).digest('hex');
-    } catch (error) {
-      // Folder doesn't exist, return empty fingerprint
-      console.log(`[EnhancedRAG] Folder ${path.basename(folderPath)}/ not found, using empty fingerprint`);
-      return crypto.createHash('sha256').update('empty').digest('hex');
-    }
-  }
-
-  /**
-   * Compute combined fingerprint for cache validation
-   * Excludes Context/Prompt folder - those files are parsed fresh each time
-   */
-  private async computeCacheFingerprint(
-    projectPath: string,
-    primaryContextPath: string
-  ): Promise<string> {
-    const proceduresPath = path.join(projectPath, 'Procedures');
-    const contextPath = path.join(projectPath, 'Context');
-    
-    console.log(`[EnhancedRAG] 🔍 Computing cache fingerprint...`);
-    
-    // Get fingerprints for all three sources
-    // Note: Context folder excludes "Prompt" subfolder - those are never cached
-    const [primaryStats, proceduresFingerprint, contextFingerprint] = await Promise.all([
-      fs.stat(primaryContextPath).catch(() => ({ mtimeMs: 0, size: 0 })),
-      this.computeFolderFingerprint(proceduresPath),
-      this.computeFolderFingerprint(contextPath, ['Prompt']) // EXCLUDE Prompt folder
-    ]);
-    
-    const primaryFingerprint = `${primaryContextPath}:${primaryStats.size}:${primaryStats.mtimeMs}`;
-    const combined = `${primaryFingerprint}|${proceduresFingerprint}|${contextFingerprint}`;
-    
-    return crypto.createHash('sha256').update(combined).digest('hex');
-  }
 
 /**
  * Load and organize files from Context folder with subfolder structure
@@ -668,7 +527,7 @@ async loadContextFolderStructured(
     const contextPath = path.join(projectPath, 'Context');
     
     // Get current fingerprints
-    const currentFingerprint = await this.computeCacheFingerprint(projectPath, primaryContextPath);
+    const currentFingerprint = await this.cacheManager.computeCacheFingerprint(projectPath, primaryContextPath);
     
     // Compare
     const changed = cachedFingerprint !== currentFingerprint;
@@ -681,8 +540,8 @@ async loadContextFolderStructured(
     // Detect what changed by comparing individual components
     try {
       // Check if files exist and count them
-      const proceduresFiles = await this.getAllFiles(proceduresPath).catch(() => []);
-      const contextFiles = await this.getAllFiles(contextPath, ['Prompt']).catch(() => []);
+      const proceduresFiles = await this.cacheManager.getAllFiles(proceduresPath).catch(() => []);
+      const contextFiles = await this.cacheManager.getAllFiles(contextPath, ['Prompt']).catch(() => []);
       
       details.push(`Current state: ${proceduresFiles.length} procedure files, ${contextFiles.length} context files`);
     } catch {
@@ -702,203 +561,63 @@ async loadContextFolderStructured(
    * Save cache metadata to disk
    */
   private async saveCacheMetadata(cache: KnowledgeCache): Promise<void> {
-    // Skip saving if caching is disabled
-    if (!this.cacheEnabled) {
-      console.log('[EnhancedRAG] ⚠️  Skipping cache metadata save (caching disabled)');
-      return;
-    }
-    
-    const metadataPath = this.getCacheMetadataPath(cache.projectPath);
-    
-    console.log(`[EnhancedRAG] 💾 [CACHE] Saving cache metadata to: ${metadataPath}`);
-    
-    try {
-      const dir = path.dirname(metadataPath);
-      await fs.mkdir(dir, { recursive: true });
-      console.log(`[EnhancedRAG] 📁 [CACHE] Cache directory created/verified: ${dir}`);
-      
-      const jsonData = JSON.stringify(cache, null, 2);
-      await fs.writeFile(metadataPath, jsonData, 'utf8');
-      
-      // Verify the file was actually written
-      try {
-        const stats = await fs.stat(metadataPath);
-        console.log(`[EnhancedRAG] ✅ [CACHE] Cache metadata saved successfully (${stats.size} bytes)`);
-        console.log(`[EnhancedRAG] 📊 [CACHE] Cache fingerprint: ${cache.fingerprint.substring(0, 16)}...`);
-      } catch (verifyError) {
-        console.error(`[EnhancedRAG] ⚠️  [CACHE] File written but verification failed:`, verifyError);
-      }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error(`[EnhancedRAG] ❌ [CACHE] Failed to save cache metadata:`, errorMsg);
-      console.error(`[EnhancedRAG] ❌ [CACHE] Target path was: ${metadataPath}`);
-      // Continue anyway - cache metadata is optional but helpful
-    }
+    await this.cacheManager.saveCacheMetadata(cache);
   }
 
   /**
    * Load cache metadata from disk
    */
   private async loadCacheMetadata(projectPath: string): Promise<KnowledgeCache | null> {
-    const metadataPath = this.getCacheMetadataPath(projectPath);
-    
-    console.log(`[EnhancedRAG] 🔍 [CACHE] Attempting to load cache metadata from: ${metadataPath}`);
-    
-    try {
-      // First check if file exists
-      try {
-        const stats = await fs.stat(metadataPath);
-        console.log(`[EnhancedRAG] 📂 [CACHE] Cache metadata file found (${stats.size} bytes)`);
-      } catch (statError) {
-        if ((statError as NodeJS.ErrnoException).code === 'ENOENT') {
-          console.log('[EnhancedRAG] ❌ [CACHE] Cache metadata file does not exist (ENOENT)');
-          return null;
-        }
-        throw statError;
-      }
-      
-      const fileContents = await fs.readFile(metadataPath, 'utf8');
-      const cache: KnowledgeCache = JSON.parse(fileContents);
-      
-      console.log('[EnhancedRAG] ✅ [CACHE] Cache metadata loaded from disk successfully');
-      console.log(`[EnhancedRAG] 📊 [CACHE] Cached fingerprint: ${cache.fingerprint.substring(0, 16)}...`);
-      console.log(`[EnhancedRAG] 📊 [CACHE] Cache indexed at: ${cache.indexedAt}`);
-      
-      return cache;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        console.log('[EnhancedRAG] ❌ [CACHE] Cache metadata file does not exist (ENOENT)');
-      } else {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        console.error('[EnhancedRAG] ❌ [CACHE] Failed to load cache metadata:', errorMsg);
-      }
-      return null;
-    }
+    return await this.cacheManager.loadCacheMetadata(projectPath);
   }
 
   /**
    * Clear old cache files for a project
    */
   private async clearOldCache(projectPath: string): Promise<void> {
-    console.log('[EnhancedRAG] 🗑️  Clearing old cache files...');
-    
-    try {
-      const vectorStorePath = this.getVectorStorePath(projectPath);
-      const sopSummariesPath = this.getSOPSummariesCachePath(projectPath);
-      const contextSummariesPath = this.getContextSummariesCachePath(projectPath);
-      const metadataPath = this.getCacheMetadataPath(projectPath);
-      
-      // Try to delete vector store
-      try {
-        await fs.unlink(vectorStorePath);
-        console.log('[EnhancedRAG] ✓ Deleted old vector store');
-      } catch (error) {
-        // File might not exist, which is fine
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-          console.log('[EnhancedRAG] ⚠️  Could not delete old vector store (continuing anyway)');
-        }
-      }
-      
-      // Try to delete SOP summaries
-      try {
-        await fs.unlink(sopSummariesPath);
-        console.log('[EnhancedRAG] ✓ Deleted old SOP summaries cache');
-      } catch (error) {
-        // File might not exist, which is fine
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-          console.log('[EnhancedRAG] ⚠️  Could not delete old SOP summaries (continuing anyway)');
-        }
-      }
-      
-      // Try to delete Context summaries
-      try {
-        await fs.unlink(contextSummariesPath);
-        console.log('[EnhancedRAG] ✓ Deleted old Context summaries cache');
-      } catch (error) {
-        // File might not exist, which is fine
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-          console.log('[EnhancedRAG] ⚠️  Could not delete old Context summaries (continuing anyway)');
-        }
-      }
-      
-      // Try to delete cache metadata
-      try {
-        await fs.unlink(metadataPath);
-        console.log('[EnhancedRAG] ✓ Deleted old cache metadata');
-      } catch (error) {
-        // File might not exist, which is fine
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-          console.log('[EnhancedRAG] ⚠️  Could not delete old cache metadata (continuing anyway)');
-        }
-      }
-    } catch (error) {
-      console.warn('[EnhancedRAG] ⚠️  Error during cache cleanup (non-fatal):', error);
-    }
+    await this.cacheManager.clearOldCache(projectPath);
   }
 
   /**
    * Check if cache is valid for a project
    */
   async isCacheValid(projectPath: string, primaryContextPath: string): Promise<boolean> {
-    // If caching is disabled, always return false to force rebuild
-    if (!this.cacheEnabled) {
-      return false;
-    }
-    
-    console.log('[EnhancedRAG] 🔍 [CACHE] ========================================');
-    console.log('[EnhancedRAG] 🔍 [CACHE] Checking cache validity for project');
-    console.log(`[EnhancedRAG] 🔍 [CACHE] Project path: ${projectPath}`);
-    console.log('[EnhancedRAG] 🔍 [CACHE] ========================================');
-    
-    // Try to get from memory first
-    let cached = this.cache.get(projectPath);
-    
-    if (cached) {
-      console.log('[EnhancedRAG] 📦 [CACHE] Cache found in MEMORY');
-    } else {
-      console.log('[EnhancedRAG] 📦 [CACHE] Cache NOT in memory, checking disk...');
-    }
-    
-    // If not in memory, try loading from disk
-    if (!cached) {
-      const diskCache = await this.loadCacheMetadata(projectPath);
-      if (diskCache !== null) {
-        // Store in memory for subsequent checks
-        cached = diskCache;
-        this.cache.set(projectPath, diskCache);
-        console.log('[EnhancedRAG] ✅ [CACHE] Cache metadata restored from disk to memory');
-      } else {
-        console.log('[EnhancedRAG] ❌ [CACHE] No cached knowledge found (memory or disk)');
-        console.log('[EnhancedRAG] 🔍 [CACHE] ========================================');
-        return false;
-      }
-    }
-    
-    console.log('[EnhancedRAG] 🔍 [CACHE] Computing current fingerprint...');
-    const currentFingerprint = await this.computeCacheFingerprint(projectPath, primaryContextPath);
-    console.log(`[EnhancedRAG] 🔍 [CACHE] Current fingerprint: ${currentFingerprint.substring(0, 16)}...`);
-    console.log(`[EnhancedRAG] 🔍 [CACHE] Cached fingerprint: ${cached.fingerprint.substring(0, 16)}...`);
-    
-    const isValid = cached.fingerprint === currentFingerprint;
-    
-    if (isValid) {
-      console.log('[EnhancedRAG] ✅ [CACHE] Cache is VALID (fingerprints match)');
-      console.log(`[EnhancedRAG] 📊 [CACHE] Cache was built at: ${cached.indexedAt}`);
-      console.log('[EnhancedRAG] 🔍 [CACHE] ========================================');
-    } else {
-      console.log('[EnhancedRAG] ⚠️  [CACHE] Cache EXPIRED - fingerprint mismatch');
-      console.log(`[EnhancedRAG] 📊 [CACHE] Old fingerprint: ${cached.fingerprint.substring(0, 16)}...`);
-      console.log(`[EnhancedRAG] 📊 [CACHE] New fingerprint: ${currentFingerprint.substring(0, 16)}...`);
-      
-      // Detect what changed
-      const changes = await this.detectCacheChanges(projectPath, primaryContextPath, cached.fingerprint);
-      if (changes.details.length > 0) {
-        changes.details.forEach((detail: string) => console.log(`[EnhancedRAG] 📋 [CACHE] ${detail}`));
-      }
-      console.log('[EnhancedRAG] 🔍 [CACHE] ========================================');
-    }
-    
-    return isValid;
+    return await this.cacheManager.isCacheValid(projectPath, primaryContextPath, this.cache);
+  }
+
+  /**
+   * Compute cache fingerprint - delegates to cacheManager
+   */
+  private async computeCacheFingerprint(projectPath: string, primaryContextPath: string): Promise<string> {
+    return await this.cacheManager.computeCacheFingerprint(projectPath, primaryContextPath);
+  }
+
+  /**
+   * Get vector store path - delegates to cacheManager
+   */
+  private getVectorStorePath(projectPath: string): string {
+    return this.cacheManager.getVectorStorePath(projectPath);
+  }
+
+  /**
+   * Get SOP summaries cache path - delegates to cacheManager
+   */
+  private getSOPSummariesCachePath(projectPath: string): string {
+    return this.cacheManager.getSOPSummariesCachePath(projectPath);
+  }
+
+  /**
+   * Get context summaries cache path - delegates to cacheManager
+   */
+  private getContextSummariesCachePath(projectPath: string): string {
+    return this.cacheManager.getContextSummariesCachePath(projectPath);
+  }
+
+  /**
+   * Get cache metadata path - delegates to cacheManager
+   */
+  private getCacheMetadataPath(projectPath: string): string {
+    return this.cacheManager.getCacheMetadataPath(projectPath);
   }
 
   /**
