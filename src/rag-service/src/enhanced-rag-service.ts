@@ -11,6 +11,7 @@ import { DocumentChunker, DocumentChunk } from './chunking/document-chunker';
 import { SummaryGenerator } from './summarization/summary-generator';
 import { CacheManager, KnowledgeCache } from './cache/cache-manager';
 import { DocumentLoader, CategorizedContextFile } from './loading/document-loader';
+import { ContextRetriever } from './retrieval/context-retriever';
 
 /**
  * GLOBAL mutex for cache builds - shared across ALL service instances
@@ -43,12 +44,14 @@ export class EnhancedRAGService {
   private chunker: DocumentChunker;
   private summaryGenerator: SummaryGenerator;
   private cacheManager: CacheManager;
+  private contextRetriever: ContextRetriever;
   
   constructor() {
     this.documentLoader = new DocumentLoader();
     this.lockManager = getLockManager();
     this.chunker = new DocumentChunker();
     this.summaryGenerator = new SummaryGenerator();
+    this.contextRetriever = new ContextRetriever();
     
     // Read CACHE_ENABLED from environment (defaults to true for backwards compatibility)
     const cacheEnvValue = process.env.CACHE_ENABLED?.toLowerCase();
