@@ -51,4 +51,4 @@ credentials.json
 # Misc
 .DS_Store
 architecture
-tsconfig.tsbuildinfo
+*.tsbuildinfo
