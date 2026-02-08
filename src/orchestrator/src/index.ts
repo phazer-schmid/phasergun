@@ -113,7 +113,7 @@ export class OrchestratorService {
       
       // Step 7: Append footnotes to generated text
       const footnotes = footnoteTracker.generateFootnotes();
-      const finalText = response.generatedText + footnotes;
+      const finalText = response.generatedText;// + footnotes;
       
       // Step 8: Track discrepancies (placeholder for now)
       const discrepancies = this.trackDiscrepancies(procedureChunks, contextChunks);
