@@ -9,6 +9,7 @@ import { ComprehensiveFileParser } from '@phasergun/file-parser';
 import { EmbeddingService } from './embedding-service';
 import { VectorStore, VectorEntry, SearchResult } from './vector-store';
 import { LockManager, getLockManager } from './lock-manager';
+import { DocumentChunker, DocumentChunk } from './chunking/document-chunker';
 
 /**
  * GLOBAL mutex for cache builds - shared across ALL service instances
@@ -22,18 +23,6 @@ const globalBuildMutex = new Mutex();
  * Separate from cache build mutex to allow parallel operations when possible
  */
 const globalSummaryMutex = new Mutex();
-
-/**
- * Document chunk with metadata
- */
-interface DocumentChunk {
-  content: string;
-  fileName: string;
-  filePath: string;
-  chunkIndex: number;
-  totalChunks: number;
-  keywords: string[];
-}
 
 /**
  * Knowledge cache entry
@@ -61,10 +50,12 @@ export class EnhancedRAGService {
   private useEmbeddings: boolean = true; // Feature flag
   private lockManager: LockManager;
   private cacheEnabled: boolean;
+  private chunker: DocumentChunker;
   
   constructor() {
     this.fileParser = new ComprehensiveFileParser();
     this.lockManager = getLockManager();
+    this.chunker = new DocumentChunker();
     
     // Read CACHE_ENABLED from environment (defaults to true for backwards compatibility)
     const cacheEnvValue = process.env.CACHE_ENABLED?.toLowerCase();
@@ -373,133 +364,10 @@ private async buildVectorStore(
 }
 
   /**
-   * Chunk a document into semantic segments (OLD - DEPRECATED)
+   * Chunk a document into semantic segments (delegates to DocumentChunker)
    */
   private chunkDocument(doc: ParsedDocument): DocumentChunk[] {
-    const chunks: DocumentChunk[] = [];
-    const content = doc.content;
-    
-    // Split by double newlines (paragraphs) or by sections
-    const segments = content.split(/\n\n+/);
-    
-    // Combine small segments and split large ones to target ~500-1000 chars per chunk
-    const targetChunkSize = 800;
-    const maxChunkSize = 1500;
-    
-    let currentChunk = '';
-    let chunkIndex = 0;
-    
-    for (const segment of segments) {
-      const trimmed = segment.trim();
-      if (!trimmed) continue;
-      
-      // If current chunk + segment is still reasonable size, combine them
-      if (currentChunk.length > 0 && (currentChunk.length + trimmed.length) < maxChunkSize) {
-        currentChunk += '\n\n' + trimmed;
-      } else {
-        // Save current chunk if it exists
-        if (currentChunk.length > 0) {
-          chunks.push({
-            content: currentChunk,
-            fileName: doc.fileName,
-            filePath: doc.filePath,
-            chunkIndex: chunkIndex++,
-            totalChunks: 0, // Will update after
-            keywords: this.extractKeywords(currentChunk)
-          });
-        }
-        
-        // Start new chunk
-        // If segment itself is too large, split it
-        if (trimmed.length > maxChunkSize) {
-          const subChunks = this.splitLargeText(trimmed, targetChunkSize);
-          for (const subChunk of subChunks) {
-            chunks.push({
-              content: subChunk,
-              fileName: doc.fileName,
-              filePath: doc.filePath,
-              chunkIndex: chunkIndex++,
-              totalChunks: 0,
-              keywords: this.extractKeywords(subChunk)
-            });
-          }
-          currentChunk = '';
-        } else {
-          currentChunk = trimmed;
-        }
-      }
-    }
-    
-    // Don't forget the last chunk
-    if (currentChunk.length > 0) {
-      chunks.push({
-        content: currentChunk,
-        fileName: doc.fileName,
-        filePath: doc.filePath,
-        chunkIndex: chunkIndex++,
-        totalChunks: 0,
-        keywords: this.extractKeywords(currentChunk)
-      });
-    }
-    
-    // Update totalChunks for all chunks
-    chunks.forEach(chunk => chunk.totalChunks = chunks.length);
-    
-    return chunks;
-  }
-
-  /**
-   * Split large text into smaller chunks
-   */
-  private splitLargeText(text: string, targetSize: number): string[] {
-    const chunks: string[] = [];
-    const sentences = text.split(/\.(?:\s|$)/);
-    
-    let currentChunk = '';
-    
-    for (const sentence of sentences) {
-      if (!sentence.trim()) continue;
-      
-      if (currentChunk.length + sentence.length < targetSize * 1.5) {
-        currentChunk += sentence + '. ';
-      } else {
-        if (currentChunk) chunks.push(currentChunk.trim());
-        currentChunk = sentence + '. ';
-      }
-    }
-    
-    if (currentChunk) chunks.push(currentChunk.trim());
-    
-    return chunks;
-  }
-
-  /**
-   * Extract keywords from text for relevance matching
-   */
-  private extractKeywords(text: string): string[] {
-    // Convert to lowercase and remove special characters
-    const cleaned = text.toLowerCase().replace(/[^\w\s]/g, ' ');
-    
-    // Common stop words to filter out
-    const stopWords = new Set([
-      'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-      'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'been', 'be',
-      'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should',
-      'could', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those'
-    ]);
-    
-    // Extract words, filter stop words, count frequency
-    const words = cleaned.split(/\s+/).filter(w => w.length > 3 && !stopWords.has(w));
-    
-    // Get unique important keywords (simple frequency-based)
-    const frequency: Map<string, number> = new Map();
-    words.forEach(word => frequency.set(word, (frequency.get(word) || 0) + 1));
-    
-    // Return top keywords sorted by frequency
-    return Array.from(frequency.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 20)
-      .map(([word]) => word);
+    return this.chunker.chunkDocument(doc);
   }
 
   /**
@@ -1464,7 +1332,7 @@ async loadContextFolderStructured(
     } catch (error) {
       console.warn('[EnhancedRAG] Embedding-based retrieval failed, falling back to keywords:', error);
       // Fallback to keyword-based retrieval
-      const queryKeywords = this.extractKeywords(queryText);
+      const queryKeywords = this.chunker.extractKeywords(queryText);
       return this.retrieveRelevantChunks(chunks, queryKeywords, topK);
     }
   }
