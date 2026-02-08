@@ -10,6 +10,7 @@ import { EmbeddingService } from './embedding-service';
 import { VectorStore, VectorEntry, SearchResult } from './vector-store';
 import { LockManager, getLockManager } from './lock-manager';
 import { DocumentChunker, DocumentChunk } from './chunking/document-chunker';
+import { SummaryGenerator } from './summarization/summary-generator';
 
 /**
  * GLOBAL mutex for cache builds - shared across ALL service instances
@@ -51,11 +52,13 @@ export class EnhancedRAGService {
   private lockManager: LockManager;
   private cacheEnabled: boolean;
   private chunker: DocumentChunker;
+  private summaryGenerator: SummaryGenerator;
   
   constructor() {
     this.fileParser = new ComprehensiveFileParser();
     this.lockManager = getLockManager();
     this.chunker = new DocumentChunker();
+    this.summaryGenerator = new SummaryGenerator();
     
     // Read CACHE_ENABLED from environment (defaults to true for backwards compatibility)
     const cacheEnvValue = process.env.CACHE_ENABLED?.toLowerCase();
@@ -237,22 +240,6 @@ export class EnhancedRAGService {
     return chunks.length > 0 ? chunks : [content];
   }
 
-  /**
-   * Deterministic extractive summary — first N words of the document.
-   * Replaces the previous LLM-generated summaries.  No API call, no
-   * non-determinism.  The detailed chunks retrieved by vector search
-   * already carry the actual content; the summary is supplementary
-   * context that just needs to convey purpose/scope (almost always at
-   * the top of a regulatory document).
-   */
-  private extractiveSummary(doc: ParsedDocument, summaryWordCount: number = 250): string {
-    const words = doc.content.split(/\s+/).filter(w => w.length > 0);
-    if (words.length <= summaryWordCount) {
-      return doc.content.trim();
-    }
-    return words.slice(0, summaryWordCount).join(' ') + ' ...';
-  }
-
 /**
  * Chunk and embed a parsed document
  * Returns VectorEntry objects ready for storage
@@ -421,173 +408,6 @@ async loadContextFolder(folderPath: string): Promise<DocumentChunk[]> {
     return [];
   }
 }
-
-  /**
-   * Hash content for cache validation
-   */
-  private hashContent(content: string): string {
-    return crypto.createHash('sha256').update(content).digest('hex');
-  }
-
-
-
-  /**
-   * Generate and cache summaries for all procedures
-   */
-  private async generateSOPSummaries(
-    proceduresFiles: ParsedDocument[],
-    projectPath: string,
-    summaryWordCount: number = 250
-  ): Promise<Map<string, string>> {
-    const summaryCache = new Map<string, string>();
-    
-    if (proceduresFiles.length === 0) {
-      return summaryCache;
-    }
-    
-    console.log('[EnhancedRAG] Generating SOP summaries...');
-    
-    // Load existing cache if available
-    const cachePath = this.getSOPSummariesCachePath(projectPath);
-    let cached: any = {};
-    
-    try {
-      const cacheData = await fs.readFile(cachePath, 'utf-8');
-      cached = JSON.parse(cacheData);
-      
-      // Check if cached summaries are still valid
-      for (const doc of proceduresFiles) {
-        const hash = this.hashContent(doc.content);
-        if (cached[doc.fileName] && cached[doc.fileName].hash === hash) {
-          summaryCache.set(doc.fileName, cached[doc.fileName].summary);
-          console.log(`[EnhancedRAG] ✓ Using cached summary for ${doc.fileName}`);
-        }
-      }
-    } catch {
-      // No cache exists, will generate fresh
-      console.log('[EnhancedRAG] No existing summary cache found');
-    }
-    
-    // Generate missing summaries
-    for (const doc of proceduresFiles) {
-      if (!summaryCache.has(doc.fileName)) {
-        console.log(`[EnhancedRAG] Summarizing ${doc.fileName}...`);
-        const summary = this.extractiveSummary(doc, summaryWordCount);
-        summaryCache.set(doc.fileName, summary);
-      }
-    }
-    
-    // Save cache - preserve original timestamps for cached entries
-    const cacheData: any = {};
-    for (const doc of proceduresFiles) {
-      const summary = summaryCache.get(doc.fileName);
-      if (summary) {
-        const hash = this.hashContent(doc.content);
-        // Preserve original timestamp if entry was cached, otherwise use current time
-        const existingEntry = cached[doc.fileName];
-        const generatedAt = (existingEntry && existingEntry.hash === hash) 
-          ? existingEntry.generatedAt 
-          : new Date().toISOString();
-        
-        cacheData[doc.fileName] = {
-          hash: hash,
-          summary: summary,
-          generatedAt: generatedAt
-        };
-      }
-    }
-    
-    try {
-      await fs.mkdir(path.dirname(cachePath), { recursive: true });
-      await fs.writeFile(cachePath, JSON.stringify(cacheData, null, 2));
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      console.warn('[EnhancedRAG] Failed to save SOP summaries cache (non-fatal):', errorMsg);
-      // Continue anyway - cache is optional
-    }
-    
-    console.log('[EnhancedRAG] ✓ SOP summaries complete');
-    return summaryCache;
-  }
-
-  /**
-   * Generate and cache summaries for all context files
-   */
-  private async generateContextSummaries(
-    contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general' }[],
-    projectPath: string,
-    summaryWordCount: number = 250
-  ): Promise<Map<string, string>> {
-    const summaryCache = new Map<string, string>();
-    
-    if (contextFiles.length === 0) {
-      return summaryCache;
-    }
-    
-    console.log('[EnhancedRAG] Generating Context file summaries...');
-    
-    // Load existing cache if available
-    const cachePath = this.getContextSummariesCachePath(projectPath);
-    let cached: any = {};
-    
-    try {
-      const cacheData = await fs.readFile(cachePath, 'utf-8');
-      cached = JSON.parse(cacheData);
-      
-      // Check if cached summaries are still valid
-      for (const { doc } of contextFiles) {
-        const hash = this.hashContent(doc.content);
-        if (cached[doc.fileName] && cached[doc.fileName].hash === hash) {
-          summaryCache.set(doc.fileName, cached[doc.fileName].summary);
-          console.log(`[EnhancedRAG] ✓ Using cached summary for ${doc.fileName}`);
-        }
-      }
-    } catch {
-      // No cache exists, will generate fresh
-      console.log('[EnhancedRAG] No existing context summary cache found');
-    }
-    
-    // Generate missing summaries
-    for (const { doc, contextCategory } of contextFiles) {
-      if (!summaryCache.has(doc.fileName)) {
-        console.log(`[EnhancedRAG] Summarizing ${doc.fileName}...`);
-        const summary = this.extractiveSummary(doc, summaryWordCount);
-        summaryCache.set(doc.fileName, summary);
-      }
-    }
-    
-    // Save cache - preserve original timestamps for cached entries
-    const cacheData: any = {};
-    for (const { doc } of contextFiles) {
-      const summary = summaryCache.get(doc.fileName);
-      if (summary) {
-        const hash = this.hashContent(doc.content);
-        // Preserve original timestamp if entry was cached, otherwise use current time
-        const existingEntry = cached[doc.fileName];
-        const generatedAt = (existingEntry && existingEntry.hash === hash) 
-          ? existingEntry.generatedAt 
-          : new Date().toISOString();
-        
-        cacheData[doc.fileName] = {
-          hash: hash,
-          summary: summary,
-          generatedAt: generatedAt
-        };
-      }
-    }
-    
-    try {
-      await fs.mkdir(path.dirname(cachePath), { recursive: true });
-      await fs.writeFile(cachePath, JSON.stringify(cacheData, null, 2));
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      console.warn('[EnhancedRAG] Failed to save Context summaries cache (non-fatal):', errorMsg);
-      // Continue anyway - cache is optional
-    }
-    
-    console.log('[EnhancedRAG] ✓ Context file summaries complete');
-    return summaryCache;
-  }
 
   /**
    * Recursively get all files from a directory
@@ -1454,7 +1274,7 @@ async loadContextFolderStructured(
         }
         
         if (proceduresFiles.length > 0) {
-          sopSummaries = await this.generateSOPSummaries(
+          sopSummaries = await this.summaryGenerator.generateSOPSummaries(
             proceduresFiles,
             projectPath,
             options.summaryWordCount || 250
@@ -1501,7 +1321,7 @@ async loadContextFolderStructured(
             return true;
           });
           
-          contextSummaries = await this.generateContextSummaries(
+          contextSummaries = await this.summaryGenerator.generateContextSummaries(
             filteredContextFiles,
             projectPath,
             options.summaryWordCount || 250
