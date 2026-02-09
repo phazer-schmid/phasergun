@@ -7,8 +7,8 @@ import { ParsedDocument } from '@phasergun/shared-types';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Mutex } from 'async-mutex';
-import { SummaryGenerator } from './summarization/summary-generator';
-import { DocumentLoader } from './loading/document-loader';
+import { SummaryGenerator } from './summary-generator';
+import { DocumentLoader } from './document-loader';
 
 /**
  * GLOBAL mutex for summary generation - prevents duplicate LLM calls

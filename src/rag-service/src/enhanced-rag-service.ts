@@ -1,21 +1,15 @@
-import { KnowledgeContext, ChunkedDocumentPart, ParsedDocument } from '@phasergun/shared-types';
+import { ParsedDocument } from '@phasergun/shared-types';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import * as crypto from 'crypto';
-import * as os from 'os';
 import { Mutex } from 'async-mutex';
 import { EmbeddingService } from './embedding-service';
-import { VectorStore, VectorEntry, SearchResult } from './vector-store';
+import { VectorStore, SearchResult } from './vector-store';
 import { LockManager, getLockManager } from './lock-manager';
-import { DocumentChunker, DocumentChunk } from './document-chunker';
-import { SummaryGenerator } from './summary-generator';
 import { CacheManager, KnowledgeCache } from './cache-manager';
-import { DocumentLoader, CategorizedContextFile } from './document-loader';
-import { ContextRetriever } from './context-retriever';
-import { parseExplicitContextReferences, logRetrievalPolicy, filterContextResults } from './reference-parser';
+import { DocumentLoader } from './document-loader';
+import { parseExplicitContextReferences } from './reference-parser';
 import { assembleContext, estimateTokens, enforceTokenLimit } from './context-assembler';
-import { buildVectorStore as buildVectorStoreImpl } from './vector-builder';
-import { chunkSectionAware, chunkWithOverlap } from './chunking-strategy';
+import { buildVectorStore as buildVectorStoreUtil } from './vector-builder';
 import { generateSOPSummaries as generateSOPSummariesOrch, generateContextSummaries as generateContextSummariesOrch } from './summary-orchestrator';
 
 /**
@@ -46,17 +40,15 @@ export class EnhancedRAGService {
   private useEmbeddings: boolean = true; // Feature flag
   private lockManager: LockManager;
   private cacheEnabled: boolean;
-  private chunker: DocumentChunker;
-  private summaryGenerator: SummaryGenerator;
   private cacheManager: CacheManager;
-  private contextRetriever: ContextRetriever;
+  private summaryGenerator: any; // Lazy-loaded when needed
   
   constructor() {
     this.documentLoader = new DocumentLoader();
     this.lockManager = getLockManager();
-    this.chunker = new DocumentChunker();
-    this.summaryGenerator = new SummaryGenerator();
-    this.contextRetriever = new ContextRetriever();
+    
+    // Lazy-load SummaryGenerator only when needed (to avoid circular dependencies)
+    this.summaryGenerator = null;
     
     // Read CACHE_ENABLED from environment (defaults to true for backwards compatibility)
     const cacheEnvValue = process.env.CACHE_ENABLED?.toLowerCase();
@@ -81,114 +73,29 @@ export class EnhancedRAGService {
 
 
 /**
- * Chunk and embed a parsed document
- * Returns VectorEntry objects ready for storage
- */
-private async chunkAndEmbedDocument(
-  doc: ParsedDocument,
-  category: 'procedure' | 'context',
-  projectPath: string,
-  contextCategory?: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general'
-): Promise<VectorEntry[]> {
-  // 1. Intelligent chunking based on category
-  const contentChunks = category === 'procedure'
-    ? chunkSectionAware(doc.content, doc.fileName, doc.filePath)
-    : chunkWithOverlap(doc.content, doc.fileName, doc.filePath);
-  
-  console.log(`[EnhancedRAG] Chunked ${doc.fileName}: ${contentChunks.length} chunks`);
-  
-  if (contentChunks.length === 0) {
-    return [];
-  }
-  
-  // 2. Generate embeddings for all chunks (batch processing)
-  const embeddingService = await this.getEmbeddingService(projectPath);
-  const embeddings = await embeddingService.embedBatch(
-    contentChunks,
-    Array(contentChunks.length).fill(doc.filePath)
-  );
-  
-  // 3. Create VectorEntry objects
-  const vectorEntries: VectorEntry[] = contentChunks.map((content: string, chunkIndex: number) => {
-    return VectorStore.createEntry(
-      content,
-      embeddings[chunkIndex],
-      {
-        fileName: doc.fileName,
-        filePath: doc.filePath,
-        category,
-        chunkIndex,
-        contextCategory
-      }
+   * Build vector store using the vector-builder utility
+   */
+  private async buildVectorStore(
+    proceduresFiles: ParsedDocument[],
+    contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general' }[],
+    projectPath: string
+  ): Promise<void> {
+    const embeddingService = await this.getEmbeddingService(projectPath);
+    const vectorStorePath = this.cacheManager.getVectorStorePath(projectPath);
+    
+    // Import chunking strategies
+    const { chunkSectionAware, chunkWithOverlap } = await import('./chunking-strategy');
+    
+    this.vectorStore = await buildVectorStoreUtil(
+      proceduresFiles,
+      contextFiles,
+      projectPath,
+      embeddingService,
+      { chunkSectionAware, chunkWithOverlap },
+      vectorStorePath,
+      this.cacheEnabled
     );
-  });
-  
-  return vectorEntries;
-}
-
-/**
- * Process all documents and build vector store
- * DETERMINISM: Files are sorted alphabetically before processing to ensure
- * consistent vector entry ordering across cache rebuilds
- */
-private async buildVectorStore(
-  proceduresFiles: ParsedDocument[],
-  contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general' }[],
-  projectPath: string
-): Promise<void> {
-  console.log('[EnhancedRAG] Building vector store with deterministic ordering...');
-  
-  // Get embedding service model info
-  const embeddingService = await this.getEmbeddingService(projectPath);
-  const modelInfo = embeddingService.getModelInfo();
-  
-  // Create new vector store
-  this.vectorStore = new VectorStore(projectPath, modelInfo.version);
-  
-  // =========================================================================
-  // DETERMINISM: Sort files alphabetically before processing
-  // This ensures vectors are always added in the same order
-  // =========================================================================
-  
-  // Sort procedures by fileName
-  const sortedProcedures = [...proceduresFiles].sort((a, b) => 
-    a.fileName.localeCompare(b.fileName)
-  );
-  
-  // Sort context files by fileName
-  const sortedContext = [...contextFiles].sort((a, b) => 
-    a.doc.fileName.localeCompare(b.doc.fileName)
-  );
-  
-  console.log('[EnhancedRAG] Processing files in sorted order for determinism...');
-  
-  // Process procedures sequentially (not in parallel) to maintain order
-  const procedureVectors: VectorEntry[] = [];
-  for (const doc of sortedProcedures) {
-    const vectors = await this.chunkAndEmbedDocument(doc, 'procedure', projectPath);
-    procedureVectors.push(...vectors);
   }
-  
-  // Process context files sequentially (not in parallel) to maintain order
-  const contextVectors: VectorEntry[] = [];
-  for (const { doc, contextCategory } of sortedContext) {
-    const vectors = await this.chunkAndEmbedDocument(doc, 'context', projectPath, contextCategory);
-    contextVectors.push(...vectors);
-  }
-  
-  // Add to vector store in deterministic order: procedures first, then context
-  const allVectors = [...procedureVectors, ...contextVectors];
-  allVectors.forEach(entry => this.vectorStore!.addEntry(entry));
-  
-  // Save to disk only if caching is enabled
-  if (this.cacheEnabled) {
-    await this.vectorStore.save(this.cacheManager.getVectorStorePath(projectPath));
-  } else {
-    console.log('[EnhancedRAG] ⚠️  Skipping vector store save (caching disabled)');
-  }
-  
-  console.log(`[EnhancedRAG] ✓ Vector store built: ${allVectors.length} chunks indexed (deterministic order)`);
-}
 
   // Cache operations delegate to cacheManager
   async isCacheValid(projectPath: string, primaryContextPath: string): Promise<boolean> {
@@ -404,74 +311,6 @@ private async buildVectorStore(
     return knowledgeCache;
   }
 
-  /**
-   * Calculate relevance score between query and chunk
-   */
-  private calculateRelevance(queryKeywords: string[], chunk: DocumentChunk): number {
-    const chunkKeywords = new Set(chunk.keywords);
-    let matches = 0;
-    
-    // Count how many query keywords appear in chunk keywords
-    for (const keyword of queryKeywords) {
-      if (chunkKeywords.has(keyword)) {
-        matches++;
-      }
-    }
-    
-    // Normalize by query length
-    return queryKeywords.length > 0 ? matches / queryKeywords.length : 0;
-  }
-
-  /**
-   * Retrieve top-K most relevant chunks using embeddings
-   */
-  private async retrieveRelevantChunksWithEmbeddings(
-    chunks: DocumentChunk[],
-    chunkEmbeddings: Float32Array[],
-    queryText: string,
-    projectPath: string,
-    topK: number = 5
-  ): Promise<DocumentChunk[]> {
-    try {
-      const embeddingService = await this.getEmbeddingService(projectPath);
-      
-      // Generate embedding for query
-      const queryEmbedding = await embeddingService.embedText(queryText);
-      
-      // Find top-K most similar chunks
-      const topMatches = EmbeddingService.findTopK(queryEmbedding, chunkEmbeddings, topK);
-      
-      // Return the chunks in order of similarity
-      return topMatches.map(match => chunks[match.index]);
-    } catch (error) {
-      console.warn('[EnhancedRAG] Embedding-based retrieval failed, falling back to keywords:', error);
-      // Fallback to keyword-based retrieval
-      const queryKeywords = this.chunker.extractKeywords(queryText);
-      return this.retrieveRelevantChunks(chunks, queryKeywords, topK);
-    }
-  }
-
-  /**
-   * Retrieve top-K most relevant chunks based on query (keyword-based fallback)
-   */
-  private retrieveRelevantChunks(
-    chunks: DocumentChunk[],
-    queryKeywords: string[],
-    topK: number = 5
-  ): DocumentChunk[] {
-    // Score all chunks
-    const scoredChunks = chunks.map(chunk => ({
-      chunk,
-      score: this.calculateRelevance(queryKeywords, chunk)
-    }));
-    
-    // Sort by score and take top K
-    return scoredChunks
-      .sort((a, b) => b.score - a.score)
-      .slice(0, topK)
-      .map(sc => sc.chunk);
-  }
-
 
   /**
    * Retrieve relevant context for a prompt using semantic search
@@ -530,6 +369,12 @@ private async buildVectorStore(
     let contextSummaries = new Map<string, string>();
     
     if (options.includeSummaries ?? true) {
+      // Lazy-load SummaryGenerator
+      if (!this.summaryGenerator) {
+        const { SummaryGenerator } = await import('./summary-generator');
+        this.summaryGenerator = new SummaryGenerator();
+      }
+      
       sopSummaries = await generateSOPSummariesOrch(
         projectPath,
         options.summaryWordCount || 250,
