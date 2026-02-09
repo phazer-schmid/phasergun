@@ -1,6 +1,5 @@
-import { VectorStore, SearchResult } from '../vector-store';
-import { EmbeddingService } from '../embedding-service';
-import { DocumentChunk } from '../chunking/document-chunker';
+import { VectorStore, SearchResult } from './vector-store';
+import { EmbeddingService } from './embedding-service';
 
 export interface RetrievalOptions {
   topK?: number;
