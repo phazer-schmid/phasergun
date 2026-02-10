@@ -30,11 +30,14 @@ if [ "$REPLY" = "y" ] || [ "$REPLY" = "Y" ]; then
     echo ""
     echo "🗑️  Deleting node_modules directories..."
     
-    # Delete each directory and show progress
-    find . -name "node_modules" -type d -prune | while read -r dir; do
-        echo "  Deleting: $dir"
-        rm -rf "$dir"
-    done
+    # Delete each directory in parallel with progress feedback
+    while read -r dir; do
+        echo "  Removing: $dir"
+        rm -rf "$dir" &
+    done < <(find . -name "node_modules" -type d -prune)
+    
+    # Wait for all background deletions to complete
+    wait
     
     echo ""
     echo "✅ All node_modules directories have been deleted!"

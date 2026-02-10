@@ -279,26 +279,25 @@ export class OrchestratorService {
   }
 
   /**
-   * Build the full LLM prompt with RAG context + user task + enforcement rules
+   * Build the full LLM prompt with RAG context + user task
+   * 
+   * BEFORE: Appended 8 lines of "MANDATORY ENFORCEMENT RULES" that duplicated
+   * the context assembler's TIER 1 (scope, length, format, stop, no preamble).
+   * Combined with TIER 1, this meant ~50 behavioral directives before the LLM
+   * even saw the task — consuming attention budget and causing reference
+   * resolution failures (e.g., [Master Record|Device Trade Name] printed literally).
+   * 
+   * AFTER: Lightweight frame. The prompt itself carries all behavioral rules.
+   * The orchestrator just marks where the task begins and ends.
    */
   private buildLLMPrompt(ragContext: string, userPrompt: string): string {
-    return `${ragContext}=== YOUR SPECIFIC TASK ===
+    return `${ragContext}=== TASK ===
 
-This is what you must do. Read carefully and follow these instructions precisely:
+    ${userPrompt}
 
-${userPrompt}
+    === END TASK ===
 
-MANDATORY ENFORCEMENT RULES
-You MUST follow these absolute constraints:
-
-1. SCOPE: Write ONLY what is requested above. If it says "Purpose section" → write ONLY Purpose, nothing else
-2. LENGTH: Respect ALL length limits (e.g., "2 paragraphs" = exactly 2 paragraphs, not 20)
-3. FORMAT: Follow the exact format specified (paragraphs, bullets, tables, etc.)
-4. STOP: When you complete the requested section, STOP immediately. Do NOT continue to other sections
-
-VIOLATION PENALTY: Generating content beyond the requested scope will result in rejection.
-
-Now write ONLY what was requested above. Begin immediately with the content - no preamble, no "Here is...", no analysis.`;
+    Write your response now.`;
   }
 
   /**
