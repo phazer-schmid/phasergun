@@ -59,7 +59,7 @@ export function assembleContext(
   
   sections.push('GENERATION RULES (apply to all tasks):\n');
   sections.push('- Write as the document author. No AI preamble, no meta-commentary.\n');
-  sections.push('- Resolve all [Master Record|...] references to their actual values from the retrieved content. Never leave bracket notation in the output.\n');
+  sections.push('- Resolve ALL bracket-notation references to their actual values from the retrieved content. This includes [Master Record|...], [Procedure|...], and [Context|...] patterns. For [Procedure|...] references, substitute the matching SOP number and title (e.g., "SOP0004 (Design Control Procedure)"). For [Master Record|...] references, substitute the actual field value. Never leave any bracket notation in the output.\n');
   sections.push('- Use procedural language as closely as retrieved content allows. If exact wording is unavailable, paraphrase and flag it.\n');
   sections.push('- Do not include footnotes or citations — these are appended separately.\n');
   sections.push('- Default tone: professional, third-person, passive voice. The prompt may override this.\n');
