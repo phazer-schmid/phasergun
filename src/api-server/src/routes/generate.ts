@@ -29,18 +29,17 @@ router.post('/generate', async (req, res) => {
       const ext = path.extname(promptFilePath).toLowerCase();
       
       if (ext === '.docx') {
-        // Use file parser for Word documents
-        console.log('[API /generate] Parsing Word document prompt...');
-        const fileParser = new ComprehensiveFileParser();
-        const parsedDocs = await fileParser.scanAndParseFolder(path.dirname(promptFilePath));
-        const promptDoc = parsedDocs.find((doc: any) => doc.filePath === promptFilePath);
+        console.log('[API /generate] Parsing Word document prompt (HTML mode for structure preservation)...');
+        const mammoth = await import('mammoth');
+        const buffer = await fs.readFile(promptFilePath);
+        const htmlResult = await mammoth.convertToHtml({ buffer });
         
-        if (!promptDoc) {
-          throw new Error('Failed to parse .docx prompt file');
+        if (!htmlResult.value || htmlResult.value.trim().length === 0) {
+          throw new Error('Failed to parse .docx prompt file (empty HTML output)');
         }
         
-        prompt = promptDoc.content;
-        console.log('[API /generate] ✓ Word document parsed successfully');
+        prompt = htmlResult.value;
+        console.log(`[API /generate] ✓ Word document parsed as HTML (${prompt.length} chars, ${htmlResult.messages.length} warnings)`);
       } else {
         // Read as plain text for .txt, .md, etc.
         prompt = await fs.readFile(promptFilePath, 'utf-8');
