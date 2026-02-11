@@ -180,7 +180,7 @@
               <div class="generated-content-section">
                 <h4 class="section-heading">📝 Generated Content</h4>
                 <div class="narrative-text">
-                  <pre>{{ analysisResult.generatedContent }}</pre>
+                  <div class="rendered-markdown" v-html="renderMarkdown(analysisResult.generatedContent || '')"></div>
                 </div>
               </div>
 
@@ -237,6 +237,7 @@ import { useProjectService } from '../composables/useProjectService';
 import { Project } from '../models/project.model';
 import { GenerationOutput } from '@phasergun/shared-types';
 import { getApiEndpoint } from '../config/api';
+import { marked } from 'marked';
 
 const router = useRouter();
 const route = useRoute();
@@ -509,6 +510,30 @@ function editProject() {
   if (project.value) {
     router.push(`/projects/${project.value.id}/edit`);
   }
+}
+
+// Render Markdown as HTML with post-processing for table cells
+function renderMarkdown(content: string): string {
+  if (!content) return '';
+  
+  // Render Markdown to HTML
+  let html = marked.parse(content, { async: false }) as string;
+  
+  // Post-process: Break inline bullet points in table cells onto separate lines.
+  // Matches "• " that is preceded by text (not at the start of a cell),
+  // and inserts a <br> before each one.
+  html = html.replace(/(<td[^>]*>)([\s\S]*?)(<\/td>)/gi, (match, open, inner, close) => {
+    // Split on bullet character and rejoin with <br>
+    const parts = inner.split(/\s*•\s*/);
+    if (parts.length <= 1) return match; // No bullets, leave as-is
+    
+    // First part might be empty (if cell starts with •), filter it out
+    const cleaned = parts.filter((p: string) => p.trim().length > 0);
+    const formatted = cleaned.map((p: string) => '• ' + p.trim()).join('<br>');
+    return open + formatted + close;
+  });
+  
+  return html;
 }
 
 // Helper functions for new output sections
@@ -1722,6 +1747,109 @@ function formatCategoryName(category: string): string {
   color: var(--text-gray);
   margin: var(--spacing-sm) 0 0 0;
   line-height: var(--line-height-relaxed);
+}
+
+/* ── Generated Content: Markdown Rendering ── */
+/* :deep() is required because v-html content does not receive Vue scoped style attributes */
+
+.rendered-markdown {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 0.925rem;
+  line-height: 1.65;
+  color: #1a1a2e;
+}
+
+/* Headings */
+.rendered-markdown :deep(h1),
+.rendered-markdown :deep(h2),
+.rendered-markdown :deep(h3),
+.rendered-markdown :deep(h4) {
+  color: #1a1a2e;
+  font-weight: 700;
+  margin-top: 1.75em;
+  margin-bottom: 0.6em;
+  line-height: 1.3;
+}
+.rendered-markdown :deep(h1) { font-size: 1.35em; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.3em; }
+.rendered-markdown :deep(h2) { font-size: 1.15em; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.25em; }
+.rendered-markdown :deep(h3) { font-size: 1.05em; }
+.rendered-markdown :deep(h4) { font-size: 1em; font-weight: 600; }
+
+/* First heading shouldn't have excessive top margin */
+.rendered-markdown :deep(h1:first-child),
+.rendered-markdown :deep(h2:first-child),
+.rendered-markdown :deep(h3:first-child) {
+  margin-top: 0;
+}
+
+/* Paragraphs */
+.rendered-markdown :deep(p) {
+  margin-bottom: 0.75em;
+}
+
+/* Lists */
+.rendered-markdown :deep(ul),
+.rendered-markdown :deep(ol) {
+  margin-left: 1.5em;
+  margin-bottom: 0.85em;
+  padding-left: 0.5em;
+}
+.rendered-markdown :deep(li) {
+  margin-bottom: 0.35em;
+}
+
+/* ── Tables ── */
+.rendered-markdown :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.25em 0;
+  font-size: 0.9em;
+  border: 2px solid #cbd5e1;
+}
+
+.rendered-markdown :deep(thead) {
+  background: #f1f5f9;
+}
+
+.rendered-markdown :deep(th) {
+  border: 1px solid #cbd5e1;
+  padding: 0.65em 0.85em;
+  text-align: left;
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 0.95em;
+  background: #f1f5f9;
+}
+
+.rendered-markdown :deep(td) {
+  border: 1px solid #e2e8f0;
+  padding: 0.6em 0.85em;
+  vertical-align: top;
+  line-height: 1.55;
+}
+
+.rendered-markdown :deep(tbody tr:nth-child(even)) {
+  background: #f8fafc;
+}
+
+.rendered-markdown :deep(tbody tr:hover) {
+  background: #f1f5f9;
+}
+
+/* Bold & Italic */
+.rendered-markdown :deep(strong) {
+  font-weight: 700;
+  color: #1e293b;
+}
+.rendered-markdown :deep(em) {
+  font-style: italic;
+}
+
+/* Horizontal rules */
+.rendered-markdown :deep(hr) {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 1.5em 0;
 }
 
 /* Responsive */
