@@ -136,4 +136,20 @@ export class DocumentLoader {
     
     return doc;
   }
+
+  async loadMasterChecklist(contextPath: string): Promise<ParsedDocument | null> {
+    console.log('[DocumentLoader] Loading Master Checklist...');
+    
+    const checklistPath = path.join(contextPath, 'Project-Master-Checklist.docx');
+    
+    try {
+      await fs.access(checklistPath);
+      const doc = await this.loadFile(checklistPath);
+      console.log('[DocumentLoader] ✓ Master Checklist loaded:', doc.fileName);
+      return doc;
+    } catch (error) {
+      console.log('[DocumentLoader] ⏭️  Master Checklist not found (Project-Master-Checklist.docx)');
+      return null;
+    }
+  }
 }

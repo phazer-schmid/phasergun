@@ -31,6 +31,19 @@ export function parseExplicitContextReferences(prompt: string): Set<'regulatory-
 }
 
 /**
+ * Parse Master Checklist reference from prompt
+ * Returns true if [Master Checklist] is explicitly referenced
+ * 
+ * Pattern: [Master Checklist]
+ * Example: [Master Checklist]
+ */
+export function parseMasterChecklistReference(prompt: string): boolean {
+  // Pattern: [Master Checklist] (case-insensitive)
+  const checklistPattern = /\[Master\s+Checklist\]/gi;
+  return checklistPattern.test(prompt);
+}
+
+/**
  * Log retrieval policy enforcement decisions
  */
 export function logRetrievalPolicy(

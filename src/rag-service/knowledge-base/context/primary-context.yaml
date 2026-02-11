@@ -10,7 +10,7 @@ knowledge_sources:
     id: "master_record"
     type: "Project Context"
     description: "Living document with key project and product information"
-    source: "Customer questionnaire at project start"
+    source: "Customer intake at project start"
     location: "[RAGFolder]/Context/Project-Master-Record.docx"
     retrieval_priority: "primary"
     usage: "Primary reference for all content generation prompts"
@@ -77,6 +77,15 @@ knowledge_sources:
     retrieval_priority: "on_demand"
     usage: "Only use in content generation if explicitly referenced in the prompts (@generation_workflow.input.prompts)"
 
+  master_checklist:
+    id: "master_checklist"
+    type: "Project Context"
+    description: "A master list of all deliverables that need to be created for this project"
+    source: "Customer intake at project start"
+    location: "[RAGFolder]/Context/Project-Master-Checklist.docx"
+    retrieval_priority: "on_demand"
+    usage: "Only use in content generation if explicitly referenced in the prompts (@generation_workflow.input.prompts)"
+
 # How prompts reference documents using bracket notation
 reference_notation:
   purpose: "Enable explicit document references within prompts"
@@ -91,6 +100,11 @@ reference_notation:
       example: "[Master Record|DEVICE_NAME]"
       retrieval: "References fields in @knowledge_sources.master_record"
       output: "PG extracts and cites specific field values"
+    master_checklist:
+      format: "[Master Checklist]"
+      example: "[Master checklist]"
+      retrieval: "Retrieves the entire contents of this file"
+      output: "The entire contents of this file as is not manipulation"
     context:
       format: "[Context|{folder}|{filename}]"
       example: "[Context|Regulatory Strategy|Predicate-Device-Analysis.docx]"

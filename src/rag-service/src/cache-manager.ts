@@ -9,6 +9,7 @@ export interface KnowledgeCache {
   primaryContext: any;
   indexedAt: string;
   vectorStoreFingerprint: string;
+  masterChecklist?: any; // ParsedDocument for Project-Master-Checklist.docx (on-demand)
 }
 
 export class CacheManager {
@@ -99,20 +100,23 @@ export class CacheManager {
   async computeCacheFingerprint(projectPath: string, primaryContextPath: string): Promise<string> {
     const proceduresPath = path.join(projectPath, 'Procedures');
     const contextPath = path.join(projectPath, 'Context');
+    const masterChecklistPath = path.join(contextPath, 'Project-Master-Checklist.docx');
     
-    const [primaryFingerprint, proceduresFingerprint, contextFingerprint] = await Promise.all([
+    const [primaryFingerprint, proceduresFingerprint, contextFingerprint, masterChecklistFingerprint] = await Promise.all([
       this.computeFileFingerprint(primaryContextPath),
       this.computeFolderFingerprint(proceduresPath, []),
-      this.computeFolderFingerprint(contextPath, ['Prompt'])
+      this.computeFolderFingerprint(contextPath, ['Prompt']),
+      this.computeFileFingerprint(masterChecklistPath)
     ]);
     
-    const combined = `primary:${primaryFingerprint}|procedures:${proceduresFingerprint}|context:${contextFingerprint}`;
+    const combined = `primary:${primaryFingerprint}|procedures:${proceduresFingerprint}|context:${contextFingerprint}|masterChecklist:${masterChecklistFingerprint}`;
     const finalFingerprint = crypto.createHash('sha256').update(combined).digest('hex');
     
-    console.log(`[CacheManager] 🔑 Primary:    ${primaryFingerprint.substring(0, 16)}...`);
-    console.log(`[CacheManager] 🔑 Procedures: ${proceduresFingerprint.substring(0, 16)}...`);
-    console.log(`[CacheManager] 🔑 Context:    ${contextFingerprint.substring(0, 16)}...`);
-    console.log(`[CacheManager] 🔑 Combined:   ${finalFingerprint.substring(0, 16)}...`);
+    console.log(`[CacheManager] 🔑 Primary:          ${primaryFingerprint.substring(0, 16)}...`);
+    console.log(`[CacheManager] 🔑 Procedures:       ${proceduresFingerprint.substring(0, 16)}...`);
+    console.log(`[CacheManager] 🔑 Context:          ${contextFingerprint.substring(0, 16)}...`);
+    console.log(`[CacheManager] 🔑 Master Checklist: ${masterChecklistFingerprint.substring(0, 16)}...`);
+    console.log(`[CacheManager] 🔑 Combined:         ${finalFingerprint.substring(0, 16)}...`);
     
     return finalFingerprint;
   }

@@ -19,7 +19,8 @@ export function assembleContext(
   contextSummaries: Map<string, string>,
   options: {
     includeFullPrimary?: boolean;
-  } = {}
+  } = {},
+  masterChecklistContent?: string
 ): string {
   const sections: string[] = [];
   
@@ -125,6 +126,14 @@ export function assembleContext(
       sections.push(result.entry.metadata.content);
       sections.push('\n');
     });
+  }
+  
+  // Include Master Checklist if provided
+  if (masterChecklistContent) {
+    sections.push('--- Master Checklist ---\n');
+    sections.push('\n[Project-Master-Checklist.docx]\n');
+    sections.push(masterChecklistContent);
+    sections.push('\n');
   }
   
   sections.push('---\n\n');

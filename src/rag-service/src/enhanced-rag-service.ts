@@ -7,7 +7,7 @@ import { VectorStore, SearchResult } from './vector-store';
 import { LockManager, getLockManager } from './lock-manager';
 import { CacheManager, KnowledgeCache } from './cache-manager';
 import { DocumentLoader } from './document-loader';
-import { parseExplicitContextReferences } from './reference-parser';
+import { parseExplicitContextReferences, parseMasterChecklistReference } from './reference-parser';
 import { assembleContext, estimateTokens, enforceTokenLimit } from './context-assembler';
 import { buildVectorStore as buildVectorStoreUtil } from './vector-builder';
 import { generateSOPSummaries as generateSOPSummariesOrch, generateContextSummaries as generateContextSummariesOrch } from './summary-orchestrator';
@@ -251,6 +251,17 @@ export class EnhancedRAGService {
       console.warn('[EnhancedRAG] Context folder not found or empty');
     }
     
+    // Load Master Checklist (on-demand, stored for later retrieval)
+    let masterChecklist = null;
+    try {
+      masterChecklist = await this.documentLoader.loadMasterChecklist(contextPath);
+      if (masterChecklist) {
+        console.log('[EnhancedRAG] ✓ Master Checklist loaded and cached');
+      }
+    } catch (error) {
+      console.log('[EnhancedRAG] Master Checklist not available');
+    }
+    
     // Build vector store if there are documents to process
     if (proceduresFiles.length > 0 || contextFiles.length > 0) {
       console.log('[EnhancedRAG] 🔄 Regenerating vector store...');
@@ -281,7 +292,8 @@ export class EnhancedRAGService {
       fingerprint,
       primaryContext,
       indexedAt: new Date().toISOString(),
-      vectorStoreFingerprint
+      vectorStoreFingerprint,
+      masterChecklist: masterChecklist || undefined
     };
     
     // Store in memory cache
@@ -344,10 +356,11 @@ export class EnhancedRAGService {
     procedureChunks: SearchResult[];
     contextChunks: SearchResult[];
   }> {
-    // 1. Parse prompt for explicit on-demand references (regulatory-strategy, general)
+    // 1. Parse prompt for explicit on-demand references (regulatory-strategy, general, master-checklist)
     const explicitlyReferencedCategories = parseExplicitContextReferences(prompt);
     const excludeGeneral = !explicitlyReferencedCategories.has('general');
     const excludeRegStrategy = !explicitlyReferencedCategories.has('regulatory-strategy');
+    const includeMasterChecklist = parseMasterChecklistReference(prompt);
     
     console.log('[EnhancedRAG] 🔒 RETRIEVAL POLICY ENFORCEMENT:');
     if (excludeGeneral) {
@@ -359,6 +372,11 @@ export class EnhancedRAGService {
       console.log('[EnhancedRAG]    ⛔ Context/Regulatory Strategy/ EXCLUDED (not explicitly referenced in prompt)');
     } else {
       console.log('[EnhancedRAG]    ✅ Context/Regulatory Strategy/ INCLUDED (explicitly referenced in prompt)');
+    }
+    if (includeMasterChecklist) {
+      console.log('[EnhancedRAG]    ✅ Master Checklist INCLUDED (explicitly referenced in prompt)');
+    } else {
+      console.log('[EnhancedRAG]    ⛔ Master Checklist EXCLUDED (not explicitly referenced in prompt)');
     }
     
     // 2. Load knowledge with lock protection (prevents concurrent rebuild collisions)
@@ -460,21 +478,29 @@ export class EnhancedRAGService {
       console.log(`[EnhancedRAG] ℹ️  No context chunks requested (contextChunks=0)`);
     }
     
-    // 8. Assemble tiered context
+    // 8. Retrieve Master Checklist if explicitly referenced
+    let masterChecklistContent: string | undefined = undefined;
+    if (includeMasterChecklist && knowledge.masterChecklist) {
+      console.log('[EnhancedRAG] 📋 Including Master Checklist in context');
+      masterChecklistContent = knowledge.masterChecklist.content;
+    }
+    
+    // 9. Assemble tiered context
     let ragContext = assembleContext(
       knowledge.primaryContext,
       procedureResults,
       contextResults,
       sopSummaries,
       contextSummaries,
-      options
+      options,
+      masterChecklistContent
     );
     
-    // 9. Enforce token limits if needed
+    // 10. Enforce token limits if needed
     const maxTokens = options.maxTokens || 150000;
     ragContext = enforceTokenLimit(ragContext, maxTokens);
     
-    // 10. Build metadata
+    // 11. Build metadata
     const sources = new Set<string>();
     procedureResults.forEach(r => sources.add(r.entry.metadata.fileName));
     contextResults.forEach(r => sources.add(r.entry.metadata.fileName));
