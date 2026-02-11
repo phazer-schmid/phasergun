@@ -63,6 +63,7 @@ export function assembleContext(
   sections.push('- Use procedural language as closely as retrieved content allows. If exact wording is unavailable, paraphrase and flag it.\n');
   sections.push('- Do not include footnotes or citations — these are appended separately.\n');
   sections.push('- Default tone: professional, third-person, passive voice. The prompt may override this.\n');
+  sections.push('- Format output as Markdown. Use ## for section headings, - for bullet lists, and | for tables. The output will be rendered by a Markdown engine.\n');
   sections.push('- Write only what the prompt requests. Respect all length and format constraints exactly.\n\n');
   
   sections.push('---\n\n');
