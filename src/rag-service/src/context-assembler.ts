@@ -20,7 +20,9 @@ export function assembleContext(
   options: {
     includeFullPrimary?: boolean;
   } = {},
-  masterChecklistContent?: string
+  masterChecklistContent?: string,
+  complianceStandards?: Array<{ id: string; name: string; scope: string }>,
+  relevantProcedureInfo?: Array<{ fileName: string; reason: string }>
 ): string {
   const sections: string[] = [];
   
@@ -59,12 +61,21 @@ export function assembleContext(
   
   sections.push('GENERATION RULES (apply to all tasks):\n');
   sections.push('- Write as the document author. No AI preamble, no meta-commentary.\n');
-  sections.push('- Resolve ALL bracket-notation references to their actual values from the retrieved content. This includes [Master Record|...], [Procedure|...], and [Context|...] patterns. For [Procedure|...] references, substitute the matching SOP number and title (e.g., "SOP0004 (Design Control Procedure)"). For [Master Record|...] references, substitute the actual field value. Never leave any bracket notation in the output.\n');
+  sections.push('- Resolve ALL bracket-notation references ([Master Record|...], [Procedure|...], [Context|...]) to their actual values from the retrieved content. For [Procedure|...] references, substitute the matching SOP number and title. Never leave any bracket notation in the output.\n');
   sections.push('- Use procedural language as closely as retrieved content allows. If exact wording is unavailable, paraphrase and flag it.\n');
   sections.push('- Do not include footnotes or citations — these are appended separately.\n');
   sections.push('- Default tone: professional, third-person, passive voice. The prompt may override this.\n');
-  sections.push('- Format output as Markdown. Use ## for section headings, - for bullet lists, and | for tables. The output will be rendered by a Markdown engine.\n');
-  sections.push('- Write only what the prompt requests. Respect all length and format constraints exactly.\n\n');
+  sections.push('- Format output as Markdown. Use ## for section headings, - for bullet lists, and | for tables.\n');
+  sections.push('- Write only what the prompt requests. Respect all length and format constraints exactly.\n');
+  
+  // Compliance-aware generation rules
+  if (complianceStandards && complianceStandards.length > 0) {
+    sections.push('- All content you generate MUST comply with the regulatory standards listed in the COMPLIANCE STANDARDS section below. Use your full training knowledge of each standard. Do not generate content that contradicts any requirement of these standards.\n');
+    sections.push('- When the content involves sequencing of activities (e.g., risk management, design verification/validation), ensure the ordering is correct per the applicable standards.\n');
+  }
+  
+  sections.push('- You have access to ALL company procedures (SOPs) via their summaries below. Draw from any procedure that is relevant to the task — do not limit yourself to only explicitly referenced procedures. If a procedure governs how this type of document should be written, follow it.\n');
+  sections.push('\n');
   
   sections.push('---\n\n');
   
@@ -73,8 +84,30 @@ export function assembleContext(
   // =========================================================================
   sections.push('=== REFERENCE MATERIALS ===\n\n');
   
+  // --- Compliance Standards (authoritative, must be followed) ---
+  if (complianceStandards && complianceStandards.length > 0) {
+    sections.push('--- COMPLIANCE STANDARDS (MANDATORY) ---\n');
+    sections.push('All generated content must comply with these standards.\n');
+    sections.push('Use your full training knowledge of each standard when writing.\n\n');
+    complianceStandards.forEach(std => {
+      sections.push(`- ${std.name} — Scope: ${std.scope}\n`);
+    });
+    sections.push('\n');
+  }
+
+  // --- Smart Procedure Selection context ---
+  if (relevantProcedureInfo && relevantProcedureInfo.length > 0) {
+    sections.push('--- PROCEDURES IDENTIFIED AS RELEVANT ---\n');
+    sections.push('These procedures were selected as relevant to your task. Their detailed sections are included below.\n\n');
+    relevantProcedureInfo.forEach(p => {
+      sections.push(`- ${p.fileName}: ${p.reason}\n`);
+    });
+    sections.push('\n');
+  }
+  
   if (sortedSopSummaries.size > 0) {
-    sections.push('--- Company Procedures (SOPs) ---\n');
+    sections.push('--- ALL Company Procedures (SOPs) — Summaries ---\n');
+    sections.push('These are summaries of EVERY procedure in the knowledge base. Consult any that are relevant.\n\n');
     sortedSopSummaries.forEach((summary, fileName) => {
       sections.push(`\n[${fileName}]\n`);
       sections.push(summary);

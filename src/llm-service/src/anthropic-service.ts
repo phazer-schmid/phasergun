@@ -26,6 +26,10 @@ export class AnthropicLLMService implements LLMService {
     console.log(`[AnthropicLLMService] Initialized with model: ${model}`);
   }
 
+  getModelName(): string {
+    return this.model;
+  }
+
   async generateText(prompt: string, context?: KnowledgeContext): Promise<LLMResponse> {
     console.log(`[AnthropicLLMService] Generating text with prompt length: ${prompt.length}`);
     

@@ -1,9 +1,11 @@
+import type { ComplianceValidationResult } from './ComplianceTypes';
+
 /**
  * Output from a content generation request.
  * Maps to primary-context.yaml → generation_workflow.output.sections
  */
 export interface GenerationOutput {
-  status: 'processing' | 'complete' | 'error';
+  status: 'processing' | 'complete' | 'error' | 'compliance_failed';
   message: string;
   timestamp: string;
 
@@ -24,6 +26,9 @@ export interface GenerationOutput {
   
   /** Additional metadata (for sources, footnotes, etc.) */
   metadata?: any;
+
+  /** Compliance gate results — present when status is 'compliance_failed' */
+  complianceResult?: ComplianceValidationResult;
 }
 
 export interface Discrepancy {

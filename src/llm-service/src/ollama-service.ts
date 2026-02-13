@@ -73,6 +73,10 @@ export class OllamaLLMService {
     console.log(`[OllamaLLMService] Temperature: ${this.temperature} (deterministic mode)`);
   }
 
+  getModelName(): string {
+    return this.model;
+  }
+
   /**
    * Generate text using Ollama
    * 

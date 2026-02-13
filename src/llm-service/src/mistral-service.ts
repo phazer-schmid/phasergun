@@ -16,6 +16,10 @@ export class MistralLLMService implements LLMService {
     console.log(`[MistralLLMService] Initialized with model: ${model}`);
   }
 
+  getModelName(): string {
+    return this.model;
+  }
+
   async generateText(prompt: string, context?: KnowledgeContext): Promise<LLMResponse> {
     console.log(`[MistralLLMService] Generating text with prompt length: ${prompt.length}`);
     

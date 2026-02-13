@@ -12,6 +12,8 @@ export interface LLMService {
    * @returns LLM response with generated text and usage stats
    */
   generateText(prompt: string, context?: KnowledgeContext): Promise<LLMResponse>;
+  /** Returns the model identifier string for capability reporting */
+  getModelName(): string;
 }
 
 // Export the real LLM services
@@ -25,6 +27,10 @@ export { GroqLLMService } from './groq-service';
  * Returns simulated AI responses for testing
  */
 export class MockLLMService implements LLMService {
+  getModelName(): string {
+    return 'mock-llm';
+  }
+
   async generateText(prompt: string, context?: KnowledgeContext): Promise<LLMResponse> {
     console.log(`[MockLLMService] Generating text with prompt length: ${prompt.length}`);
     

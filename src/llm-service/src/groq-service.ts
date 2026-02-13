@@ -25,6 +25,10 @@ export class GroqLLMService implements LLMService {
     console.log(`[GroqLLMService] Initialized with model: ${model}`);
   }
 
+  getModelName(): string {
+    return this.model;
+  }
+
   async generateText(prompt: string, context?: KnowledgeContext): Promise<LLMResponse> {
     console.log(`[GroqLLMService] Generating text with prompt length: ${prompt.length}`);
     

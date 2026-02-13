@@ -16,4 +16,5 @@ export interface LLMResponse {
  */
 export interface LLMService {
   generateText(prompt: string, context?: KnowledgeContext): Promise<LLMResponse>;
+  getModelName(): string;
 }

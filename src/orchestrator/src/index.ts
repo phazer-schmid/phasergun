@@ -1,6 +1,7 @@
 import { GenerationOutput, SourceAttribution, Discrepancy, ConfidenceRating } from '@phasergun/shared-types';
-import { EnhancedRAGService, FootnoteTracker, SourceReference } from '@phasergun/rag-service';
+import { EnhancedRAGService, FootnoteTracker, SourceReference, assembleContext, enforceTokenLimit } from '@phasergun/rag-service';
 import { LLMService } from '@phasergun/llm-service';
+import type { SearchResult } from '@phasergun/rag-service';
 
 /**
  * Orchestrator Service
@@ -42,46 +43,109 @@ export class OrchestratorService {
       console.log(`[Orchestrator]   - Master Record fields:`, references.masterRecordFields);
       console.log(`[Orchestrator]   - Context documents:`, references.contextDocs);
       
-      // Step 2: Retrieve relevant context using intelligent filtering
-      const hasProcedureRefs = references.procedures.length > 0;
+      // Step 2: Retrieve context summaries and semantic context chunks
       const hasContextRefs = references.masterRecordFields.length > 0 || references.contextDocs.length > 0;
-      const hasAnyRefs = hasProcedureRefs || hasContextRefs;
 
-      const { ragContext, metadata, procedureChunks, contextChunks } = 
-        await this.ragService.retrieveRelevantContext(
-          input.projectPath,
-          input.primaryContextPath,
-          input.prompt,
-          {
-            // Use parsed references to boost retrieval, but always retrieve baseline chunks
-            procedureChunks: hasProcedureRefs 
-              ? (input.options?.topKProcedures ?? 5)
-              : (input.options?.topKProcedures ?? 3),
-            contextChunks: hasContextRefs
-              ? (input.options?.topKContext ?? 5)
-              : (input.options?.topKContext ?? 2),
-            includeFullPrimary: true,  // Always include primary context YAML
-            includeSummaries: true,  // Always include SOP summaries
-          }
-        );
+      const { 
+        metadata, 
+        procedureChunks: semanticProcedureChunks, 
+        contextChunks, 
+        sopSummaries,
+        contextSummaries,
+        masterChecklistContent
+      } = await this.ragService.retrieveRelevantContext(
+        input.projectPath,
+        input.primaryContextPath,
+        input.prompt,
+        {
+          procedureChunks: 0,  // Don't use semantic search for procedures - smart selection will handle it
+          contextChunks: hasContextRefs
+            ? (input.options?.topKContext ?? 5)
+            : (input.options?.topKContext ?? 2),
+          includeFullPrimary: true,
+          includeSummaries: true,
+        }
+      );
+      
+      // Step 2b: Smart Procedure Identification
+      // Use the LLM to review ALL SOP summaries and identify which are relevant
+      const relevantProcedureNames = await this.identifyRelevantProcedures(
+        sopSummaries,
+        input.prompt
+      );
+
+      // Step 2c: Retrieve ALL chunks for each identified procedure
+      let smartProcedureChunks: SearchResult[] = [];
+      const smartProcedureFileNames = new Set<string>();
+
+      for (const procInfo of relevantProcedureNames) {
+        const fileName = procInfo.fileName;
+        const entries = this.ragService.getEntriesByFileName(fileName);
+        if (entries.length > 0) {
+          smartProcedureFileNames.add(fileName);
+          entries.forEach(entry => {
+            smartProcedureChunks.push({ entry, similarity: 1.0 }); // Full retrieval, max similarity
+          });
+        } else {
+          console.warn(`[Orchestrator] ⚠️  Procedure "${fileName}" identified as relevant but not found in vector store`);
+        }
+      }
+
+      // Sort for determinism
+      smartProcedureChunks.sort((a, b) => {
+        const fileCmp = a.entry.metadata.fileName.localeCompare(b.entry.metadata.fileName);
+        if (fileCmp !== 0) return fileCmp;
+        return a.entry.metadata.chunkIndex - b.entry.metadata.chunkIndex;
+      });
+
+      console.log(`[Orchestrator] 📄 Smart procedure retrieval: ${smartProcedureChunks.length} chunks from ${smartProcedureFileNames.size} procedures`);
       
       // Step 3: Initialize footnote tracker and track sources
       const footnoteTracker = new FootnoteTracker();
-      footnoteTracker.addFromRetrievalResults(procedureChunks, contextChunks);
+      footnoteTracker.addFromRetrievalResults(smartProcedureChunks, contextChunks);
       
       // Add regulatory standards mentioned in the prompt (if any)
       this.addRegulatoryStandardsToTracker(input.prompt, footnoteTracker);
       
-      console.log('[Orchestrator] Context assembled:');
-      console.log('  - Retrieval mode: ' + (hasAnyRefs ? 'bracket notation (boosted)' : 'semantic search (baseline)'));
-      console.log('  - Primary context: included');
-      console.log('  - Procedures: ' + metadata.procedureChunksRetrieved + ' chunks' + (hasProcedureRefs ? ' (boosted for: ' + references.procedures.join(', ') + ')' : ''));
-      console.log('  - Context files: ' + metadata.contextChunksRetrieved + ' chunks' + (hasContextRefs ? ' (boosted for explicit refs)' : ''));
-      console.log('  - Footnotes tracked: ' + footnoteTracker.getSourceCount() + ' sources');
-      console.log('  - Estimated tokens: ' + metadata.totalTokensEstimate);
+      // Add compliance standards to footnotes
+      const primaryContext = await this.loadPrimaryContext(input.primaryContextPath);
+      if (primaryContext?.compliance?.standards) {
+        for (const std of primaryContext.compliance.standards) {
+          footnoteTracker.addStandardReference(std.name, std.scope);
+        }
+      }
       
-      // Step 4: Build the LLM prompt with enforcement rules
-      const fullPrompt = this.buildLLMPrompt(ragContext, input.prompt);
+      console.log('[Orchestrator] Context assembled with smart procedure selection:');
+      console.log('  - Primary context: included');
+      console.log('  - Smart procedures: ' + smartProcedureChunks.length + ' chunks from ' + smartProcedureFileNames.size + ' files');
+      console.log('  - Context files: ' + metadata.contextChunksRetrieved + ' chunks');
+      console.log('  - Footnotes tracked: ' + footnoteTracker.getSourceCount() + ' sources');
+      
+      // Step 4: Extract compliance standards from primary context
+      const complianceStandardsList = primaryContext?.compliance?.standards?.map((s: any) => ({
+        id: s.id || 'unknown',
+        name: s.name || 'Unknown',
+        scope: s.scope || 'General'
+      })) || [];
+      
+      // Step 5: Rebuild RAG context with smart procedure chunks + compliance awareness
+      const ragContext = assembleContext(
+        primaryContext,
+        smartProcedureChunks,
+        contextChunks,
+        sopSummaries,
+        contextSummaries,
+        { includeFullPrimary: true },
+        masterChecklistContent,
+        complianceStandardsList,
+        relevantProcedureNames
+      );
+
+      const finalRagContext = enforceTokenLimit(ragContext, 150000);
+      console.log('  - Estimated tokens: ' + Math.ceil(finalRagContext.length / 4));
+      
+      // Step 5: Build the LLM prompt with enforcement rules
+      const fullPrompt = this.buildLLMPrompt(finalRagContext, input.prompt);
       
       console.log(`[Orchestrator] Full prompt length: ${fullPrompt.length} chars`);
       console.log(`[Orchestrator] Calling LLM service...`);
@@ -116,7 +180,7 @@ export class OrchestratorService {
       const finalText = response.generatedText;// + footnotes;
       
       // Step 8: Track discrepancies (placeholder for now)
-      const discrepancies = this.trackDiscrepancies(procedureChunks, contextChunks);
+      const discrepancies = this.trackDiscrepancies(smartProcedureChunks, contextChunks);
       
       // Step 9: Calculate confidence rating
       const confidence = this.buildConfidenceRating(
@@ -432,6 +496,124 @@ export class OrchestratorService {
         procedureAdherence
       }
     };
+  }
+
+  /**
+   * Load the full primary-context.yaml object.
+   */
+  private async loadPrimaryContext(primaryContextPath: string): Promise<any> {
+    const fs = await import('fs/promises');
+    const yaml = await import('js-yaml');
+    const fileContents = await fs.readFile(primaryContextPath, 'utf8');
+    return yaml.load(fileContents) as any;
+  }
+
+  /**
+   * Smart Procedure Identification
+   *
+   * Reviews ALL SOP summaries and the user's task to determine which
+   * procedures are relevant — whether or not they're explicitly referenced
+   * in the prompt. This replaces pure semantic top-K search for procedures.
+   *
+   * Returns an array of procedure file names that should be retrieved in full.
+   */
+  private async identifyRelevantProcedures(
+    sopSummaries: Map<string, string>,
+    userPrompt: string
+  ): Promise<Array<{ fileName: string; reason: string }>> {
+    if (sopSummaries.size === 0) {
+      return [];
+    }
+
+    console.log(`[Orchestrator] 🧠 SMART PROCEDURE SELECTION: Analyzing ${sopSummaries.size} SOPs for relevance...`);
+
+    // Build the summaries block
+    const summaryBlock = Array.from(sopSummaries.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([fileName, summary]) => `### ${fileName}\n${summary}`)
+      .join('\n\n');
+
+    const prompt = `You are a regulatory documentation expert. You are about to generate content for a medical device project. Below are summaries of ALL company procedures (SOPs) available, followed by the user's generation task.
+
+Your job: identify EVERY procedure that is relevant to this task. A procedure is relevant if:
+1. It is explicitly referenced in the task (e.g., [Procedure|Design Control Procedure])
+2. It governs the type of document being generated (e.g., a Design Control SOP is relevant when writing a Design and Development Plan)
+3. It provides requirements, templates, or guidance that the generated content must follow
+4. It defines processes that the generated content describes or references
+5. It would be consulted by a regulatory professional writing this document
+
+Be inclusive. It is better to include a marginally relevant procedure than to miss one that matters. Do NOT include procedures that are clearly unrelated to the task.
+
+=== AVAILABLE PROCEDURES ===
+${summaryBlock}
+=== END PROCEDURES ===
+
+=== USER TASK ===
+${userPrompt.substring(0, 3000)}
+=== END TASK ===
+
+Respond with ONLY a valid JSON object (no markdown fences, no preamble):
+
+{
+  "relevant_procedures": [
+    {
+      "fileName": "Exact file name from the summaries above",
+      "reason": "Brief reason why this procedure is relevant"
+    }
+  ]
+}`;
+
+    try {
+      const response = await this.llmService.generateText(prompt);
+      const rawText = response.generatedText.trim();
+      const cleaned = rawText.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(cleaned);
+      } catch {
+        console.error('[Orchestrator] ⚠️  Failed to parse procedure identification response — falling back to all procedures');
+        // Fail safe: include all procedures
+        return Array.from(sopSummaries.keys()).map(fileName => ({ 
+          fileName, 
+          reason: 'Included due to parsing failure' 
+        }));
+      }
+
+      const relevant = (parsed.relevant_procedures || []).map((p: any) => {
+        console.log(`[Orchestrator]    ✅ ${p.fileName}: ${p.reason}`);
+        return { fileName: p.fileName, reason: p.reason || 'Relevant to task' };
+      });
+
+      // Also include any procedures explicitly referenced in the prompt via [Procedure|...] notation
+      // that might have been missed by the LLM
+      const explicitProcedurePattern = /\[Procedure\|([^\]]+)\]/gi;
+      let match;
+      while ((match = explicitProcedurePattern.exec(userPrompt)) !== null) {
+        const refName = match[1].trim().toLowerCase();
+        // Find matching SOP by partial name match
+        for (const [fileName] of sopSummaries) {
+          if (fileName.toLowerCase().includes(refName.toLowerCase()) ||
+              refName.toLowerCase().includes(fileName.toLowerCase().replace(/\.docx|\.pdf|\.txt/gi, ''))) {
+            if (!relevant.some((r: { fileName: string; reason: string }) => r.fileName === fileName)) {
+              console.log(`[Orchestrator]    ✅ ${fileName}: (explicitly referenced in prompt)`);
+              relevant.push({ fileName, reason: 'Explicitly referenced in prompt' });
+            }
+          }
+        }
+      }
+
+      console.log(`[Orchestrator] 🧠 SMART PROCEDURE SELECTION: ${relevant.length} of ${sopSummaries.size} procedures identified as relevant`);
+
+      return relevant;
+
+    } catch (err) {
+      console.error('[Orchestrator] ❌ Procedure identification failed — falling back to all procedures:', err);
+      return Array.from(sopSummaries.keys()).map(fileName => ({ 
+        fileName, 
+        reason: 'Included due to identification failure' 
+      }));
+    }
   }
 
   /**

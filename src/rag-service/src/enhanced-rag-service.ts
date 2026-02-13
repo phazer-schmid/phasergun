@@ -3,7 +3,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Mutex } from 'async-mutex';
 import { EmbeddingService } from './embedding-service';
-import { VectorStore, SearchResult } from './vector-store';
+import { VectorStore, VectorEntry, SearchResult } from './vector-store';
 import { LockManager, getLockManager } from './lock-manager';
 import { CacheManager, KnowledgeCache } from './cache-manager';
 import { DocumentLoader } from './document-loader';
@@ -355,6 +355,9 @@ export class EnhancedRAGService {
     };
     procedureChunks: SearchResult[];
     contextChunks: SearchResult[];
+    sopSummaries: Map<string, string>;
+    contextSummaries: Map<string, string>;
+    masterChecklistContent?: string;
   }> {
     // 1. Parse prompt for explicit on-demand references (regulatory-strategy, general, master-checklist)
     const explicitlyReferencedCategories = parseExplicitContextReferences(prompt);
@@ -519,7 +522,10 @@ export class EnhancedRAGService {
       ragContext, 
       metadata,
       procedureChunks: procedureResults,
-      contextChunks: contextResults
+      contextChunks: contextResults,
+      sopSummaries,
+      contextSummaries,
+      masterChecklistContent
     };
   }
 
@@ -635,6 +641,44 @@ export class EnhancedRAGService {
     };
     
     return { ragContext, metadata };
+  }
+
+  /**
+   * Get ALL procedure entries from the vector store.
+   * Used for holistic compliance checking across all procedures.
+   */
+  getAllProcedureEntries(): VectorEntry[] {
+    if (!this.vectorStore) {
+      console.warn('[EnhancedRAG] No vector store — cannot get procedure entries');
+      return [];
+    }
+    return this.vectorStore.getEntriesByCategory('procedure');
+  }
+
+  /**
+   * Get all vector entries for a specific file by name.
+   * Used for targeted full-document retrieval after smart selection.
+   */
+  getEntriesByFileName(fileName: string): VectorEntry[] {
+    if (!this.vectorStore) {
+      console.warn('[EnhancedRAG] No vector store — cannot get entries by file name');
+      return [];
+    }
+    // Match by fileName (case-insensitive partial match)
+    return this.vectorStore.getEntriesByCategory('procedure').filter(
+      e => e.metadata.fileName.toLowerCase().includes(fileName.toLowerCase())
+    );
+  }
+
+  /**
+   * Get all context entries (for holistic checking if needed)
+   */
+  getAllContextEntries(): VectorEntry[] {
+    if (!this.vectorStore) {
+      console.warn('[EnhancedRAG] No vector store — cannot get context entries');
+      return [];
+    }
+    return this.vectorStore.getEntriesByCategory('context');
   }
 
   /**
