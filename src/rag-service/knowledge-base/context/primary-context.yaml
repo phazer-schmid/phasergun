@@ -310,6 +310,31 @@ operational_rules:
     rule: "Procedures must be resolved by subcategory_id and category_id metadata tags, never by filename"
     action: "If no indexed document matches the referenced category, flag in discrepancies rather than attempting filename-based fallback"
     
+  source_tracking:
+    rule: |
+      As PG generates content, it must maintain a running log of every source consulted,
+      distinguishing between concrete documents (physical files retrieved from the RAG folder
+      or Google Drive) and knowledge-based sources (external standards drawn from the LLM model).
+    tracking_categories:
+      concrete_documents:
+        description: "Physical files retrieved and read during generation"
+        includes:
+          - "Procedure documents, cited by resolved filename, subcategory_id, category_id, and section"
+          - "Master Record fields, cited by field name"
+          - "Bootstrap documents, cited by filename"
+          - "Bootstrap-referenced supporting documents, cited by filename and section"
+          - "Doc field values, cited by document name and field name"
+      knowledge_based_sources:
+        description: "Standards and regulations drawn from LLM model knowledge, not a physical file"
+        includes:
+          - "External standards cited by standard id and name (e.g., iso_14971, FDA 21 CFR Part 820.30)"
+          - "Specific clause or section of the standard referenced, where identifiable"
+    action: |
+      The running source log is used to populate @generation_workflow.output.sections.references
+      at the end of generation. Every statement in the generated content must be traceable
+      to at least one entry in the log. If a statement cannot be attributed to a tracked
+      source, PG must flag it in @generation_workflow.output.sections.discrepancies.
+      
 # Cache system for knowledge base persistence and performance
 cache_system:
   purpose: "Persist indexed knowledge (vectors, summaries, metadata) across requests and process restarts to avoid expensive re-parsing and re-embedding"
