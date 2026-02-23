@@ -76,10 +76,11 @@ api-server → orchestrator → rag-service → rag-core → shared-types
    - Calls `EnhancedRAGService.retrieveRelevantContext()` with the parsed prompt
 3. **RAG Service** (`src/rag-service/src/enhanced-rag-service.ts`):
    - Checks/builds vector cache (mutex + file lock protected for concurrency safety)
+   - Calls `parseProcedureReferences()`, `parseKnowledgeSourceScopes()`, `parseBootstrapReferences()`, `parseDocFieldReferences()` from `reference-parser.ts`
    - Embeds the prompt query and performs cosine similarity search
-   - Applies retrieval policy: `Context/General/` and `Context/Regulatory Strategy/` are **excluded unless explicitly referenced** in the prompt
-   - Assembles tiered context: role instructions → SOP summaries → relevant chunks
-4. **Orchestrator** builds full LLM prompt and calls `LLMService.generateText()`
+   - Applies retrieval policy: `Context/General/`, `Context/Regulatory Strategy/`, `Procedures/QPs/`, `Procedures/QaPs/` are **excluded unless explicitly referenced** in the prompt
+   - Assembles tiered context: role instructions (from `prompt-builder.ts`) → SOP summaries → relevant chunks
+4. **Orchestrator** builds full LLM prompt via `buildLLMPrompt()` (from `prompt-builder.ts`) and calls `LLMService.generateText()`
 5. Returns `GenerationOutput` with `generatedContent`, `references`, `confidence`, and `metadata`
 
 ### Project Folder Convention
@@ -87,7 +88,11 @@ api-server → orchestrator → rag-service → rag-core → shared-types
 Every "project" the user creates has this expected structure on disk:
 ```
 [ProjectPath]/
-  Procedures/          # Company SOPs — always indexed
+  Procedures/
+    SOPs/              # Standard Operating Procedures — subcategory: sops — always indexed
+    QPs/               # Quality Policies — subcategory: quality_policies — ON-DEMAND ONLY
+    QaPs/              # Project Quality Plans — subcategory: project_quality_plans — ON-DEMAND ONLY
+    *.docx/pdf/txt     # Files at root → tagged sops (backward compat, always indexed)
   Context/
     Initiation/        # Always indexed
     Ongoing/           # Always indexed
@@ -99,6 +104,8 @@ Every "project" the user creates has this expected structure on disk:
     Project-Master-Checklist.docx  # Referenced via [Master Checklist]
 ```
 
+**Note on cache upgrade:** If you add `SOPs/`, `QPs/`, or `QaPs/` subfolders to an existing project, clear the vector cache (`CACHE_ENABLED=false` for one request, or delete `$TMPDIR/phasergun-cache/`) so that subcategory metadata is re-embedded.
+
 ### Cache System
 
 Vector embeddings are cached to `$TMPDIR/phasergun-cache/` keyed by a SHA-256 fingerprint of all file paths, sizes, and mtimes. Cache is invalidated automatically when source files change. The `CACHE_ENABLED=false` env var disables caching (forces fresh processing on every request).
@@ -106,10 +113,15 @@ Vector embeddings are cached to `$TMPDIR/phasergun-cache/` keyed by a SHA-256 fi
 ### Reference Notation in Prompts
 
 Prompts use bracket syntax to request specific sources:
-- `[Procedure|Design Control Procedure]` — boosts retrieval of SOPs matching that category
+- `[Procedure|sops|design_control]` — new format: retrieves SOPs from a specific subcategory/category
+- `[Procedure|quality_policies|iso_13485]` — explicit reference to quality policy (on-demand)
+- `[Procedure|Design Control Procedure]` — **legacy format** (still supported, logs deprecation; maps to `sops` subcategory)
 - `[Master Record|DEVICE_NAME]` — extracts a specific field from the master record
-- `[Context|Regulatory Strategy|predicate.docx]` — retrieves a specific on-demand document
+- `[Context|Regulatory Strategy|predicate.docx]` — retrieves a specific on-demand context document
 - `[Master Checklist]` — includes the full Project-Master-Checklist.docx
+- `@sops`, `@global_standards` — knowledge source scope tags (parsed, enforcement not yet implemented)
+- `[Bootstrap|name]` — Google Drive bootstrap chain (NOT YET IMPLEMENTED — logs warning, generation continues)
+- `[Doc|document|field]` — field extraction from bootstrap docs (NOT YET IMPLEMENTED — logs warning)
 
 ### LLM Provider Selection
 
@@ -131,5 +143,39 @@ CACHE_ENABLED=true
 - **`rag-core` vs `rag-service`**: `rag-core` holds pure infrastructure (no project-specific logic). `rag-service` holds PhaserGun-specific document loading patterns and context assembly. When refactoring, keep project-agnostic primitives in `rag-core`.
 - **Concurrency**: Cache builds use a global in-process `Mutex` (async-mutex) combined with cross-process file locks (proper-lockfile) to prevent cache corruption under concurrent requests.
 - **Local embeddings**: `@xenova/transformers` runs `all-MiniLM-L6-v2` locally (384-dim). No external embedding API calls.
-- **On-demand filtering**: `Context/General/` and `Context/Regulatory Strategy/` are only retrieved when explicitly referenced in prompts. This is enforced in `enhanced-rag-service.ts:retrieveRelevantContext()`.
+- **On-demand filtering**: `Context/General/`, `Context/Regulatory Strategy/`, `Procedures/QPs/`, and `Procedures/QaPs/` are only retrieved when explicitly referenced in prompts. Enforced in `enhanced-rag-service.ts:retrieveRelevantContext()`.
+- **Prompt instructions single source of truth**: All LLM-injected behavioral instructions live in `src/rag-service/src/prompt-builder.ts`. Do not add behavioral directives elsewhere.
 - **After build**: All packages compile to `dist/`. The API server runs `dist/index.js` in production and `ts-node src/index.ts` in dev. When adding a new package, you must run `npm run build-packages` before the API server can import it.
+
+## primary-context.yaml → Code Location Mapping
+
+| yaml directive / section | Implementation location |
+|---|---|
+| `product.name`, `product.purpose` | Read in `prompt-builder.ts:buildSystemSection()` |
+| `operational_rules.source_tracking` | `prompt-builder.ts:RULE_WRITE_AS_AUTHOR`, `RULE_USE_PROCEDURAL_LANGUAGE` |
+| `reference_notation.*` | Parsed in `reference-parser.ts:parseProcedureReferences()`, `parseExplicitContextReferences()`, `parseMasterChecklistReference()`, `parseKnowledgeSourceScopes()` |
+| `reference_notation.procedure` (new `[Procedure\|sub\|cat]` format) | `reference-parser.ts:parseProcedureReferences()` |
+| `reference_notation.knowledge_source_refs` (`@source_id`) | `reference-parser.ts:parseKnowledgeSourceScopes()` — parsed only, enforcement NOT YET IMPLEMENTED |
+| `reference_notation.document_bootstrap` (`[Bootstrap\|...]`) | `reference-parser.ts:parseBootstrapReferences()` — stub, logs warning; NOT YET IMPLEMENTED |
+| `reference_notation.document_field` (`[Doc\|...\|...]`) | `reference-parser.ts:parseDocFieldReferences()` — stub, logs warning; NOT YET IMPLEMENTED |
+| `generation_workflow.output.sections.references` | `prompt-builder.ts:RULE_NO_INLINE_FOOTNOTES`; footnotes appended by `footnote-tracker.ts` |
+| `generation_workflow.output.sections.generated_content.format` | `prompt-builder.ts:RULE_MARKDOWN_FORMAT` |
+| `generation_workflow.processing` (task wrapper) | `prompt-builder.ts:buildLLMPrompt()` |
+| `operational_rules.knowledge_source_scoping` | `prompt-builder.ts:RULE_WRITE_ONLY_REQUESTED` |
+| `operational_rules.retrieval_scope` (on-demand filtering) | `reference-parser.ts:filterContextResults()`, `filterProcedureResults()` — called from `enhanced-rag-service.ts:retrieveRelevantContext()` |
+| `knowledge_sources.procedures.subcategories.sops` | `document-loader.ts:CategorizedProcedureFile`, `Procedures/SOPs/` folder → `procedureSubcategory: 'sops'` |
+| `knowledge_sources.procedures.subcategories.quality_policies` | `document-loader.ts`, `Procedures/QPs/` → `procedureSubcategory: 'quality_policies'`; on-demand: excluded unless `[Procedure\|quality_policies\|...]` in prompt |
+| `knowledge_sources.procedures.subcategories.project_quality_plans` | `document-loader.ts`, `Procedures/QaPs/` → `procedureSubcategory: 'project_quality_plans'`; on-demand: excluded unless `[Procedure\|project_quality_plans\|...]` in prompt |
+| `knowledge_sources.context.regulatory_strategy` (on-demand) | `enhanced-rag-service.ts:retrieveRelevantContext()` + `summary-orchestrator.ts:generateContextSummaries()` |
+| `knowledge_sources.context.general` (on-demand) | Same as regulatory_strategy |
+| `operational_rules.source_tracking` (citation format) | `footnote-tracker.ts:generateFootnotes()` — includes `subcategory_id/category_id` for procedure sources |
+| `vector_store.metadata.procedureSubcategory` | `vector-store.ts:VectorEntry.metadata.procedureSubcategory` + `vector-builder.ts:ProcedureDoc` |
+| `vector_store.metadata.procedureCategoryId` | `vector-store.ts:VectorEntry.metadata.procedureCategoryId` |
+
+### Not Yet Implemented (document in code with warnings)
+
+| Feature | Status | Where to implement |
+|---|---|---|
+| `[Bootstrap\|name]` Google Drive resolution | Warning logged, generation continues | Needs new bootstrap loader infrastructure |
+| `[Doc\|document\|field]` field extraction | Warning logged, generation continues | Depends on Bootstrap being implemented first |
+| `@{source_id}` per-scope retrieval enforcement | Scopes parsed and logged, but retrieval is not filtered per-scope | Requires redesign of vector search to support per-scope queries |

@@ -10,6 +10,7 @@
  */
 
 import { SearchResult } from '@phasergun/rag-core';
+import { buildSystemSection } from './prompt-builder';
 
 export function assembleContext(
   primaryContext: any,
@@ -49,24 +50,9 @@ export function assembleContext(
   
   // =========================================================================
   // SECTION 1: ROLE + UNIVERSAL RULES
-  // These apply to every generation. Prompts only need task-specific rules.
+  // Single source of truth: prompt-builder.ts
   // =========================================================================
-  
-  const role = primaryContext?.product?.name || 'PhaserGun AI';
-  const purpose = primaryContext?.product?.purpose || 'Generate regulatory documents';
-  
-  sections.push(`You are ${role}, a regulatory documentation expert. ${purpose}.\n\n`);
-  
-  sections.push('GENERATION RULES (apply to all tasks):\n');
-  sections.push('- Write as the document author. No AI preamble, no meta-commentary.\n');
-  sections.push('- Resolve ALL bracket-notation references to their actual values from the retrieved content. This includes [Master Record|...], [Procedure|...], and [Context|...] patterns. For [Procedure|...] references, substitute the matching SOP number and title (e.g., "SOP0004 (Design Control Procedure)"). For [Master Record|...] references, substitute the actual field value. Never leave any bracket notation in the output.\n');
-  sections.push('- Use procedural language as closely as retrieved content allows. If exact wording is unavailable, paraphrase and flag it.\n');
-  sections.push('- Do not include footnotes or citations — these are appended separately.\n');
-  sections.push('- Default tone: professional, third-person, passive voice. The prompt may override this.\n');
-  sections.push('- Format output as Markdown. Use ## for section headings, - for bullet lists, and | for tables. The output will be rendered by a Markdown engine.\n');
-  sections.push('- Write only what the prompt requests. Respect all length and format constraints exactly.\n\n');
-  
-  sections.push('---\n\n');
+  sections.push(buildSystemSection(primaryContext));
   
   // =========================================================================
   // SECTION 2: REFERENCE MATERIALS

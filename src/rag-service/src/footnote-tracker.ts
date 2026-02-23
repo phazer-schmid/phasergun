@@ -11,6 +11,8 @@ export interface SourceReference {
   category: 'procedure' | 'context' | 'standard';
   chunkIndex?: number;            // Chunk index if applicable
   citationText?: string;          // Optional specific text cited
+  procedureSubcategory?: string;  // Procedure subcategory (sops | quality_policies | project_quality_plans)
+  procedureCategoryId?: string;   // Procedure category ID from [Procedure|sub|categoryId] notation
 }
 
 export class FootnoteTracker {
@@ -46,7 +48,9 @@ export class FootnoteTracker {
       this.addSource({
         fileName: result.entry.metadata.fileName,
         category: 'procedure',
-        chunkIndex: result.entry.metadata.chunkIndex
+        chunkIndex: result.entry.metadata.chunkIndex,
+        procedureSubcategory: result.entry.metadata.procedureSubcategory,
+        procedureCategoryId: result.entry.metadata.procedureCategoryId,
       });
     });
     
@@ -89,16 +93,22 @@ export class FootnoteTracker {
     );
     
     sorted.forEach(source => {
-      const categoryLabel = source.category === 'procedure' ? 'Procedure' : 
-                           source.category === 'context' ? 'Context' : 
+      const categoryLabel = source.category === 'procedure' ? 'Procedure' :
+                           source.category === 'context' ? 'Context' :
                            'Regulatory Standard';
-      
-      const chunkInfo = source.chunkIndex !== undefined ? 
+
+      const chunkInfo = source.chunkIndex !== undefined ?
                        ` (Section ${source.chunkIndex + 1})` : '';
-      
+
       const citationInfo = source.citationText ? ` - ${source.citationText}` : '';
-      
-      footnotes.push(`[${source.id}] ${categoryLabel}: ${source.fileName}${chunkInfo}${citationInfo}\n`);
+
+      // Per operational_rules.source_tracking: procedure citations include subcategory_id and category_id
+      let subcategoryInfo = '';
+      if (source.category === 'procedure' && source.procedureSubcategory) {
+        subcategoryInfo = ` [${source.procedureSubcategory}${source.procedureCategoryId ? '/' + source.procedureCategoryId : ''}]`;
+      }
+
+      footnotes.push(`[${source.id}] ${categoryLabel}: ${source.fileName}${subcategoryInfo}${chunkInfo}${citationInfo}\n`);
     });
     
     return footnotes.join('');

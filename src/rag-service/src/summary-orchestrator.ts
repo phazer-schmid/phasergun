@@ -8,7 +8,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Mutex } from 'async-mutex';
 import { SummaryGenerator } from './summary-generator';
-import { DocumentLoader } from './document-loader';
+import { DocumentLoader, CategorizedProcedureFile } from './document-loader';
 
 /**
  * GLOBAL mutex for summary generation - prevents duplicate LLM calls
@@ -16,37 +16,59 @@ import { DocumentLoader } from './document-loader';
 const globalSummaryMutex = new Mutex();
 
 /**
- * Generate SOP summaries with mutex protection
+ * Generate SOP summaries with mutex protection.
+ * Filters out on-demand procedure subcategories (quality_policies, project_quality_plans)
+ * that were not explicitly referenced in the prompt, mirroring the same logic applied to
+ * Context/General/ and Context/Regulatory Strategy/.
+ *
+ * @param excludedSubcategories - Subcategories to exclude (e.g., new Set(['quality_policies']))
  */
 export async function generateSOPSummaries(
   projectPath: string,
   summaryWordCount: number,
   documentLoader: DocumentLoader,
-  summaryGenerator: SummaryGenerator
+  summaryGenerator: SummaryGenerator,
+  excludedSubcategories: Set<string> = new Set()
 ): Promise<Map<string, string>> {
   let sopSummaries = new Map<string, string>();
-  
+
   // Acquire GLOBAL summary mutex to prevent duplicate summary generation
   const releaseSummary = await globalSummaryMutex.acquire();
   console.log('[SummaryOrchestrator] 🔒 Summary mutex acquired - generating SOP summaries...');
-  
+
   try {
-    // Get procedure files
+    // Get categorized procedure files
     const proceduresPath = path.join(projectPath, 'Procedures');
-    let proceduresFiles: ParsedDocument[] = [];
+    let categorizedFiles: CategorizedProcedureFile[] = [];
     try {
       await fs.access(proceduresPath);
-      proceduresFiles = await documentLoader.loadProceduresFolder(proceduresPath);
+      categorizedFiles = await documentLoader.loadProceduresFolder(proceduresPath);
     } catch {
       // No procedures folder
     }
-    
-    if (proceduresFiles.length > 0) {
-      sopSummaries = await summaryGenerator.generateSOPSummaries(
-        proceduresFiles,
-        projectPath,
-        summaryWordCount
-      );
+
+    if (categorizedFiles.length > 0) {
+      // Filter out on-demand procedure subcategories not explicitly referenced
+      const filteredFiles = categorizedFiles.filter(cf => {
+        if (excludedSubcategories.has(cf.procedureSubcategory)) {
+          console.log(
+            `[SummaryOrchestrator] ⏭️  Excluding summary for ${cf.doc.fileName} (subcategory: ${cf.procedureSubcategory}, not referenced)`
+          );
+          return false;
+        }
+        return true;
+      });
+
+      // Extract ParsedDocument[] for the summary generator
+      const docsForSummary: ParsedDocument[] = filteredFiles.map(cf => cf.doc);
+
+      if (docsForSummary.length > 0) {
+        sopSummaries = await summaryGenerator.generateSOPSummaries(
+          docsForSummary,
+          projectPath,
+          summaryWordCount
+        );
+      }
     }
   } catch (error) {
     console.warn('[SummaryOrchestrator] Failed to generate SOP summaries, continuing without them:', error);
@@ -54,7 +76,7 @@ export async function generateSOPSummaries(
     releaseSummary();
     console.log('[SummaryOrchestrator] 🔓 Summary mutex released');
   }
-  
+
   return sopSummaries;
 }
 

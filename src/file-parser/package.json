@@ -12,14 +12,14 @@
   "dependencies": {
     "@phasergun/shared-types": "file:../shared-types",
     "mammoth": "^1.8.0",
+    "officeparser": "^6.0.4",
     "pdf-parse": "^1.1.1",
-    "tesseract.js": "^5.1.1",
     "sharp": "^0.33.5",
-    "officeparser": "^4.1.1"
+    "tesseract.js": "^5.1.1"
   },
   "devDependencies": {
-    "typescript": "~5.9.0",
     "@types/node": "^20.0.0",
-    "@types/pdf-parse": "^1.1.4"
+    "@types/pdf-parse": "^1.1.4",
+    "typescript": "~5.9.0"
   }
 }

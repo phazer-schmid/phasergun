@@ -1,5 +1,5 @@
 import { GenerationOutput, SourceAttribution, Discrepancy, ConfidenceRating } from '@phasergun/shared-types';
-import { EnhancedRAGService, FootnoteTracker, SourceReference } from '@phasergun/rag-service';
+import { EnhancedRAGService, FootnoteTracker, SourceReference, buildLLMPrompt, parseProcedureReferences, parseKnowledgeSourceScopes } from '@phasergun/rag-service';
 import { LLMService } from '@phasergun/llm-service';
 
 /**
@@ -38,7 +38,7 @@ export class OrchestratorService {
       // Step 1: Parse reference notation from prompt
       const references = this.parseReferenceNotation(input.prompt);
       console.log(`[Orchestrator] Parsed reference notation from prompt:`);
-      console.log(`[Orchestrator]   - Procedures requested:`, references.procedures);
+      console.log(`[Orchestrator]   - Procedures requested:`, references.procedures.map(p => p.categoryId ? `${p.subcategoryId}/${p.categoryId}` : p.subcategoryId));
       console.log(`[Orchestrator]   - Master Record fields:`, references.masterRecordFields);
       console.log(`[Orchestrator]   - Context documents:`, references.contextDocs);
       
@@ -75,13 +75,14 @@ export class OrchestratorService {
       console.log('[Orchestrator] Context assembled:');
       console.log('  - Retrieval mode: ' + (hasAnyRefs ? 'bracket notation (boosted)' : 'semantic search (baseline)'));
       console.log('  - Primary context: included');
-      console.log('  - Procedures: ' + metadata.procedureChunksRetrieved + ' chunks' + (hasProcedureRefs ? ' (boosted for: ' + references.procedures.join(', ') + ')' : ''));
+      const procedureRefSummary = references.procedures.map(p => p.categoryId ? `${p.subcategoryId}/${p.categoryId}` : p.subcategoryId).join(', ');
+      console.log('  - Procedures: ' + metadata.procedureChunksRetrieved + ' chunks' + (hasProcedureRefs ? ` (boosted for: ${procedureRefSummary})` : ''));
       console.log('  - Context files: ' + metadata.contextChunksRetrieved + ' chunks' + (hasContextRefs ? ' (boosted for explicit refs)' : ''));
       console.log('  - Footnotes tracked: ' + footnoteTracker.getSourceCount() + ' sources');
       console.log('  - Estimated tokens: ' + metadata.totalTokensEstimate);
       
-      // Step 4: Build the LLM prompt with enforcement rules
-      const fullPrompt = this.buildLLMPrompt(ragContext, input.prompt);
+      // Step 4: Build the LLM prompt (single source of truth: prompt-builder.ts in rag-service)
+      const fullPrompt = buildLLMPrompt(ragContext, input.prompt);
       
       console.log(`[Orchestrator] Full prompt length: ${fullPrompt.length} chars`);
       console.log(`[Orchestrator] Calling LLM service...`);
@@ -157,58 +158,66 @@ export class OrchestratorService {
   }
 
   /**
-   * Parse reference_notation patterns from the prompt
-   * Extracts bracket-based references per primary-context.yaml
-   * 
+   * Parse reference_notation patterns from the prompt.
+   * Extracts bracket-based references per primary-context.yaml.
+   *
    * Patterns:
-   * - [Procedure|{category}] → e.g., [Procedure|Design Control Procedure]
+   * - [Procedure|sops|design_control] → new format (subcategoryId + categoryId)
+   * - [Procedure|Design Control Procedure] → legacy format (logs deprecation warning)
    * - [Master Record|{field}] → e.g., [Master Record|DEVICE_NAME]
    * - [Context|{folder}|{filename}] → e.g., [Context|Regulatory Strategy|predicate.docx]
+   * - @{source_id} → knowledge source scope (e.g., @sops, @global_standards)
    */
   private parseReferenceNotation(prompt: string): {
-    procedures: string[];
+    procedures: Array<{ subcategoryId: string; categoryId?: string }>;
     masterRecordFields: string[];
     contextDocs: Array<{ folder: string; filename: string }>;
+    knowledgeScopes: Set<string>;
   } {
     const result = {
-      procedures: [] as string[],
+      procedures: [] as Array<{ subcategoryId: string; categoryId?: string }>,
       masterRecordFields: [] as string[],
-      contextDocs: [] as Array<{ folder: string; filename: string }>
+      contextDocs: [] as Array<{ folder: string; filename: string }>,
+      knowledgeScopes: new Set<string>(),
     };
-    
-    // Pattern 1: [Procedure|{category}]
-    const procedurePattern = /\[Procedure\|([^\]]+)\]/gi;
-    let match;
-    while ((match = procedurePattern.exec(prompt)) !== null) {
-      result.procedures.push(match[1].trim());
-    }
-    
+
+    // Pattern 1: [Procedure|...] — delegated to reference-parser for new/legacy format handling
+    result.procedures = parseProcedureReferences(prompt);
+
     // Pattern 2: [Master Record|{field}]
     const masterRecordPattern = /\[Master Record\|([^\]]+)\]/gi;
+    let match;
     while ((match = masterRecordPattern.exec(prompt)) !== null) {
       result.masterRecordFields.push(match[1].trim());
     }
-    
+
     // Pattern 3: [Context|{folder}|{filename}]
     const contextPattern = /\[Context\|([^|\]]+)\|([^\]]+)\]/gi;
     while ((match = contextPattern.exec(prompt)) !== null) {
       result.contextDocs.push({
         folder: match[1].trim(),
-        filename: match[2].trim()
+        filename: match[2].trim(),
       });
     }
-    
+
+    // Pattern 4: @{source_id} — knowledge source scope references
+    result.knowledgeScopes = parseKnowledgeSourceScopes(prompt);
+    if (result.knowledgeScopes.size > 0) {
+      console.log(
+        `[Orchestrator] ℹ️  Knowledge source scopes: @${Array.from(result.knowledgeScopes).join(', @')} (full enforcement not yet implemented)`
+      );
+    }
+
     // LEGACY SUPPORT: Also parse old "INPUT DATA:" section for backwards compatibility
-    // This ensures existing prompts still work during transition
     const legacyData = this.parseLegacyInputDataSection(prompt);
     if (legacyData.sops.length > 0) {
       console.log('[Orchestrator] ℹ️  Found legacy INPUT DATA section, merging with bracket notation');
-      result.procedures.push(...legacyData.sops);
+      result.procedures.push(...legacyData.sops.map(s => ({ subcategoryId: 'sops', categoryId: s })));
     }
     if (legacyData.includePrimaryContext) {
       console.log('[Orchestrator] ℹ️  Legacy prompt requests primary context');
     }
-    
+
     return result;
   }
 
@@ -279,28 +288,6 @@ export class OrchestratorService {
   }
 
   /**
-   * Build the full LLM prompt with RAG context + user task
-   * 
-   * BEFORE: Appended 8 lines of "MANDATORY ENFORCEMENT RULES" that duplicated
-   * the context assembler's TIER 1 (scope, length, format, stop, no preamble).
-   * Combined with TIER 1, this meant ~50 behavioral directives before the LLM
-   * even saw the task — consuming attention budget and causing reference
-   * resolution failures (e.g., [Master Record|Device Trade Name] printed literally).
-   * 
-   * AFTER: Lightweight frame. The prompt itself carries all behavioral rules.
-   * The orchestrator just marks where the task begins and ends.
-   */
-  private buildLLMPrompt(ragContext: string, userPrompt: string): string {
-    return `${ragContext}=== TASK ===
-
-    ${userPrompt}
-
-    === END TASK ===
-
-    Write your response now.`;
-  }
-
-  /**
    * Build source attributions from footnote tracker
    */
   private buildSourceAttributions(tracker: FootnoteTracker): SourceAttribution[] {
@@ -353,9 +340,10 @@ export class OrchestratorService {
    */
   private buildConfidenceRating(
     references: {
-      procedures: string[];
+      procedures: Array<{ subcategoryId: string; categoryId?: string }>;
       masterRecordFields: string[];
       contextDocs: Array<{ folder: string; filename: string }>;
+      knowledgeScopes?: Set<string>;
     },
     metadata: {
       procedureChunksRetrieved: number;

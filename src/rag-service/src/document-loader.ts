@@ -9,6 +9,17 @@ export interface CategorizedContextFile {
   contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general';
 }
 
+/**
+ * A procedure document tagged with its subcategory from the Procedures/ folder structure.
+ * Mirrors ProcedureDoc in rag-core/vector-builder.ts but with the required subcategory field.
+ * Maps to: knowledge_sources.procedures.subcategories in primary-context.yaml
+ */
+export interface CategorizedProcedureFile {
+  doc: ParsedDocument;
+  procedureSubcategory: 'sops' | 'quality_policies' | 'project_quality_plans';
+  procedureCategoryId?: string;
+}
+
 export class DocumentLoader {
   private fileParser: ComprehensiveFileParser;
 
@@ -24,18 +35,55 @@ export class DocumentLoader {
     return primaryContext;
   }
 
-  async loadProceduresFolder(folderPath: string): Promise<ParsedDocument[]> {
+  async loadProceduresFolder(folderPath: string): Promise<CategorizedProcedureFile[]> {
     console.log('[DocumentLoader] Loading Procedures folder:', folderPath);
-    
+
     try {
       await fs.access(folderPath);
-      const documents = await this.fileParser.scanAndParseFolder(folderPath);
-      console.log(`[DocumentLoader] Loaded ${documents.length} files from Procedures folder`);
-      return documents;
-    } catch (error) {
+    } catch {
       console.warn('[DocumentLoader] Procedures folder not found or empty:', folderPath);
       return [];
     }
+
+    const results: CategorizedProcedureFile[] = [];
+
+    // Map known subfolder names to their subcategory IDs
+    // Maps to: knowledge_sources.procedures.subcategories in primary-context.yaml
+    const subfolderMapping: Record<string, 'sops' | 'quality_policies' | 'project_quality_plans'> = {
+      'SOPs': 'sops',
+      'QPs': 'quality_policies',
+      'QaPs': 'project_quality_plans',
+    };
+
+    // Scan all documents in the Procedures tree once
+    const allDocs = await this.fileParser.scanAndParseFolder(folderPath);
+
+    for (const doc of allDocs) {
+      const relPath = path.relative(folderPath, doc.filePath);
+      const parts = relPath.split(path.sep);
+
+      // Determine subcategory from the immediate parent folder name
+      let subcategory: 'sops' | 'quality_policies' | 'project_quality_plans' = 'sops';
+      if (parts.length > 1) {
+        const parentFolder = parts[0];
+        subcategory = subfolderMapping[parentFolder] ?? 'sops';
+      }
+      // Files at the Procedures/ root (parts.length === 1) default to 'sops' for backward compat
+
+      results.push({ doc, procedureSubcategory: subcategory });
+    }
+
+    // Log a breakdown by subcategory
+    const counts: Record<string, number> = {};
+    for (const { procedureSubcategory } of results) {
+      counts[procedureSubcategory] = (counts[procedureSubcategory] || 0) + 1;
+    }
+    Object.entries(counts).forEach(([sub, n]) =>
+      console.log(`[DocumentLoader] ✓ ${n} procedure file(s) tagged as ${sub}`)
+    );
+    console.log(`[DocumentLoader] Total procedure files loaded: ${results.length}`);
+
+    return results;
   }
 
   async loadContextFolder(folderPath: string): Promise<ParsedDocument[]> {

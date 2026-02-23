@@ -8,6 +8,17 @@ import { EmbeddingService } from './embedding-service';
 import { VectorStore, VectorEntry } from './vector-store';
 
 /**
+ * A procedure document with its subcategory metadata.
+ * Defined here in rag-core so the layer boundary is not violated.
+ * rag-service's CategorizedProcedureFile is structurally compatible with this type.
+ */
+export interface ProcedureDoc {
+  doc: ParsedDocument;
+  procedureSubcategory?: 'sops' | 'quality_policies' | 'project_quality_plans';
+  procedureCategoryId?: string;
+}
+
+/**
  * Chunk and embed a parsed document
  * Returns VectorEntry objects ready for storage
  */
@@ -20,7 +31,9 @@ export async function chunkAndEmbedDocument(
     chunkSectionAware: (content: string, fileName: string, filePath: string) => string[];
     chunkWithOverlap: (content: string, fileName: string, filePath: string) => string[];
   },
-  contextCategory?: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general'
+  contextCategory?: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general',
+  procedureSubcategory?: 'sops' | 'quality_policies' | 'project_quality_plans',
+  procedureCategoryId?: string
 ): Promise<VectorEntry[]> {
   // 1. Intelligent chunking based on category
   const contentChunks = category === 'procedure'
@@ -49,7 +62,9 @@ export async function chunkAndEmbedDocument(
         filePath: doc.filePath,
         category,
         chunkIndex,
-        contextCategory
+        contextCategory,
+        procedureSubcategory,
+        procedureCategoryId
       }
     );
   });
@@ -63,7 +78,7 @@ export async function chunkAndEmbedDocument(
  * consistent vector entry ordering across cache rebuilds
  */
 export async function buildVectorStore(
-  proceduresFiles: ParsedDocument[],
+  proceduresFiles: ProcedureDoc[],
   contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general' }[],
   projectPath: string,
   embeddingService: EmbeddingService,
@@ -88,8 +103,8 @@ export async function buildVectorStore(
   // =========================================================================
   
   // Sort procedures by fileName
-  const sortedProcedures = [...proceduresFiles].sort((a, b) => 
-    a.fileName.localeCompare(b.fileName)
+  const sortedProcedures = [...proceduresFiles].sort((a, b) =>
+    a.doc.fileName.localeCompare(b.doc.fileName)
   );
   
   // Sort context files by fileName
@@ -101,13 +116,16 @@ export async function buildVectorStore(
   
   // Process procedures sequentially (not in parallel) to maintain order
   const procedureVectors: VectorEntry[] = [];
-  for (const doc of sortedProcedures) {
+  for (const { doc, procedureSubcategory, procedureCategoryId } of sortedProcedures) {
     const vectors = await chunkAndEmbedDocument(
       doc,
       'procedure',
       projectPath,
       embeddingService,
-      chunkingStrategy
+      chunkingStrategy,
+      undefined,
+      procedureSubcategory,
+      procedureCategoryId
     );
     procedureVectors.push(...vectors);
   }

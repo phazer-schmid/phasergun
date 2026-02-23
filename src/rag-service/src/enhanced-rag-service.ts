@@ -3,8 +3,17 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Mutex } from 'async-mutex';
 import { EmbeddingService, VectorStore, SearchResult, LockManager, getLockManager, CacheManager, KnowledgeCache, buildVectorStore as buildVectorStoreUtil, chunkSectionAware, chunkWithOverlap } from '@phasergun/rag-core';
-import { DocumentLoader } from './document-loader';
-import { parseExplicitContextReferences, parseMasterChecklistReference } from './reference-parser';
+import { DocumentLoader, CategorizedProcedureFile } from './document-loader';
+import {
+  parseExplicitContextReferences,
+  parseMasterChecklistReference,
+  parseProcedureReferences,
+  parseKnowledgeSourceScopes,
+  parseBootstrapReferences,
+  parseDocFieldReferences,
+  filterContextResults,
+  filterProcedureResults,
+} from './reference-parser';
 import { assembleContext, estimateTokens, enforceTokenLimit } from './context-assembler';
 import { generateSOPSummaries as generateSOPSummariesOrch, generateContextSummaries as generateContextSummariesOrch } from './summary-orchestrator';
 
@@ -66,7 +75,7 @@ export class EnhancedRAGService {
    * Build vector store using the vector-builder utility
    */
   private async buildVectorStore(
-    proceduresFiles: ParsedDocument[],
+    proceduresFiles: CategorizedProcedureFile[],
     contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general' }[],
     projectPath: string
   ): Promise<void> {
@@ -218,14 +227,14 @@ export class EnhancedRAGService {
     // Load and parse documents
     const proceduresPath = path.join(projectPath, 'Procedures');
     const contextPath = path.join(projectPath, 'Context');
-    
-    let proceduresFiles: ParsedDocument[] = [];
+
+    let proceduresFiles: CategorizedProcedureFile[] = [];
     let contextFiles: { doc: ParsedDocument; contextCategory: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general' }[] = [];
     
     try {
       await fs.access(proceduresPath);
       proceduresFiles = await this.documentLoader.loadProceduresFolder(proceduresPath);
-      console.log(`[EnhancedRAG] Loaded ${proceduresFiles.length} files from Procedures folder`);
+      console.log(`[EnhancedRAG] Loaded ${proceduresFiles.length} categorized files from Procedures folder`);
     } catch (error) {
       console.warn('[EnhancedRAG] Procedures folder not found or empty');
     }
@@ -343,12 +352,32 @@ export class EnhancedRAGService {
     procedureChunks: SearchResult[];
     contextChunks: SearchResult[];
   }> {
-    // 1. Parse prompt for explicit on-demand references (regulatory-strategy, general, master-checklist)
+    // 1. Parse prompt for all explicit references and on-demand scopes
     const explicitlyReferencedCategories = parseExplicitContextReferences(prompt);
     const excludeGeneral = !explicitlyReferencedCategories.has('general');
     const excludeRegStrategy = !explicitlyReferencedCategories.has('regulatory-strategy');
     const includeMasterChecklist = parseMasterChecklistReference(prompt);
-    
+
+    // Parse procedure references (new [Procedure|subcategoryId|categoryId] format)
+    const procedureRefs = parseProcedureReferences(prompt);
+    const referencedProcedureSubcategories = new Set(procedureRefs.map(r => r.subcategoryId));
+
+    // QPs and QaPs are on-demand: excluded unless explicitly referenced
+    const excludedProcedureSubcategories = new Set<string>();
+    if (!referencedProcedureSubcategories.has('quality_policies')) {
+      excludedProcedureSubcategories.add('quality_policies');
+    }
+    if (!referencedProcedureSubcategories.has('project_quality_plans')) {
+      excludedProcedureSubcategories.add('project_quality_plans');
+    }
+
+    // Surface not-yet-implemented warnings for Bootstrap and Doc field references
+    parseBootstrapReferences(prompt);
+    parseDocFieldReferences(prompt);
+
+    // Parse knowledge source scopes (@sops, @global_standards, etc.) — for logging
+    const knowledgeScopes = parseKnowledgeSourceScopes(prompt);
+
     console.log('[EnhancedRAG] 🔒 RETRIEVAL POLICY ENFORCEMENT:');
     if (excludeGeneral) {
       console.log('[EnhancedRAG]    ⛔ Context/General/ EXCLUDED (not explicitly referenced in prompt)');
@@ -360,10 +389,23 @@ export class EnhancedRAGService {
     } else {
       console.log('[EnhancedRAG]    ✅ Context/Regulatory Strategy/ INCLUDED (explicitly referenced in prompt)');
     }
+    if (excludedProcedureSubcategories.has('quality_policies')) {
+      console.log('[EnhancedRAG]    ⛔ Procedures/QPs/ EXCLUDED (quality_policies not explicitly referenced)');
+    } else {
+      console.log('[EnhancedRAG]    ✅ Procedures/QPs/ INCLUDED (quality_policies explicitly referenced)');
+    }
+    if (excludedProcedureSubcategories.has('project_quality_plans')) {
+      console.log('[EnhancedRAG]    ⛔ Procedures/QaPs/ EXCLUDED (project_quality_plans not explicitly referenced)');
+    } else {
+      console.log('[EnhancedRAG]    ✅ Procedures/QaPs/ INCLUDED (project_quality_plans explicitly referenced)');
+    }
     if (includeMasterChecklist) {
       console.log('[EnhancedRAG]    ✅ Master Checklist INCLUDED (explicitly referenced in prompt)');
     } else {
       console.log('[EnhancedRAG]    ⛔ Master Checklist EXCLUDED (not explicitly referenced in prompt)');
+    }
+    if (knowledgeScopes.size > 0) {
+      console.log(`[EnhancedRAG]    ℹ️  Knowledge source scopes detected: @${Array.from(knowledgeScopes).join(', @')} (logging only — full scope enforcement not yet implemented)`);
     }
     
     // 2. Load knowledge with lock protection (prevents concurrent rebuild collisions)
@@ -384,7 +426,8 @@ export class EnhancedRAGService {
         projectPath,
         options.summaryWordCount || 250,
         this.documentLoader,
-        this.summaryGenerator
+        this.summaryGenerator,
+        excludedProcedureSubcategories
       );
       
       contextSummaries = await generateContextSummariesOrch(
@@ -402,56 +445,41 @@ export class EnhancedRAGService {
     const promptEmbedding = await embeddingService.embedText(prompt);
     const promptEmbeddingArray = VectorStore.float32ArrayToNumbers(promptEmbedding);
     
-    // 6. Search procedures
+    // 6. Search procedures with on-demand subcategory filtering
     // CRITICAL: Use explicit undefined check so 0 is respected (0 || 5 would give 5!)
     const procedureChunksToRetrieve = options.procedureChunks !== undefined ? options.procedureChunks : 5;
     console.log(`[EnhancedRAG] 🔍 Searching for top ${procedureChunksToRetrieve} procedure chunks...`);
-    
-    const procedureResults = procedureChunksToRetrieve > 0
+
+    let procedureResults = procedureChunksToRetrieve > 0
       ? this.vectorStore!.search(promptEmbeddingArray, procedureChunksToRetrieve, 'procedure')
       : [];
-    
+
+    // ENFORCE RETRIEVAL POLICY: Filter out on-demand procedure subcategories (QPs, QaPs)
+    procedureResults = filterProcedureResults(procedureResults, excludedProcedureSubcategories);
+
     if (procedureResults.length > 0) {
       console.log(`[EnhancedRAG] 📄 Procedure files included in context:`);
       const uniqueProcedures = new Set(procedureResults.map(r => r.entry.metadata.fileName));
       uniqueProcedures.forEach(fileName => {
         const chunks = procedureResults.filter(r => r.entry.metadata.fileName === fileName).length;
-        console.log(`[EnhancedRAG]    ✓ ${fileName} (${chunks} chunk${chunks > 1 ? 's' : ''})`);
+        const sub = procedureResults.find(r => r.entry.metadata.fileName === fileName)?.entry.metadata.procedureSubcategory || 'sops';
+        console.log(`[EnhancedRAG]    ✓ ${fileName} (${chunks} chunk${chunks > 1 ? 's' : ''}, subcategory: ${sub})`);
       });
     } else if (procedureChunksToRetrieve === 0) {
       console.log(`[EnhancedRAG] ℹ️  No procedure chunks requested (procedureChunks=0)`);
     }
-    
+
     // 7. Search context files with on-demand filtering
     // CRITICAL: Use explicit undefined check so 0 is respected
     const contextChunksToRetrieve = options.contextChunks !== undefined ? options.contextChunks : 5;
     console.log(`[EnhancedRAG] 🔍 Searching for top ${contextChunksToRetrieve} context chunks...`);
-    
+
     let contextResults = contextChunksToRetrieve > 0
       ? this.vectorStore!.search(promptEmbeddingArray, contextChunksToRetrieve, 'context')
       : [];
-    
-    // ENFORCE RETRIEVAL POLICY: Filter out on-demand categories
-    const originalContextCount = contextResults.length;
-    contextResults = contextResults.filter(result => {
-      const category = result.entry.metadata.contextCategory;
-      
-      if (category === 'general' && excludeGeneral) {
-        console.log(`[EnhancedRAG] ⏭️  Filtered out: ${result.entry.metadata.fileName} (General folder, not referenced)`);
-        return false;
-      }
-      
-      if (category === 'regulatory-strategy' && excludeRegStrategy) {
-        console.log(`[EnhancedRAG] ⏭️  Filtered out: ${result.entry.metadata.fileName} (Regulatory Strategy folder, not referenced)`);
-        return false;
-      }
-      
-      return true;
-    });
-    
-    if (originalContextCount !== contextResults.length) {
-      console.log(`[EnhancedRAG] 🔒 FILTERING APPLIED: ${originalContextCount - contextResults.length} context chunks excluded due to retrieval_priority="on_demand"`);
-    }
+
+    // ENFORCE RETRIEVAL POLICY: Filter out on-demand context categories
+    contextResults = filterContextResults(contextResults, excludeGeneral, excludeRegStrategy);
     
     if (contextResults.length > 0) {
       console.log(`[EnhancedRAG] 📄 Context files included in prompt:`);

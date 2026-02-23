@@ -23,6 +23,8 @@ export interface VectorEntry {
     content: string;             // Original text content
     contentHash: string;         // SHA256 of content
     contextCategory?: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general';  // Context subfolder category
+    procedureSubcategory?: 'sops' | 'quality_policies' | 'project_quality_plans';  // Procedure subfolder subcategory
+    procedureCategoryId?: string;  // Procedure category ID from [Procedure|subcategory|categoryId] notation
   };
 }
 
@@ -485,6 +487,8 @@ export class VectorStore {
       category: 'procedure' | 'context';
       chunkIndex: number;
       contextCategory?: 'primary-context-root' | 'initiation' | 'ongoing' | 'predicates' | 'regulatory-strategy' | 'general';
+      procedureSubcategory?: 'sops' | 'quality_policies' | 'project_quality_plans';
+      procedureCategoryId?: string;
     }
   ): VectorEntry {
     const contentHash = VectorStore.computeContentHash(content);

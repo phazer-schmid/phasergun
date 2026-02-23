@@ -20,10 +20,11 @@ echo ""
 # Define modules in dependency order
 modules=(
   "shared-types"
+  "rag-core"
   "file-parser"
   "llm-service"
-  "orchestrator"
   "rag-service"
+  "orchestrator"
   "api-server"
 )
 

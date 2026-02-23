@@ -13,4 +13,4 @@ export { chunkSectionAware, chunkWithOverlap } from './chunking-strategy';
 export { DocumentChunker, DocumentChunk, ChunkingOptions } from './document-chunker';
 
 // Vector building
-export { chunkAndEmbedDocument, buildVectorStore } from './vector-builder';
+export { chunkAndEmbedDocument, buildVectorStore, ProcedureDoc } from './vector-builder';
