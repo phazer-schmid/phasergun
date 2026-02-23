@@ -6,7 +6,7 @@ import mammoth from 'mammoth';
 import pdfParse from 'pdf-parse';
 import { createWorker } from 'tesseract.js';
 import sharp from 'sharp';
-import officeParser from 'officeparser';
+import { parseOffice } from 'officeparser';
 
 /**
  * File Parser Interface
@@ -209,12 +209,13 @@ export class ComprehensiveFileParser implements FileParser {
    * Parse Office files (DOC, PPT, PPTX) using officeparser
    */
   private async parseOfficeFile(filePath: string): Promise<{ content: string; metadata: any }> {
-    const content = await officeParser.parseOfficeAsync(filePath);
-    
+    const ast = await parseOffice(filePath);
+    const text = ast.toText();
+
     return {
-      content: content || '',
+      content: text || '',
       metadata: {
-        wordCount: content ? content.split(/\s+/).length : 0
+        wordCount: text ? text.split(/\s+/).length : 0
       }
     };
   }
