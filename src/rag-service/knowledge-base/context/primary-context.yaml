@@ -6,110 +6,214 @@ product:
 
 # Core knowledge sources that PG retrieves from
 knowledge_sources:
+
   master_record:
     id: "master_record"
     type: "Project Context"
     description: "Living document with key project and product information"
     source: "Customer intake at project start"
     location: "[RAGFolder]/Context/Project-Master-Record.docx"
-    retrieval_priority: "primary"
+    retrieval_priority: "always"
+    precedence: |
+      Answers in the master record document outrank inferred or generated content from all
+      other sources. If a master document answer answers something the prompt is asking,
+      PG must use that answer verbatim rather than generating its own.
     usage: "Primary reference for all content generation prompts"
-  
-  compliance:
-    id: "compliance"
+
+  external_standards:
+    id: "external_standards"
     type: "Regulatory Standards"
-    description: "FDA and ISO standards for medical device documentation"
+    description: "FDA regulations and ISO standards governing medical device documentation"
+    # location, retrieval_priority, and usage apply to all subcategories
     location: "LLM Model"
-    retrieval_priority: "mandatory"
-    standards:
-      - id: "fda_820_30"
-        name: "FDA 21 CFR Part 820.30"
-        scope: "Design Controls"
-      - id: "fda_807"
-        name: "FDA 21 CFR Part 807"
-        scope: "Premarket Notification [510(k)] - Substantial Equivalence"
-      - id: "iso_13485"
-        name: "ISO 13485"
-        scope: "Quality Management Systems"
-      - id: "iso_14971"
-        name: "ISO 14971"
-        scope: "Risk Management"
-    usage: "All generated content must comply with these standards"
-  
-  procedures:
-    id: "procedures"
-    type: "Company SOPs"
-    description: "Company-developed operating procedures"
-    location: "[RAGFolder]/Procedures"
-    retrieval_priority: "high"
-    categories:
-      - id: "quality_manual"
-        name: "Quality Manual"
-      - id: "design_control"
-        name: "Design Control Procedure"
-      - id: "risk_management"
-        name: "Risk Management"
-      - id: "document_control"
-        name: "Document Control Procedure"
-      - id: "production_process"
-        name: "Production and Process Control"
-      - id: "quality_records"
-        name: "Quality Records Procedure"
-    document_types:
-      - {id: "sop", name: "Standard Operating Procedure", acronym: "SOP"}
-      - {id: "qp", name: "Quality Plan", acronym: "QP"}
-      - {id: "qap", name: "Quality Assurance Plan", acronym: "QAP"}
-    usage: "Must adhere when generating content; report conflicts with @compliance"
-  
-  regulatory_strategy:
-    id: "regulatory_strategy"
-    type: "Project Strategy"
-    description: "Predicate devices and regulatory strategy documents"
-    location: "[RAGFolder]/Context/Regulatory Strategy"
-    retrieval_priority: "on_demand"
-    usage: "Only use in content generation if explicitly referenced in the prompts (@generation_workflow.input.prompts)"
-  
-  general:
-    id: "general"
-    type: "Reference Materials"
-    description: "Additional reference documents for content generation"
-    location: "[RAGFolder]/Context/General"
-    retrieval_priority: "on_demand"
-    usage: "Only use in content generation if explicitly referenced in the prompts (@generation_workflow.input.prompts)"
+    retrieval_priority: "always"
+    usage: "All generated content must comply with applicable standards; flag any conflicts with company_processes"
+    subcategories:
+      global_standards:
+        id: "global_standards"
+        description: "International rules for quality and risk management in device making"
+        standards:
+          - id: "iso_13485"
+            name: "ISO 13485"
+            scope: "Quality Management Systems"
+          - id: "iso_14971"
+            name: "ISO 14971"
+            scope: "Risk Management"
+      us_regulations:
+        id: "us_regulations"
+        description: "Mandatory US (FDA) rules for devices sold in the United States"
+        standards:
+          - id: "fda_820_30"
+            name: "FDA 21 CFR Part 820.30"
+            scope: "Design Controls"
+          - id: "fda_807"
+            name: "FDA 21 CFR Part 807"
+            scope: "Premarket Notification [510(k)] - Substantial Equivalence"
 
-  master_checklist:
-    id: "master_checklist"
-    type: "Project Context"
-    description: "A master list of all deliverables that need to be created for this project"
-    source: "Customer intake at project start"
-    location: "[RAGFolder]/Context/Project-Master-Checklist.docx"
-    retrieval_priority: "on_demand"
-    usage: "Only use in content generation if explicitly referenced in the prompts (@generation_workflow.input.prompts)"
+  company_processes:
+    id: "company_processes"
+    type: "Company Quality System"
+    description: "Company-developed operating procedures, quality policies, and project quality plans"
+    subcategories:
+      sops:
+        id: "sops"
+        name: "Standard Instructions (SOPs)"
+        description: "Detailed, step-by-step guides for tasks within the company quality management system"
+        location: "[RAGFolder]/Procedures/SOPs"
+        retrieval_priority: "always"
+        usage: "Must adhere when generating content; report conflicts with @external_standards"
+        categories:
+          - id: "quality_manual"
+            name: "Quality Manual"
+          - id: "design_control"
+            name: "Design Control Procedure"
+          - id: "risk_management"
+            name: "Risk Management"
+          - id: "document_control"
+            name: "Document Control Procedure"
+          - id: "production_process"
+            name: "Production and Process Control"
+          - id: "quality_records"
+            name: "Quality Records Procedure"
+      quality_policies:
+        id: "quality_policies"
+        name: "Quality Policies (QPs)"
+        description: "High-level company rules and responsibilities for QMS elements such as audits and management reviews"
+        location: "[RAGFolder]/Procedures/QPs"
+        retrieval_priority: "on_demand"
+        usage: "Use to establish overall quality and compliance structure in document drafts; report conflicts with @external_standards"
+      project_quality_plans:
+        id: "project_quality_plans"
+        name: "Project Quality Plans (QaPs)"
+        description: "Specific plans detailing quality activities, resources, and timelines for a given project"
+        location: "[RAGFolder]/Procedures/QaPs"
+        retrieval_priority: "on_demand"
+        usage: "Only retrieve when explicitly referenced in a prompt; use to ensure project documentation follows the defined quality strategy and timeline"
 
-# How prompts reference documents using bracket notation
+  document_bootstraps:
+    id: "document_bootstraps"
+    type: "Document-Specific Context"
+    description: |
+      Bootstrap documents provide document-specific information to help generate a more
+      comprehensive draft. A prompt references a bootstrap document stored in Google Drive;
+      that bootstrap document can in turn list any number of additional supporting documents
+      also stored in Google Drive. PG resolves the full chain at retrieval time.
+    location: "Google Drive"
+    retrieval_priority: "on_demand"
+    usage: |
+      Only retrieve when a prompt explicitly references a bootstrap document via
+      @reference_notation.document_bootstrap. PG follows the chain: prompt -> bootstrap doc ->
+      any documents listed inside the bootstrap doc. Cite every resolved document in output references.
+    notes:
+      - "Bootstrap documents are not themselves regulatory content; they supply additional project or document-specific inputs"
+      - "Bootstrap documents may reference other Google Drive documents by name or URL"
+      - "PG must not infer or hallucinate documents not explicitly listed in the bootstrap chain"
+
+# How prompts reference documents and knowledge sources
 reference_notation:
-  purpose: "Enable explicit document references within prompts"
-  syntax_patterns:
-    procedure:
-      format: "[Procedure|{category_name}]"
-      example: "[Procedure|Design Control Procedure]"
-      retrieval: "References @knowledge_sources.procedures.categories by name"
-      output: "PG cites procedure filename and section used"
-    master_record:
-      format: "[Master Record|{field_name}]"
-      example: "[Master Record|DEVICE_NAME]"
-      retrieval: "References fields in @knowledge_sources.master_record"
-      output: "PG extracts and cites specific field values"
-    master_checklist:
-      format: "[Master Checklist]"
-      example: "[Master checklist]"
-      retrieval: "Retrieves the entire contents of this file"
-      output: "The entire contents of this file as is not manipulation"
-    context:
-      format: "[Context|{folder}|{filename}]"
-      example: "[Context|Regulatory Strategy|Predicate-Device-Analysis.docx]"
-      retrieval: "References documents in [RAGFolder]/Context/{folder}"
-      output: "PG retrieves and cites specified document"
+  purpose: |
+    Provide unambiguous, structured references within prompts so PG knows exactly which
+    knowledge source, document, or field to retrieve — preventing the LLM from substituting
+    general knowledge where specific source material is required.
+
+  # ── Knowledge Source References ───────────────────────────────────────────────
+  # Use these to scope an instruction to a specific knowledge source or subcategory.
+  # PG treats the referenced source as the exclusive context for that instruction.
+  knowledge_source_refs:
+    description: "Reference a knowledge source or subcategory defined in @knowledge_sources"
+    format: "@{source_id}"
+    resolution: "source_id must match an id field in knowledge_sources or one of its subcategories"
+    example: "Using @global_standards, describe the risk management requirements for this device."
+    examples:
+      - pattern: "@external_standards"
+        meaning: "Use all external standards (global + US) as context for this instruction"
+      - pattern: "@global_standards"
+        meaning: "Scope context exclusively to ISO standards; do not draw from US regulations or LLM general knowledge"
+      - pattern: "@us_regulations"
+        meaning: "Scope context exclusively to FDA regulations; do not draw from ISO standards or LLM general knowledge"
+      - pattern: "@company_processes"
+        meaning: "Use all company process documents (SOPs, QPs, QaPs) as context"
+      - pattern: "@sops"
+        meaning: "Scope context exclusively to SOP documents"
+      - pattern: "@quality_policies"
+        meaning: "Scope context exclusively to Quality Policy documents"
+      - pattern: "@project_quality_plans"
+        meaning: "Scope context exclusively to Project Quality Plan documents"
+      - pattern: "@master_record"
+        meaning: "Scope context exclusively to the Project Master Record"
+      - pattern: "@document_bootstraps"
+        meaning: "Include all bootstrap-resolved documents as context"
+    behavior: |
+      When a knowledge source reference appears in a prompt, PG must:
+      1. Retrieve content only from the identified source(s)
+      2. Explicitly note in the References output which source was used
+      3. Flag if the requested source contains insufficient information rather than
+         supplementing silently with LLM general knowledge
+
+  # ── Field References (Master Record & Bootstrap Documents) ────────────────────
+  master_record_field:
+    format: "[Master Record|{field_name}]"
+    example: "[Master Record|DEVICE_NAME]"
+    retrieval: "Extracts the named field from @knowledge_sources.master_record"
+    output: "PG replaces the reference with the field value and cites the source field"
+
+  document_field:
+    format: "[Doc|{document_name}|{field_name}]"
+    example: "[Doc|DDP-Bootstrap|INTENDED_USE]"
+    retrieval: |
+      Extracts the named field from the specified document. The document must be the
+      bootstrap document itself or a document listed within the bootstrap chain.
+    output: "PG replaces the reference with the field value and cites the document and field"
+
+  # ── Document Bootstrap Reference ──────────────────────────────────────────────
+  document_bootstrap:
+    format: "[Bootstrap|{bootstrap_document_name}]"
+    example: "[Bootstrap|DDP-Bootstrap.docx]"
+    bootstrap_content_types:
+      document_references:
+        description: "Links to other Google Drive documents PG should retrieve and use as context"
+        example: "Verification Protocol: https://drive.google.com/..."
+      qa_pairs:
+        description: "Explicit question/answer pairs written directly in the bootstrap document"
+        example: |
+          Q: What is the intended use of this device?
+          A: The device is intended for single-use monitoring of...
+        behavior: |
+          PG treats Q&A pairs as authoritative, document-specific facts.
+          They take precedence over inferred content from other sources.
+          Each Q&A pair is cited as originating from the bootstrap document.
+    retrieval: |
+      1. Locate the named bootstrap document in Google Drive (@knowledge_sources.document_bootstraps.location)
+      2. Parse the bootstrap document for both content types:
+         a. Extract any document references and retrieve those documents from Google Drive
+         b. Extract any Q&A pairs and load them as structured, high-priority context
+      3. Make the bootstrap document, all resolved supporting documents, and all Q&A pairs available as context
+    precedence: |
+      Q&A pairs from a bootstrap document outrank inferred or generated content from all
+      other sources. If a Q&A pair directly answers something the prompt is asking,
+      PG must use that answer verbatim rather than generating its own.
+    output: |
+      PG cites the bootstrap document for each Q&A pair used, and cites the bootstrap
+      document plus each resolved supporting document for any referenced file content used.
+
+  # ── Procedure / SOP Reference ─────────────────────────────────────────────────
+  procedure:
+    format: "[Procedure|{subcategory_id}|{category_id}]"
+    examples:
+      - "[Procedure|sops|design_control]"
+      - "[Procedure|sops|risk_management]"
+      - "[Procedure|quality_policies]"
+      - "[Procedure|project_quality_plans]"
+    retrieval: |
+      PG resolves the reference by matching subcategory_id and (optionally) category_id
+      against @knowledge_sources.company_processes.subcategories. The actual filename
+      on disk is irrelevant — PG uses the category metadata loaded at startup to locate
+      the correct document(s).
+    loading_requirement: |
+      At cache build time, PG must index each procedure document with its subcategory_id
+      and category_id as metadata tags (not just filename). This is what makes
+      category-based retrieval possible at prompt time.
+    output: "PG cites the resolved filename and section used, alongside the category reference"
 
 # Content generation workflow
 generation_workflow:
@@ -118,70 +222,98 @@ generation_workflow:
       location: "[RAG Folder]/Prompts"
       interface: "Dropdown list on web page"
       trigger: "User selects prompt and clicks Generate button"
-  
+
   processing:
-    step_1: "Parse @reference_notation patterns in selected prompt"
-    step_2: "Retrieve referenced documents from @knowledge_sources"
-    step_3: "Validate against @knowledge_sources.compliance.standards"
-    step_4: "Generate content adhering to @knowledge_sources.procedures"
-    step_5: "Track conflicts between sources"
-    step_6: "Calculate confidence rating"
-  
+    step_1: "Parse all @reference_notation patterns in the selected prompt"
+    step_2: "Resolve @{source_id} knowledge source scopes"
+    step_3: "Resolve [Bootstrap|...]: locate bootstrap document in Google Drive, retrieve all referenced supporting documents, and extract Q&A pairs"
+    step_4: "Retrieve [Master Record|field] values from @knowledge_sources.master_record"
+    step_5: "Retrieve [Doc|document|field] values from bootstrap-resolved documents (requires step_3 to be complete)"
+    step_6: "Retrieve [Procedure|subcategory_id|category_id] documents by matching against category metadata tags loaded at index time"
+    step_7: "Generate content — apply bootstrap Q&A pairs with precedence over all other sources; use scoped knowledge sources from step_2"
+    step_8: "Validate generated content against @external_standards"
+    step_9: "Check for conflicts between @company_processes and @external_standards"
+    step_10: "Calculate confidence rating"
+
   output:
-    location: "PG web page output panel"
-    sections:
-      generated_content:
-        description: "DHF documentation with inline reference footnotes"
-        format: "Structured text with citation markers"
-      
-      discrepancies:
-        description: "Conflicts found during generation"
-        includes: 
-          - "Procedure vs compliance conflicts"
-          - "Source contradictions"
-          - "Missing required information"
-        example: "SOP-001 Design Control conflicts with FDA 21 CFR 820.30 on design review timing"
-      
-      references:
-        description: "Complete source attribution"
-        includes:
-          - "Document names and locations"
-          - "Specific sections or field values used"
-          - "LLM knowledge base citations"
-          - "How each reference informed the content"
-      
-      confidence:
-        description: "Content accuracy confidence assessment"
-        scale: ["High", "Medium", "Low"]
-        criteria:
-          - "Source agreement level"
-          - "Completeness of information"
-          - "Compliance alignment"
-          - "Procedure adherence"
-        output: "Rating with detailed rationale"
+      location: "PG web page output panel"
+      sections:
+        generated_content:
+          description: "DHF documentation with inline reference footnotes"
+          format: "Structured text with citation markers"
+
+        discrepancies:
+          description: "Conflicts found during generation"
+          includes:
+            - "Company process vs. external standards conflicts"
+            - "Source contradictions"
+            - "Missing required information"
+            - "Bootstrap Q&A pair conflicts with other knowledge sources"
+            - "Bootstrap document not found or inaccessible in Google Drive"
+            - "Supporting document referenced in bootstrap not found or inaccessible in Google Drive"
+            - "Procedure category reference matched no indexed documents"
+          example: "SOP-001 Design Control conflicts with FDA 21 CFR 820.30 on design review timing"
+
+        references:
+          description: "Complete source attribution"
+          includes:
+            - "Knowledge source id and scope used (e.g., @global_standards, @sops)"
+            - "Procedure documents cited by subcategory_id and category_id, with resolved filename and section"
+            - "Bootstrap chain: bootstrap document -> each resolved supporting document"
+            - "Bootstrap Q&A pairs cited individually, attributed to the bootstrap document they originated from"
+            - "Master Record and Doc field values cited by field name and source document"
+            - "How each reference informed the content"
+
+        confidence:
+          description: "Content accuracy confidence assessment"
+          scale: ["High", "Medium", "Low"]
+          criteria:
+            - "Source agreement level"
+            - "Completeness of information"
+            - "Compliance alignment"
+            - "Procedure adherence"
+          output: "Rating with detailed rationale"
 
 # Core operational rules
 operational_rules:
   compliance_enforcement:
-    rule: "All content must comply with @knowledge_sources.compliance.standards"
+    rule: "All content must comply with @external_standards"
     action: "Reject or flag non-compliant content"
-  
+
   discrepancy_handling:
-    rule: "Report all conflicts between @knowledge_sources.procedures and @knowledge_sources.compliance"
+    rule: "Report all conflicts between @company_processes and @external_standards"
     action: "Document in @generation_workflow.output.sections.discrepancies"
-  
+
+  knowledge_source_scoping:
+    rule: |
+      When a prompt contains a @{source_id} reference, PG must restrict retrieval to that
+      source and must not silently fall back to LLM general knowledge
+    action: "If the scoped source is insufficient, surface a warning in discrepancies rather than supplementing from general knowledge"
+
   retrieval_scope:
-    rule: "Only retrieve @knowledge_sources.regulatory_strategy and @knowledge_sources.general when explicitly referenced via @reference_notation.context"
-    action: "Exclude from semantic search unless [Context|Regulatory Strategy|...] or [Context|General|...] pattern detected in prompt"
-  
+    rule: "@knowledge_sources.document_bootstraps and @knowledge_sources.company_processes.project_quality_plans are only retrieved when explicitly referenced in the prompt"
+    action: "Exclude from semantic search unless the corresponding reference pattern is present in the prompt"
+
   primary_source:
     rule: "@knowledge_sources.master_record is the authoritative source for project-specific information"
-    action: "Prioritize master record data over other sources"
+    action: "Prioritize master record data over other sources for project-specific fields"
 
+  bootstrap_integrity:
+    rule: "PG must only retrieve documents explicitly listed in the bootstrap chain"
+    action: "Do not infer or hallucinate additional documents; flag missing documents in discrepancies"
+
+  bootstrap_qa_precedence:
+    rule: "Q&A pairs extracted from a bootstrap document are authoritative and take precedence over inferred or generated content from all other sources"
+    action: "When a Q&A pair directly addresses content being generated, use the answer verbatim; do not paraphrase or override with content from other sources"
+
+  procedure_category_resolution:
+    rule: "Procedures must be resolved by subcategory_id and category_id metadata tags, never by filename"
+    action: "If no indexed document matches the referenced category, flag in discrepancies rather than attempting filename-based fallback"
+    
 # Cache system for knowledge base persistence and performance
 cache_system:
   purpose: "Persist indexed knowledge (vectors, summaries, metadata) across requests and process restarts to avoid expensive re-parsing and re-embedding"
-  
+
   toggle:
     env_variable: "CACHE_ENABLED"
     default: true
@@ -203,13 +335,12 @@ cache_system:
     inputs:
       - source: "@knowledge_sources.master_record"
         signal: "file path, size, mtime"
-      - source: "@knowledge_sources.procedures"
-        signal: "all file paths, sizes, mtimes (sorted, concatenated)"
-      - source: "@knowledge_sources.general and @knowledge_sources.regulatory_strategy context folders"
-        signal: "all file paths, sizes, mtimes (sorted, concatenated)"
-        excludes: ["Context/Prompt"]
+      - source: "@knowledge_sources.company_processes"
+        signal: "all file paths, sizes, mtimes across sops / quality_policies / project_quality_plans (sorted, concatenated)"
     combined: "SHA-256 of pipe-delimited individual fingerprints"
     validation: "Current fingerprint compared against cached fingerprint; mismatch triggers full rebuild"
+    notes:
+      - "Bootstrap documents reside in Google Drive and are fetched on-demand per request; they are excluded from the local cache fingerprint"
 
   validation_flow:
     step_1: "Check in-memory Map for project cache entry (fastest)"
@@ -220,9 +351,8 @@ cache_system:
     result_invalid: "Clear old cache artifacts, rebuild everything, save new cache to disk and memory"
 
   rebuild_trigger:
-    - "Any file added, removed, or modified in @knowledge_sources.procedures"
+    - "Any file added, removed, or modified in @knowledge_sources.company_processes (any subcategory)"
     - "Any file added, removed, or modified in @knowledge_sources.master_record"
-    - "Any file added, removed, or modified in context folders (Initiation, Ongoing, Predicates, root-level Primary Context)"
     - "primary-context.yaml itself is modified"
     - "Cache metadata or vector store file is missing or corrupt"
     - "CACHE_ENABLED set to false (forces fresh build every request, never saves)"
@@ -230,6 +360,8 @@ cache_system:
   excluded_from_cache:
     - folder: "Context/Prompt"
       reason: "Prompt files are user-selected per request and parsed on-demand; caching them would serve stale or irrelevant prompt content"
+    - source: "@knowledge_sources.document_bootstraps"
+      reason: "Bootstrap documents live in Google Drive and are resolved dynamically per request"
 
   concurrency_protection:
     in_process:
