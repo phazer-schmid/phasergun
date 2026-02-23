@@ -12,6 +12,7 @@
     "@phasergun/file-parser": "file:../file-parser",
     "@phasergun/llm-service": "file:../llm-service",
     "@phasergun/orchestrator": "file:../orchestrator",
+    "@phasergun/rag-core": "file:../rag-core",
     "@phasergun/rag-service": "file:../rag-service",
     "@phasergun/shared-types": "file:../shared-types",
     "cors": "^2.8.5",

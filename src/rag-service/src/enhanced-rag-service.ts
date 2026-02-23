@@ -2,14 +2,10 @@ import { ParsedDocument } from '@phasergun/shared-types';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Mutex } from 'async-mutex';
-import { EmbeddingService } from './embedding-service';
-import { VectorStore, SearchResult } from './vector-store';
-import { LockManager, getLockManager } from './lock-manager';
-import { CacheManager, KnowledgeCache } from './cache-manager';
+import { EmbeddingService, VectorStore, SearchResult, LockManager, getLockManager, CacheManager, KnowledgeCache, buildVectorStore as buildVectorStoreUtil, chunkSectionAware, chunkWithOverlap } from '@phasergun/rag-core';
 import { DocumentLoader } from './document-loader';
 import { parseExplicitContextReferences, parseMasterChecklistReference } from './reference-parser';
 import { assembleContext, estimateTokens, enforceTokenLimit } from './context-assembler';
-import { buildVectorStore as buildVectorStoreUtil } from './vector-builder';
 import { generateSOPSummaries as generateSOPSummariesOrch, generateContextSummaries as generateContextSummariesOrch } from './summary-orchestrator';
 
 /**
@@ -18,12 +14,6 @@ import { generateSOPSummaries as generateSOPSummariesOrch, generateContextSummar
  * (e.g., one per API request), they all coordinate through the same mutex.
  */
 const globalBuildMutex = new Mutex();
-
-/**
- * GLOBAL mutex for summary generation - prevents duplicate LLM calls
- * Separate from cache build mutex to allow parallel operations when possible
- */
-const globalSummaryMutex = new Mutex();
 
 /**
  * Enhanced RAG Service for Content Generation
@@ -82,9 +72,6 @@ export class EnhancedRAGService {
   ): Promise<void> {
     const embeddingService = await this.getEmbeddingService(projectPath);
     const vectorStorePath = this.cacheManager.getVectorStorePath(projectPath);
-    
-    // Import chunking strategies
-    const { chunkSectionAware, chunkWithOverlap } = await import('./chunking-strategy');
     
     this.vectorStore = await buildVectorStoreUtil(
       proceduresFiles,

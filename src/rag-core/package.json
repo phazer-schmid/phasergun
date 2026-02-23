@@ -1,0 +1,26 @@
+{
+  "name": "@phasergun/rag-core",
+  "version": "1.0.0",
+  "description": "Core RAG infrastructure: chunking, embedding, vector store, cache, and lock management",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "@phasergun/shared-types": "file:../shared-types",
+    "@xenova/transformers": "^2.17.2",
+    "async-mutex": "^0.5.0",
+    "better-sqlite3": "^12.5.0",
+    "dotenv": "^16.3.1",
+    "proper-lockfile": "^4.1.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^20.10.0",
+    "@types/proper-lockfile": "^4.1.4",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.2"
+  }
+}

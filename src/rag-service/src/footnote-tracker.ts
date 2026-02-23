@@ -3,7 +3,7 @@
  * Tracks which sources were used and formats citations
  */
 
-import { VectorEntry, SearchResult } from './vector-store';
+import { VectorEntry, SearchResult } from '@phasergun/rag-core';
 
 export interface SourceReference {
   id: string;                     // Unique ID for this reference

@@ -9,7 +9,7 @@
  * and any output-specific overrides. Everything else is handled here.
  */
 
-import { SearchResult } from './vector-store';
+import { SearchResult } from '@phasergun/rag-core';
 
 export function assembleContext(
   primaryContext: any,
