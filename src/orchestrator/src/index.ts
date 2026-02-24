@@ -47,7 +47,7 @@ export class OrchestratorService {
       const hasContextRefs = references.masterRecordFields.length > 0 || references.contextDocs.length > 0;
       const hasAnyRefs = hasProcedureRefs || hasContextRefs;
 
-      const { ragContext, metadata, procedureChunks, contextChunks } = 
+      const { ragContext, metadata, procedureChunks, contextChunks, externalStandards } =
         await this.ragService.retrieveRelevantContext(
           input.projectPath,
           input.primaryContextPath,
@@ -68,9 +68,11 @@ export class OrchestratorService {
       // Step 3: Initialize footnote tracker and track sources
       const footnoteTracker = new FootnoteTracker();
       footnoteTracker.addFromRetrievalResults(procedureChunks, contextChunks);
-      
-      // Add regulatory standards mentioned in the prompt (if any)
-      this.addRegulatoryStandardsToTracker(input.prompt, footnoteTracker);
+
+      // Always add external_standards (retrieval_priority: always per primary-context.yaml)
+      externalStandards.forEach(s => {
+        footnoteTracker.addStandardReference(s.name, s.scope);
+      });
       
       console.log('[Orchestrator] Context assembled:');
       console.log('  - Retrieval mode: ' + (hasAnyRefs ? 'bracket notation (boosted)' : 'semantic search (baseline)'));
@@ -267,24 +269,6 @@ export class OrchestratorService {
     }
     
     return result;
-  }
-
-  /**
-   * Add regulatory standards to footnote tracker based on prompt content
-   */
-  private addRegulatoryStandardsToTracker(prompt: string, tracker: FootnoteTracker): void {
-    if (prompt.match(/ISO\s*13485/i)) {
-      tracker.addStandardReference('ISO 13485:2016', 'Quality Management Systems for Medical Devices');
-    }
-    if (prompt.match(/ISO\s*14971/i)) {
-      tracker.addStandardReference('ISO 14971:2019', 'Risk Management for Medical Devices');
-    }
-    if (prompt.match(/21\s*CFR\s*820/i)) {
-      tracker.addStandardReference('21 CFR Part 820', 'FDA Quality System Regulation');
-    }
-    if (prompt.match(/510\(k\)/i)) {
-      tracker.addStandardReference('FDA 510(k) Guidance', 'Premarket Notification Requirements');
-    }
   }
 
   /**

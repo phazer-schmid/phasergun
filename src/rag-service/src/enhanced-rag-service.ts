@@ -14,7 +14,7 @@ import {
   filterContextResults,
   filterProcedureResults,
 } from './reference-parser';
-import { assembleContext, estimateTokens, enforceTokenLimit } from './context-assembler';
+import { assembleContext, estimateTokens, enforceTokenLimit, extractExternalStandards } from './context-assembler';
 import { generateSOPSummaries as generateSOPSummariesOrch, generateContextSummaries as generateContextSummariesOrch } from './summary-orchestrator';
 
 /**
@@ -351,6 +351,7 @@ export class EnhancedRAGService {
     };
     procedureChunks: SearchResult[];
     contextChunks: SearchResult[];
+    externalStandards: Array<{ id: string; name: string; scope: string }>;
   }> {
     // 1. Parse prompt for all explicit references and on-demand scopes
     const explicitlyReferencedCategories = parseExplicitContextReferences(prompt);
@@ -530,11 +531,15 @@ export class EnhancedRAGService {
       sources: Array.from(sources)
     };
     
-    return { 
-      ragContext, 
+    // 12. Extract external standards for footnote tracking in orchestrator
+    const externalStandards = extractExternalStandards(knowledge.primaryContext);
+
+    return {
+      ragContext,
       metadata,
       procedureChunks: procedureResults,
-      contextChunks: contextResults
+      contextChunks: contextResults,
+      externalStandards
     };
   }
 

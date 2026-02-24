@@ -12,6 +12,24 @@
 import { SearchResult } from '@phasergun/rag-core';
 import { buildSystemSection } from './prompt-builder';
 
+/**
+ * Extract all external standards from primary-context.yaml.
+ * Maps to: knowledge_sources.external_standards (retrieval_priority: always)
+ */
+export function extractExternalStandards(
+  primaryContext: any
+): Array<{ id: string; name: string; scope: string }> {
+  const standards: Array<{ id: string; name: string; scope: string }> = [];
+  const subcategories = primaryContext?.knowledge_sources?.external_standards?.subcategories;
+  if (!subcategories) return standards;
+  for (const subcategory of Object.values(subcategories) as any[]) {
+    for (const std of subcategory.standards || []) {
+      standards.push({ id: std.id, name: std.name, scope: std.scope });
+    }
+  }
+  return standards;
+}
+
 export function assembleContext(
   primaryContext: any,
   procedureChunks: SearchResult[],
@@ -58,7 +76,19 @@ export function assembleContext(
   // SECTION 2: REFERENCE MATERIALS
   // =========================================================================
   sections.push('=== REFERENCE MATERIALS ===\n\n');
-  
+
+  // External standards — retrieval_priority: "always" per primary-context.yaml
+  // Always injected so the LLM observes them for every generation task.
+  const externalStandards = extractExternalStandards(primaryContext);
+  if (externalStandards.length > 0) {
+    sections.push('--- Applicable Regulatory Standards (@external_standards) ---\n');
+    sections.push('All generated content must comply with the following standards. Flag any conflicts with company procedures.\n\n');
+    externalStandards.forEach(s => {
+      sections.push(`- **${s.name}** — ${s.scope}\n`);
+    });
+    sections.push('\n');
+  }
+
   if (sortedSopSummaries.size > 0) {
     sections.push('--- Company Procedures (SOPs) ---\n');
     sortedSopSummaries.forEach((summary, fileName) => {
