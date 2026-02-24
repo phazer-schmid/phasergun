@@ -59,6 +59,14 @@ export const RULE_WRITE_ONLY_REQUESTED =
   '- Write only what the prompt requests. Respect all length and format constraints exactly.\n';
 
 /**
+ * Do not echo or reproduce any part of the task specification in the response.
+ * Prevents models from repeating prompt headings, section titles, or reference notation
+ * (e.g., "[Bootstrap|...]", "[Master Checklist]", "Task", "References") at the start of output.
+ */
+export const RULE_NO_ECHO_PROMPT =
+  '- Do NOT echo, repeat, or reproduce any part of the task specification, prompt headings, section titles (e.g., "Task", "References"), or reference notation ([Bootstrap|...], [Master Checklist], etc.) in your response. Begin immediately with the requested document content.\n';
+
+/**
  * Build SECTION 1 of the LLM prompt: role declaration + universal generation rules.
  * Previously inline in context-assembler.ts:58-67.
  * Maps to: product.name, product.purpose, and all operational_rules above.
@@ -79,6 +87,7 @@ export function buildSystemSection(primaryContext: any): string {
     RULE_TONE,
     RULE_MARKDOWN_FORMAT,
     RULE_WRITE_ONLY_REQUESTED,
+    RULE_NO_ECHO_PROMPT,
     '\n',
     '---\n\n',
   ].join('');
