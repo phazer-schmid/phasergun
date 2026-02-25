@@ -16,11 +16,13 @@ export const RULE_WRITE_AS_AUTHOR =
   '- Write as the document author. No AI preamble, no meta-commentary.\n';
 
 /**
- * Resolve ALL bracket-notation references to their actual values from retrieved content.
+ * Resolve any remaining bracket-notation references that were not pre-resolved server-side.
+ * [Master Record|...] tokens are resolved server-side before this prompt is sent; if any
+ * survive (file not found), the LLM must resolve them from the retrieved context.
  * Maps to: reference_notation.*
  */
 export const RULE_RESOLVE_BRACKET_NOTATION =
-  '- Resolve ALL bracket-notation references to their actual values from the retrieved content. This includes [Master Record|...], [Procedure|...], and [Context|...] patterns. For [Procedure|...] references, substitute the matching SOP number and title (e.g., "SOP0004 (Design Control Procedure)"). For [Master Record|...] references, substitute the actual field value. Never leave any bracket notation in the output.\n';
+  '- Resolve any remaining bracket-notation references to their actual values from the retrieved content. For [Procedure|...] references, substitute the matching SOP number and title (e.g., "SOP0004 (Design Control Procedure)"). For any [Master Record|FIELD_NAME] references that remain, look up the field value in the Project Master Record document included in the reference materials and substitute the actual value. Never leave any bracket notation in the output.\n';
 
 /**
  * Use procedural language as closely as retrieved content allows.

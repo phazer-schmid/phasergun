@@ -185,6 +185,186 @@ export class DocumentLoader {
     return doc;
   }
 
+  /**
+   * Load the Project Master Record document and parse its field values into a key-value map.
+   * The master record is formatted as:
+   *   FIELD_NAME
+   *       Field value text
+   *
+   * Looks for the file by scanning the Context folder (and its immediate subdirectories)
+   * for any .docx file whose name contains both "master" and "record" (case-insensitive).
+   * Falls back to the conventional name "Project-Master-Record.docx" first.
+   *
+   * Maps to: knowledge_sources.master_record in primary-context.yaml
+   */
+  async loadMasterRecord(contextPath: string): Promise<ParsedDocument | null> {
+    console.log('[DocumentLoader] Loading Master Record...');
+
+    // 1. Try the conventional exact name first
+    const conventionalPath = path.join(contextPath, 'Project-Master-Record.docx');
+    try {
+      await fs.access(conventionalPath);
+      const doc = await this.loadFile(conventionalPath);
+      console.log('[DocumentLoader] ✓ Master Record loaded (conventional name):', doc.fileName);
+      return doc;
+    } catch {
+      // Not at conventional path — fall through to directory scan
+    }
+
+    // 2. Scan the Context root for any file (with or without .docx extension)
+    //    whose name contains "master" and "record".
+    //    Extension-less files are handled by ComprehensiveFileParser via magic bytes.
+    try {
+      const entries = await fs.readdir(contextPath, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isFile()) continue;
+        const nameLower = entry.name.toLowerCase();
+        if (nameLower.includes('master') && nameLower.includes('record')) {
+          const filePath = path.join(contextPath, entry.name);
+          try {
+            const doc = await this.loadFile(filePath);
+            console.log('[DocumentLoader] ✓ Master Record loaded (by pattern scan):', doc.fileName);
+            return doc;
+          } catch (err) {
+            console.warn(`[DocumentLoader] Could not load candidate "${entry.name}":`, err);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[DocumentLoader] Could not scan Context folder for master record:', err);
+    }
+
+    console.warn('[DocumentLoader] ⚠️  Master Record not found in Context folder (tried conventional name and pattern scan)');
+    return null;
+  }
+
+  /**
+   * Parse the text content of a master record document into a field-value map.
+   *
+   * Handles multiple formats that mammoth or other parsers may produce:
+   *   1. Multi-line:   "FIELD_NAME\n    value text"  (standard definition-list style)
+   *   2. Colon-sep:   "FIELD_NAME: value text"       (inline with colon)
+   *   3. Tab-sep:     "FIELD_NAME\tvalue text"        (inline with tab, from table cells)
+   *
+   * Field names must be ALL_CAPS identifiers (letters, digits, underscores, min 3 chars).
+   *
+   * Returns a Map<FIELD_NAME, value> suitable for token substitution.
+   */
+  static parseMasterRecordFields(content: string): Map<string, string> {
+    const fields = new Map<string, string>();
+    // A field name is an all-caps identifier (may include underscores, digits)
+    const fieldNamePattern = /^[A-Z][A-Z0-9_]{2,}$/;
+    // Inline format: FIELD_NAME: value  OR  FIELD_NAME\tvalue
+    const inlinePattern = /^([A-Z][A-Z0-9_]{2,})[\t:]\s*(.+)$/;
+
+    const lines = content.split(/\r?\n/);
+
+    let currentField: string | null = null;
+    const valueLines: string[] = [];
+
+    const flush = () => {
+      if (currentField && valueLines.length > 0) {
+        fields.set(currentField, valueLines.join(' ').trim());
+      }
+      currentField = null;
+      valueLines.length = 0;
+    };
+
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) {
+        continue;
+      }
+
+      // Check for inline format first: "FIELD_NAME: value" or "FIELD_NAME\tvalue"
+      const inlineMatch = line.match(inlinePattern);
+      if (inlineMatch) {
+        flush();
+        fields.set(inlineMatch[1], inlineMatch[2].trim());
+        currentField = null; // already stored, no multi-line continuation
+        continue;
+      }
+
+      if (fieldNamePattern.test(line)) {
+        // Bare field name on its own line — value is on subsequent lines
+        flush();
+        currentField = line;
+      } else if (currentField) {
+        // Value line for the current field
+        valueLines.push(line);
+      }
+      // Lines before any field name (e.g. headings, descriptions) are ignored
+    }
+
+    flush(); // Save last field
+    return fields;
+  }
+
+  /**
+   * Load a bootstrap document by its referenced name.
+   * The referenced name (e.g., "DDP-Bootstrap-Phase1.docx") may not match the exact filename
+   * on disk (e.g., "DDP-Bootstrap-Phase1-V4.docx"), so this method does fuzzy matching:
+   *   1. Exact filename match
+   *   2. Filename starts with the base name (handles version suffixes like -V4)
+   *   3. Filename contains the base name
+   *
+   * Searches the Context root and one level of subdirectories.
+   *
+   * Maps to: knowledge_sources.document_bootstraps in primary-context.yaml
+   */
+  async loadBootstrapDocument(contextPath: string, bootstrapDocName: string): Promise<ParsedDocument | null> {
+    console.log(`[DocumentLoader] Loading bootstrap document: ${bootstrapDocName}`);
+
+    // Normalize: strip extension for matching
+    const refBaseLower = bootstrapDocName.replace(/\.docx$/i, '').toLowerCase();
+
+    // Build search directories: Context root + one level of subdirectories
+    const searchDirs: string[] = [contextPath];
+    try {
+      const entries = await fs.readdir(contextPath, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          searchDirs.push(path.join(contextPath, entry.name));
+        }
+      }
+    } catch {}
+
+    for (const searchDir of searchDirs) {
+      let entries: import('fs').Dirent[];
+      try {
+        entries = await fs.readdir(searchDir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+
+      for (const entry of entries) {
+        if (!entry.isFile()) continue;
+        const nameLower = entry.name.toLowerCase();
+        // Strip .docx extension if present for comparison (also handles extension-less files)
+        const baseNameLower = nameLower.replace(/\.docx$/i, '');
+
+        const isMatch =
+          baseNameLower === refBaseLower ||            // exact
+          baseNameLower.startsWith(refBaseLower) ||    // version suffix (DDP-Bootstrap-Phase1-V4)
+          baseNameLower.includes(refBaseLower);        // contains
+
+        if (isMatch) {
+          const filePath = path.join(searchDir, entry.name);
+          try {
+            const doc = await this.loadFile(filePath);
+            console.log(`[DocumentLoader] ✓ Bootstrap doc loaded: ${doc.fileName} (for reference: "${bootstrapDocName}")`);
+            return doc;
+          } catch (err) {
+            console.warn(`[DocumentLoader] Could not parse bootstrap file ${filePath}:`, err);
+          }
+        }
+      }
+    }
+
+    console.warn(`[DocumentLoader] ⚠️  Bootstrap document not found: "${bootstrapDocName}" (searched in ${contextPath})`);
+    return null;
+  }
+
   async loadMasterChecklist(contextPath: string): Promise<ParsedDocument | null> {
     console.log('[DocumentLoader] Loading Master Checklist...');
     

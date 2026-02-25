@@ -26,11 +26,42 @@ export interface FileParser {
  * Supports PDF, DOCX, PPTX, images (with OCR), and various other formats
  */
 export class ComprehensiveFileParser implements FileParser {
+  /**
+   * File extensions that are explicitly known and handled.
+   * Files with NO extension are sniffed via magic bytes (see detectExtensionFromMagicBytes).
+   * Files with an unrecognized extension that are not executables/archives are logged as warnings.
+   */
   private supportedExtensions = [
     '.pdf', '.docx', '.doc', '.pptx', '.ppt',
     '.txt', '.md', '.csv',
-    '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp'
+    '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp',
+    '.rtf', '.odt', '.xlsx', '.xls',
   ];
+
+  /**
+   * Extensions that are silently skipped (executables, archives, binaries, system files).
+   * Encountering one of these logs a safety warning but never throws.
+   */
+  private blockedExtensions = new Set([
+    // Executables / scripts
+    '.exe', '.com', '.bat', '.cmd', '.sh', '.bash', '.zsh', '.ps1', '.vbs',
+    '.msi', '.app', '.dmg', '.pkg', '.deb', '.rpm',
+    // Compressed / archives
+    '.zip', '.tar', '.gz', '.bz2', '.xz', '.7z', '.rar', '.tgz', '.tbz2',
+    // Libraries / objects
+    '.dll', '.so', '.dylib', '.lib', '.a', '.o',
+    // Disk images / virtual machines
+    '.iso', '.vmdk', '.vhd', '.qcow2',
+    // Database
+    '.sqlite', '.db', '.mdb',
+    // Web / source code (not document content)
+    '.html', '.htm', '.js', '.ts', '.jsx', '.tsx', '.css', '.scss',
+    '.json', '.xml', '.yaml', '.yml',
+    // Media (not text-extractable here)
+    '.mp3', '.mp4', '.wav', '.avi', '.mov', '.mkv', '.flv',
+    // System
+    '.sys', '.bin', '.dat', '.log', '.tmp', '.lock', '.DS_Store',
+  ]);
 
   async scanAndParseFolder(folderPath: string): Promise<ParsedDocument[]> {
     console.log(`[ComprehensiveFileParser] Scanning folder: ${folderPath}`);
@@ -61,7 +92,10 @@ export class ComprehensiveFileParser implements FileParser {
   }
 
   /**
-   * Recursively get all files from a directory
+   * Recursively get all files from a directory.
+   * Files with no extension are included so magic byte detection can run on them.
+   * Files with blocked extensions (executables, archives, etc.) are skipped with a warning.
+   * Files with unrecognized extensions are included so parseFile can log a clear error.
    */
   private async getAllFiles(dirPath: string): Promise<string[]> {
     const files: string[] = [];
@@ -76,8 +110,20 @@ export class ComprehensiveFileParser implements FileParser {
           const subFiles = await this.getAllFiles(fullPath);
           files.push(...subFiles);
         } else if (entry.isFile()) {
+          // Skip hidden files (macOS .DS_Store, dot-files, etc.)
+          if (entry.name.startsWith('.')) continue;
+
           const ext = path.extname(entry.name).toLowerCase();
-          if (this.supportedExtensions.includes(ext)) {
+
+          if (ext === '') {
+            // No extension — include for magic byte detection
+            files.push(fullPath);
+          } else if (this.blockedExtensions.has(ext)) {
+            console.warn(
+              `[ComprehensiveFileParser] ⚠️  SKIPPED (blocked type "${ext}"): ${fullPath}`
+            );
+          } else {
+            // Known supported OR unknown — include and let parseFile decide
             files.push(fullPath);
           }
         }
@@ -90,62 +136,151 @@ export class ComprehensiveFileParser implements FileParser {
   }
 
   /**
-   * Parse a single file based on its type
+   * Detect file type from magic bytes for extension-less files.
+   * Returns the inferred extension (e.g., '.docx', '.pdf') or '' if unknown.
+   *
+   * Signatures checked:
+   *   50 4B 03 04  → ZIP-based Office (DOCX, XLSX, PPTX)
+   *   25 50 44 46  → PDF
+   *   D0 CF 11 E0  → Legacy OLE2 Office (DOC, XLS, PPT)
+   *   FF D8 FF     → JPEG
+   *   89 50 4E 47  → PNG
+   *   47 49 46 38  → GIF
+   */
+  private async detectExtensionFromMagicBytes(filePath: string): Promise<string> {
+    let fd: import('fs/promises').FileHandle | null = null;
+    try {
+      fd = await fs.open(filePath, 'r');
+      const buf = Buffer.alloc(8);
+      const { bytesRead } = await fd.read(buf, 0, 8, 0);
+      if (bytesRead < 4) return '';
+
+      // ZIP-based Office Open XML (DOCX, XLSX, PPTX all start with PK♥♦)
+      if (buf[0] === 0x50 && buf[1] === 0x4B && buf[2] === 0x03 && buf[3] === 0x04) {
+        return '.docx';
+      }
+      // PDF
+      if (buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) {
+        return '.pdf';
+      }
+      // Legacy OLE2 Office (DOC / XLS / PPT)
+      if (buf[0] === 0xD0 && buf[1] === 0xCF && buf[2] === 0x11 && buf[3] === 0xE0) {
+        return '.doc';
+      }
+      // JPEG
+      if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) {
+        return '.jpg';
+      }
+      // PNG
+      if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) {
+        return '.png';
+      }
+      // GIF
+      if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38) {
+        return '.gif';
+      }
+      return '';
+    } catch {
+      return '';
+    } finally {
+      if (fd) await fd.close().catch(() => {});
+    }
+  }
+
+  /**
+   * Parse a single file based on its type.
+   *
+   * For extension-less files, magic bytes are read to determine the format.
+   * For files with unrecognized extensions, a loud error is logged and the
+   * file is skipped (returns null).
    */
   private async parseFile(filePath: string): Promise<ParsedDocument | null> {
     const fileName = path.basename(filePath);
-    const ext = path.extname(fileName).toLowerCase();
+    let ext = path.extname(fileName).toLowerCase();
     const id = this.generateFileId(filePath);
-    
-    console.log(`[ComprehensiveFileParser] Parsing: ${fileName}`);
+
+    // ── Extension-less files: detect via magic bytes ─────────────────────────
+    if (ext === '') {
+      const detected = await this.detectExtensionFromMagicBytes(filePath);
+      if (detected === '') {
+        console.error(
+          `\n` +
+          `╔════════════════════════════════════════════════════════════════╗\n` +
+          `║  ❌  UNSUPPORTED FILE — CANNOT PARSE (no extension, unknown bytes)\n` +
+          `║  File: ${filePath}\n` +
+          `║  Action: Add the correct file extension (e.g., .docx, .pdf) and\n` +
+          `║          re-run so PhaserGun can process this document.\n` +
+          `╚════════════════════════════════════════════════════════════════╝`
+        );
+        return null;
+      }
+      console.log(`[ComprehensiveFileParser] 🔍 Extension-less file "${fileName}" detected as ${detected} via magic bytes`);
+      ext = detected;
+    }
+
+    // ── Unknown extension: loud error, skip ──────────────────────────────────
+    if (!this.supportedExtensions.includes(ext)) {
+      console.error(
+        `\n` +
+        `╔════════════════════════════════════════════════════════════════╗\n` +
+        `║  ❌  UNSUPPORTED FILE TYPE — SKIPPED\n` +
+        `║  File: ${filePath}\n` +
+        `║  Extension: "${ext}"\n` +
+        `║  Supported: ${this.supportedExtensions.join(', ')}\n` +
+        `║  If this file contains document content you need PhaserGun to\n` +
+        `║  process, convert it to PDF or DOCX and re-run.\n` +
+        `╚════════════════════════════════════════════════════════════════╝`
+      );
+      return null;
+    }
+
+    console.log(`[ComprehensiveFileParser] Parsing: ${fileName}${ext !== path.extname(fileName).toLowerCase() ? ` (detected as ${ext})` : ''}`);
 
     let content = '';
     let metadata: any = {};
-    let mimeType = this.getMimeType(ext);
+    const mimeType = this.getMimeType(ext);
 
     try {
       switch (ext) {
-        case '.pdf':
-          const pdfResult = await this.parsePDF(filePath);
-          content = pdfResult.content;
-          metadata = pdfResult.metadata;
-          break;
-          
+        case '.pdf': {
+          const r = await this.parsePDF(filePath);
+          content = r.content; metadata = r.metadata; break;
+        }
         case '.docx':
-          const docxResult = await this.parseDOCX(filePath);
-          content = docxResult.content;
-          metadata = docxResult.metadata;
-          break;
-          
+        case '.xlsx':
+        case '.xls':
+        case '.odt': {
+          // mammoth handles DOCX; xlsx/odt fallback gracefully (warns internally)
+          const r = await this.parseDOCX(filePath);
+          content = r.content; metadata = r.metadata; break;
+        }
         case '.doc':
         case '.pptx':
         case '.ppt':
-          const officeResult = await this.parseOfficeFile(filePath);
-          content = officeResult.content;
-          metadata = officeResult.metadata;
-          break;
-          
+        case '.rtf': {
+          const r = await this.parseOfficeFile(filePath);
+          content = r.content; metadata = r.metadata; break;
+        }
         case '.txt':
         case '.md':
-        case '.csv':
-          content = await this.parseTextFile(filePath);
-          break;
-          
+        case '.csv': {
+          content = await this.parseTextFile(filePath); break;
+        }
         case '.png':
         case '.jpg':
         case '.jpeg':
         case '.gif':
         case '.bmp':
         case '.tiff':
-        case '.webp':
-          const imageResult = await this.parseImage(filePath);
-          content = imageResult.content;
-          metadata = imageResult.metadata;
-          break;
-          
-        default:
-          console.warn(`[ComprehensiveFileParser] Unsupported file type: ${ext}`);
+        case '.webp': {
+          const r = await this.parseImage(filePath);
+          content = r.content; metadata = r.metadata; break;
+        }
+        default: {
+          // Should never reach here — guarded by the unsupported-extension check above
+          console.error(`[ComprehensiveFileParser] ❌ BUG: reached default case for extension "${ext}" on ${filePath}`);
           return null;
+        }
       }
 
       return {
@@ -158,7 +293,8 @@ export class ComprehensiveFileParser implements FileParser {
           ...metadata,
           fileSize: (await fs.stat(filePath)).size,
           parsedAt: new Date().toISOString(),
-          extension: ext
+          extension: ext,
+          detectedVsMagicBytes: ext !== path.extname(fileName).toLowerCase()
         }
       };
     } catch (error) {

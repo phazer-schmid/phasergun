@@ -2,8 +2,8 @@
 export { EnhancedRAGService, enhancedRAGService } from './enhanced-rag-service';
 export { FootnoteTracker, SourceReference } from './footnote-tracker';
 
-// Document loader types
-export { CategorizedContextFile, CategorizedProcedureFile } from './document-loader';
+// Document loader
+export { DocumentLoader, CategorizedContextFile, CategorizedProcedureFile } from './document-loader';
 
 // Prompt building (single source of truth for all LLM-injected instructions)
 export {
