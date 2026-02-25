@@ -22,7 +22,10 @@ export const RULE_WRITE_AS_AUTHOR =
  * Maps to: reference_notation.*
  */
 export const RULE_RESOLVE_BRACKET_NOTATION =
-  '- Resolve any remaining bracket-notation references to their actual values from the retrieved content. For [Procedure|...] references, substitute the matching SOP number and title (e.g., "SOP0004 (Design Control Procedure)"). For any [Master Record|FIELD_NAME] references that remain, look up the field value in the Project Master Record document included in the reference materials and substitute the actual value. Never leave any bracket notation in the output.\n';
+  '- Resolve any remaining bracket-notation references to their actual values from the retrieved content. For [Procedure|...] references, substitute the matching SOP number and title (e.g., "SOP0004 (Design Control Procedure)"). For [Master Checklist] references, insert the checklist content from the retrieved materials. Never leave any bracket notation in the output.\n';
+
+export const RULE_NO_HALLUCINATION =
+  '- STRICT: Do NOT invent, fabricate, or assume values for any data not explicitly present in the retrieved materials or the resolved prompt. If a value is shown as "(FIELD_NAME: not configured in Master Record)" or "(FIELD_NAME: not set)" or similar, reproduce that placeholder exactly — do NOT replace it with a made-up value, example data, or generic text. Only real data from the provided sources may be written into the document.\n';
 
 /**
  * Use procedural language as closely as retrieved content allows.
@@ -83,6 +86,7 @@ export function buildSystemSection(primaryContext: any): string {
     `You are ${role}, a regulatory documentation expert. ${purpose}.\n\n`,
     'GENERATION RULES (apply to all tasks):\n',
     RULE_WRITE_AS_AUTHOR,
+    RULE_NO_HALLUCINATION,
     RULE_RESOLVE_BRACKET_NOTATION,
     RULE_USE_PROCEDURAL_LANGUAGE,
     RULE_NO_INLINE_FOOTNOTES,

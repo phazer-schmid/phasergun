@@ -85,25 +85,54 @@ export class OrchestratorService {
       console.log('  - Footnotes tracked: ' + footnoteTracker.getSourceCount() + ' sources');
       console.log('  - Estimated tokens: ' + metadata.totalTokensEstimate);
       
-      // Step 4a: Resolve [Master Record|FIELD] tokens server-side before sending to LLM.
-      // Per primary-context.yaml → reference_notation.master_record_field:
-      //   "PG replaces the reference with the field value and cites the source field"
-      // Doing this deterministically here prevents the LLM from leaving the bracket notation
-      // in the output or hallucinating a field value.
+      // Step 4a: Resolve [Master Record|FIELD] tokens server-side.
+      // Returns file-found status so we can block generation if the file is missing.
       let resolvedPrompt = input.prompt;
+      const generationErrors: string[] = [];
+
       if (references.masterRecordFields.length > 0) {
-        resolvedPrompt = await this.resolveMasterRecordTokens(resolvedPrompt, input.projectPath);
+        const mrResult = await this.resolveMasterRecordTokens(resolvedPrompt, input.projectPath);
+        resolvedPrompt = mrResult.resolved;
+        if (!mrResult.fileFound) {
+          generationErrors.push(
+            `Master Record file not found in ${input.projectPath}/Context/\n` +
+            `  Referenced fields: ${references.masterRecordFields.join(', ')}\n` +
+            `  Fix: Add "Project-Master-Record.docx" (or any file with "master" and "record" in the name) to the Context folder.`
+          );
+        }
       }
 
       // Step 4b: Resolve [Doc|BootstrapName|FIELD] tokens server-side.
-      // Per primary-context.yaml → reference_notation.document_field:
-      //   "PG replaces the reference with the field value and cites the document and field"
       const hasDocFieldRefs = /\[Doc\|[^|\]]+\|[^\]]+\]/i.test(resolvedPrompt);
       if (hasDocFieldRefs) {
-        resolvedPrompt = await this.resolveDocFieldTokens(resolvedPrompt, input.projectPath);
+        const dfResult = await this.resolveDocFieldTokens(resolvedPrompt, input.projectPath);
+        resolvedPrompt = dfResult.resolved;
+        for (const missingDoc of dfResult.missingDocs) {
+          generationErrors.push(
+            `Bootstrap document not found: "${missingDoc}"\n` +
+            `  Fix: Add this file to the Context folder (version suffixes like -V4 are OK).`
+          );
+        }
       }
 
-      // Step 4c: Build the LLM prompt (single source of truth: prompt-builder.ts in rag-service)
+      // Step 4c: Block generation if any critical document references could not be satisfied.
+      // PhaserGun never hallucinate missing information — it returns a clear error instead.
+      if (generationErrors.length > 0) {
+        const errorList = generationErrors.map((e, i) => `${i + 1}. ${e}`).join('\n\n');
+        console.error(`\n[Orchestrator] ❌ GENERATION BLOCKED — ${generationErrors.length} missing required document(s):\n${errorList}\n`);
+        return {
+          status: 'error',
+          message: `Generation blocked — required documents not found:\n\n${errorList}`,
+          timestamp: new Date().toISOString(),
+          generatedContent:
+            `## ⚠️ Generation Blocked — Missing Required Documents\n\n` +
+            `PhaserGun cannot generate this document because the following referenced files were not found:\n\n` +
+            generationErrors.map((e, i) => `**${i + 1}.** ${e}`).join('\n\n') +
+            `\n\nPlease add the missing files and try again.`,
+        };
+      }
+
+      // Step 4d: Build the LLM prompt (single source of truth: prompt-builder.ts in rag-service)
       const fullPrompt = buildLLMPrompt(ragContext, resolvedPrompt);
       
       console.log(`[Orchestrator] Full prompt length: ${fullPrompt.length} chars`);
@@ -303,7 +332,10 @@ export class OrchestratorService {
    * Unresolved fields (not found in the master record) are left as-is so the LLM
    * will at least see the bracket notation and can flag a discrepancy.
    */
-  private async resolveMasterRecordTokens(prompt: string, projectPath: string): Promise<string> {
+  private async resolveMasterRecordTokens(
+    prompt: string,
+    projectPath: string
+  ): Promise<{ resolved: string; fileFound: boolean; unresolvedFields: string[] }> {
     const contextPath = path.join(projectPath, 'Context');
     const loader = new DocumentLoader();
 
@@ -311,33 +343,43 @@ export class OrchestratorService {
     try {
       masterRecord = await loader.loadMasterRecord(contextPath);
     } catch (err) {
-      console.warn('[Orchestrator] Could not load Master Record for token substitution:', err);
-      return prompt;
+      console.warn('[Orchestrator] Could not load Master Record:', err);
+      return { resolved: prompt, fileFound: false, unresolvedFields: [] };
     }
 
     if (!masterRecord) {
-      console.warn('[Orchestrator] Master Record not found — [Master Record|...] tokens will remain unresolved');
-      return prompt;
+      return { resolved: prompt, fileFound: false, unresolvedFields: [] };
     }
 
-    const fields = DocumentLoader.parseMasterRecordFields(masterRecord.content);
+    // Prefer HTML-based parsing (handles bold+inline and table formats in Word docs).
+    // Fall back to raw-text parsing if the file-based method returns nothing.
+    let fields = await DocumentLoader.parseMasterRecordFieldsFromFile(masterRecord.filePath);
+    if (fields.size === 0) {
+      console.warn('[Orchestrator] HTML parse returned 0 fields — falling back to raw text parser');
+      fields = DocumentLoader.parseMasterRecordFields(masterRecord.content);
+      fields = DocumentLoader.synthesizeCompositeFields(fields);
+    }
     console.log(`[Orchestrator] Master Record parsed: ${fields.size} field(s) available for substitution`);
 
+    const unresolvedFields: string[] = [];
     let resolved = prompt;
     const tokenPattern = /\[Master Record\|([^\]]+)\]/gi;
     resolved = resolved.replace(tokenPattern, (_match, fieldName) => {
       const key = fieldName.trim().toUpperCase();
       const value = fields.get(key);
       if (value !== undefined) {
-        console.log(`[Orchestrator] ✓ Resolved [Master Record|${key}] → "${value}"`);
+        const preview = value.length > 60 ? value.substring(0, 60) + '…' : value;
+        console.log(`[Orchestrator] ✓ Resolved [Master Record|${key}] → "${preview}"`);
         return value;
       } else {
-        console.warn(`[Orchestrator] ⚠️  [Master Record|${key}] not found in master record — leaving unresolved`);
-        return _match; // leave original token so LLM sees it
+        unresolvedFields.push(key);
+        console.warn(`[Orchestrator] ⚠️  [Master Record|${key}] not found in master record — substituting clean placeholder`);
+        // Return clean text (no bracket notation) so the LLM doesn't output raw syntax
+        return `(${key}: not configured in Master Record)`;
       }
     });
 
-    return resolved;
+    return { resolved, fileFound: true, unresolvedFields };
   }
 
   /**
@@ -351,7 +393,10 @@ export class OrchestratorService {
    *
    * Unresolved fields are left as-is so the LLM can flag them.
    */
-  private async resolveDocFieldTokens(prompt: string, projectPath: string): Promise<string> {
+  private async resolveDocFieldTokens(
+    prompt: string,
+    projectPath: string
+  ): Promise<{ resolved: string; missingDocs: string[]; unresolvedFields: Array<{ doc: string; field: string }> }> {
     const contextPath = path.join(projectPath, 'Context');
     const loader = new DocumentLoader();
 
@@ -363,13 +408,13 @@ export class OrchestratorService {
       docNames.add(scanMatch[1].trim());
     }
 
-    if (docNames.size === 0) return prompt;
+    if (docNames.size === 0) return { resolved: prompt, missingDocs: [], unresolvedFields: [] };
 
     console.log(`[Orchestrator] 📄 Resolving [Doc|...] tokens for: ${Array.from(docNames).join(', ')}`);
 
     // Load each referenced bootstrap document and parse its fields
-    // Key: normalized doc name (no extension, lowercase)
     const docFieldMaps = new Map<string, Map<string, string>>();
+    const missingDocs: string[] = [];
 
     for (const docName of docNames) {
       const doc = await loader.loadBootstrapDocument(contextPath, docName);
@@ -380,18 +425,20 @@ export class OrchestratorService {
         console.log(`[Orchestrator] ✓ Parsed ${fields.size} field(s) from "${docName}"`);
       } else {
         console.warn(`[Orchestrator] ⚠️  [Doc|${docName}|...] — bootstrap doc not found`);
+        missingDocs.push(docName);
       }
     }
 
     // Substitute every [Doc|DocName|FIELD] token
+    const unresolvedFields: Array<{ doc: string; field: string }> = [];
     let resolved = prompt;
     const tokenPattern = /\[Doc\|([^|\]]+)\|([^\]]+)\]/gi;
     resolved = resolved.replace(tokenPattern, (_match, docName, fieldName) => {
       const key = docName.trim().replace(/\.docx$/i, '').toLowerCase();
       const fieldMap = docFieldMaps.get(key);
       if (!fieldMap) {
-        console.warn(`[Orchestrator] ⚠️  [Doc|${docName}|${fieldName}] — doc not loaded, leaving unresolved`);
-        return _match;
+        // Missing doc already recorded above; use clean placeholder
+        return `(${fieldName.trim()}: document "${docName}" not found)`;
       }
       const fieldKey = fieldName.trim().toUpperCase();
       const value = fieldMap.get(fieldKey);
@@ -400,12 +447,13 @@ export class OrchestratorService {
         console.log(`[Orchestrator] ✓ Resolved [Doc|${docName}|${fieldKey}] → "${preview}"`);
         return value;
       } else {
-        console.warn(`[Orchestrator] ⚠️  [Doc|${docName}|${fieldKey}] — field not found in doc, leaving unresolved`);
-        return _match;
+        unresolvedFields.push({ doc: docName, field: fieldKey });
+        console.warn(`[Orchestrator] ⚠️  [Doc|${docName}|${fieldKey}] — field not found — substituting clean placeholder`);
+        return `(${fieldKey}: not configured in ${docName})`;
       }
     });
 
-    return resolved;
+    return { resolved, missingDocs, unresolvedFields };
   }
 
   /**
