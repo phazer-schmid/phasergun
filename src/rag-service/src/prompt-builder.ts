@@ -25,7 +25,15 @@ export const RULE_RESOLVE_BRACKET_NOTATION =
   '- Resolve any remaining bracket-notation references to their actual values from the retrieved content. For [Procedure|...] references, substitute the matching SOP number and title (e.g., "SOP0004 (Design Control Procedure)"). For [Master Checklist] references, insert the checklist content from the retrieved materials. Never leave any bracket notation in the output.\n';
 
 export const RULE_NO_HALLUCINATION =
-  '- STRICT: Do NOT invent, fabricate, or assume values for any data not explicitly present in the retrieved materials or the resolved prompt. If a value is shown as "(FIELD_NAME: not configured in Master Record)" or "(FIELD_NAME: not set)" or similar, reproduce that placeholder exactly — do NOT replace it with a made-up value, example data, or generic text. Only real data from the provided sources may be written into the document.\n';
+  '- STRICT: Do NOT invent, fabricate, or assume values for project-specific facts (e.g., names, dates, device identifiers, submission numbers, test results, specific regulatory decisions). If a value is shown as "(FIELD_NAME: not configured in Master Record)" or "(FIELD_NAME: not set)" or similar, reproduce that placeholder exactly — do NOT replace it with a made-up value, example data, or generic text. Only real project-specific data from the provided sources may be written into those fields.\n';
+
+/**
+ * Role responsibilities may be derived from SOP/procedure context when the Master Record
+ * does not contain explicit responsibility text. This prevents Claude from collapsing
+ * a responsibilities column simply because the field is not in the Master Record.
+ */
+export const RULE_DERIVE_RESPONSIBILITIES_FROM_SOPS =
+  '- Role responsibilities and functional descriptions (e.g., for a team responsibilities table) MAY be derived from retrieved SOP/procedure context or standard regulatory practice for that role — this is NOT considered hallucination. If the retrieved procedures describe the duties of a Project Manager, Lead Engineer, Quality Engineer, etc., use that content to populate a Responsibilities column. Only omit the column if no procedure context whatsoever is available.\n';
 
 /**
  * Use procedural language as closely as retrieved content allows.
@@ -87,6 +95,7 @@ export function buildSystemSection(primaryContext: any): string {
     'GENERATION RULES (apply to all tasks):\n',
     RULE_WRITE_AS_AUTHOR,
     RULE_NO_HALLUCINATION,
+    RULE_DERIVE_RESPONSIBILITIES_FROM_SOPS,
     RULE_RESOLVE_BRACKET_NOTATION,
     RULE_USE_PROCEDURAL_LANGUAGE,
     RULE_NO_INLINE_FOOTNOTES,
