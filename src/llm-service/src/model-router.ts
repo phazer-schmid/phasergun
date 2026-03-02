@@ -6,6 +6,7 @@ import {
   ProviderConfig,
   ProviderMode,
   ModelRole,
+  ModelAssignment,
   buildProviderConfigFromEnv,
 } from './provider-config';
 
@@ -68,6 +69,21 @@ export class ModelRouter {
     ] as ModelRole[]) {
       this.services.set(role, this.instantiateService(role));
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Public inspection
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Return the {@link ModelAssignment} for a given role.
+   *
+   * Useful for callers that need to surface model IDs in logs or traces
+   * (e.g., {@link MultiModelOrchestrator}) without holding a separate
+   * reference to the {@link ProviderConfig}.
+   */
+  getAssignment(role: ModelRole): ModelAssignment {
+    return this.config.roleAssignments[role];
   }
 
   // ---------------------------------------------------------------------------
