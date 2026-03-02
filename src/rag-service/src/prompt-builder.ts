@@ -113,15 +113,14 @@ export function buildSystemSection(primaryContext: any): string {
  * Previously in orchestrator/src/index.ts:buildLLMPrompt().
  * Maps to: generation_workflow.processing (task wrapper structure)
  *
+ * NOTE: Do not add an "=== END TASK ===" closing marker. Modern frontier
+ * models do not need it, and it wastes tokens on every generation call.
+ * The "=== TASK ===" marker is kept because LLM service implementations
+ * use it to split the assembled context into system vs user message.
+ *
  * @param ragContext - Assembled context from context-assembler (SECTIONS 1 + 2)
  * @param userPrompt - The user's generation prompt
  */
 export function buildLLMPrompt(ragContext: string, userPrompt: string): string {
-  return `${ragContext}=== TASK ===
-
-    ${userPrompt}
-
-    === END TASK ===
-
-    Write your response now.`;
+  return `${ragContext}=== TASK ===\n\n${userPrompt.trim()}\n`;
 }
