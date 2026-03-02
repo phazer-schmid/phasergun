@@ -456,6 +456,139 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for complete production deployment instruct
 
 ---
 
+## Multi-Model Architecture (Phase 2)
+
+### Pipeline Overview
+
+When `LLM_MODE=multi-model`, the single-model `OrchestratorService` is replaced by
+`MultiModelOrchestrator`, which runs four specialised models in sequence.  The RAG
+retrieval layer is completely unchanged — only the LLM consumption layer changes.
+
+```
+POST /api/generate
+       │
+       ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  API Server: reads LLM_MODE, instantiates ModelRouter               │
+└──────────────────────────────┬───────────────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  RAG Context Assembly  (EnhancedRAGService — unchanged)              │
+│  • Checks / rebuilds vector cache                                    │
+│  • Semantic search → top-K procedure + context chunks                │
+│  • Assembles ragContext string (role rules + summaries + chunks)     │
+│  • Returns: ragContext, procedureChunks, contextChunks,              │
+│             externalStandards, metadata.totalTokensEstimate          │
+└──────────────────────────────┬───────────────────────────────────────┘
+                               │
+              ┌────────────────┼─────────────────────┐
+              │                │                     │
+       token estimate     Master Record         [Doc|...] tokens
+         > 6000?          tokens resolved         resolved
+              │
+              ▼
+┌─────────────────────────────────────┐
+│  Step 1 — INGESTION  (optional)     │  model: gpt-4o-mini (default)
+│  Compresses large ragContext to     │  skip if: totalTokensEstimate ≤ 6000
+│  reduce DRAFTER input cost          │       or: ENABLE_INGESTION_STEP=false
+└──────────────────┬──────────────────┘
+                   │  effectiveRagContext
+                   ▼
+┌─────────────────────────────────────┐
+│  Step 2 — DRAFT                     │  model: gpt-4.1 (default)
+│  Writes full regulatory narrative   │  always runs
+│  using buildLLMPrompt() output      │
+└──────────────────┬──────────────────┘
+                   │  draftText
+                   ▼
+┌─────────────────────────────────────┐
+│  Step 3 — AUDIT  (optional)         │  model: o3-mini (default)
+│  Reviews draft against ISO 14971 /  │  skip if: ENABLE_AUDIT_STEP=false
+│  820.30; returns numbered findings  │
+└──────────────────┬──────────────────┘
+                   │  auditFindings  (if len ≥ 50 chars)
+                   ▼
+┌─────────────────────────────────────┐
+│  Step 4 — REVISION  (optional)      │  model: gpt-4.1 (default)
+│  Rewrites draft to address findings │  skip if: ENABLE_REVISION_STEP=false
+│                                     │       or: findings < 50 chars
+└──────────────────┬──────────────────┘
+                   │  finalContent
+                   ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  Step 5 — ASSEMBLE OUTPUT                                            │
+│  GenerationOutput {                                                  │
+│    generatedContent,  references,  confidence,  discrepancies,       │
+│    auditFindings,     pipelineTrace,  usageStats.modelBreakdown      │
+│  }                                                                   │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Model Role Assignments
+
+| Role | Default Model | Purpose | Temperature |
+|---|---|---|---|
+| `INGESTION` | `gpt-4o-mini` | Fast structured extraction; context compression | 0.2 |
+| `DRAFTER` | `gpt-4.1` | Primary narrative author; full section generation | 0.3 |
+| `AUDITOR` | `o3-mini` | Compliance gap analysis against ISO 14971 / 820.30 | none (reasoning model) |
+| `REVISER` | `gpt-4.1` | Final rewrite addressing audit findings | 0.2 |
+| `EMBEDDINGS` | `text-embedding-3-large` | Vector embeddings (owned by rag-core, not wired here) | — |
+
+Override any role at runtime:
+```bash
+MODEL_DRAFTER=claude-sonnet-4-20250514   # routes to AnthropicLLMService automatically
+MODEL_AUDITOR=o1-mini
+MODEL_INGESTION=gpt-4o-mini
+```
+
+### Switching to Azure AI Foundry
+
+No code changes are needed.  Set `PROVIDER_MODE=azure_foundry` and supply the
+Azure endpoint and key; `OpenAILLMService` detects the mode at construction time
+and configures `baseURL`, `api-version`, and `api-key` headers accordingly.
+
+```bash
+PROVIDER_MODE=azure_foundry
+AZURE_ENDPOINT=https://YOUR-HUB-NAME.openai.azure.com
+AZURE_API_KEY=...
+AZURE_API_VERSION=2024-12-01-preview
+AZURE_DEPLOYMENT_PREFIX=phasergun-   # maps gpt-4.1 → phasergun-gpt-4.1
+LLM_MODE=multi-model
+```
+
+Azure deployment names must follow the pattern `{AZURE_DEPLOYMENT_PREFIX}{modelId}`,
+e.g. `phasergun-gpt-4.1`, `phasergun-o3-mini`.
+
+### RAG Service Stability
+
+The `rag-core` and `rag-service` packages are **intentionally unchanged** by the
+multi-model upgrade.  All of the following remain identical regardless of which
+`LLM_MODE` is active:
+
+- Vector store, embedding generation, and cosine similarity search (`rag-core`)
+- Document loading, chunking, and cache management (`rag-core`)
+- Reference-notation parsing (`[Procedure|...]`, `[Master Record|...]`, `[Doc|...]`)
+- Master Record and Doc token resolution (blocking on missing files)
+- Context assembly and `buildLLMPrompt()` output (`rag-service/prompt-builder.ts`)
+- `GenerationOutput` shape — `pipelineTrace`, `auditFindings`, and `modelBreakdown`
+  are optional fields; single-model responses omit them, preserving backward compatibility
+
+Only the **LLM consumption layer** changes: `llm-service` (new `OpenAILLMService`,
+`ModelRouter`, `ProviderConfig`) and `orchestrator` (`MultiModelOrchestrator`).
+
+### Key Files
+
+| File | Role |
+|---|---|
+| `src/llm-service/src/provider-config.ts` | `ProviderMode` / `ModelRole` enums, `ProviderConfig`, `buildProviderConfigFromEnv()` |
+| `src/llm-service/src/openai-service.ts` | `OpenAILLMService` — direct + Azure Foundry |
+| `src/llm-service/src/model-router.ts` | `ModelRouter` — one `LLMService` per role |
+| `src/orchestrator/src/multi-model-orchestrator.ts` | 5-step pipeline implementation |
+| `src/api-server/src/routes/generate.ts` | `IOrchestrator` dispatch — `multi-model` vs single-model |
+
+---
+
 ## Next Steps
 
 - **For API details**: See [API.md](./API.md)

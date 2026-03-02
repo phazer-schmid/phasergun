@@ -125,17 +125,40 @@ Prompts use bracket syntax to request specific sources:
 
 ### LLM Provider Selection
 
-Controlled by `LLM_MODE` in `src/api-server/.env`. Valid values: `anthropic`, `mistral`, `groq`, `ollama`, `mock`. The `mock` provider requires no API keys and is useful for development.
+Controlled by `LLM_MODE` in `src/api-server/.env`.
+
+| Value | Behaviour |
+|---|---|
+| `anthropic` | Single-model: Anthropic Claude |
+| `mistral` | Single-model: Mistral AI |
+| `groq` | Single-model: Groq LPU |
+| `ollama` | Single-model: local Ollama |
+| `mock` | Single-model: simulated responses (no API key needed) |
+| `multi-model` | **Multi-model pipeline**: INGESTION → DRAFT → AUDIT → REVISION via `ModelRouter` |
+
+The `mock` provider requires no API keys and is useful for development.
+The `multi-model` mode requires `OPENAI_API_KEY` (and optionally `ANTHROPIC_API_KEY` for any
+role assigned a `claude-*` model). See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#multi-model-architecture-phase-2)
+and the `## Multi-Model Mode` section below for full configuration details.
 
 ## Environment Configuration
 
 Copy `src/api-server/.env.template` to `src/api-server/.env` and set:
 ```bash
 PORT=3001
-LLM_MODE=anthropic          # or mistral, groq, ollama, mock
+LLM_MODE=anthropic          # or mistral, groq, ollama, mock, multi-model
 ANTHROPIC_API_KEY=sk-ant-…
 ANTHROPIC_MODEL=claude-sonnet-4-20250514
 CACHE_ENABLED=true
+```
+
+For multi-model mode, use the dedicated templates instead:
+```bash
+# Direct OpenAI/Anthropic APIs:
+cp .env.multi-model.template src/api-server/.env
+
+# Azure AI Foundry:
+cp .env.azure-foundry.template src/api-server/.env
 ```
 
 ## Key Architectural Decisions
