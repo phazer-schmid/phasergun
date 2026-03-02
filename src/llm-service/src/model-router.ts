@@ -178,6 +178,24 @@ export class ModelRouter {
     return this.service(ModelRole.REVISER).generateText(combined, context);
   }
 
+  /**
+   * Produce a revised document from a fully pre-assembled revision prompt.
+   *
+   * Use when the orchestrator builds the complete structured prompt itself
+   * (e.g. to include regulatory standards context or custom task instructions)
+   * and needs to route directly to the REVISER model without additional
+   * wrapping by this class.
+   *
+   * @param prompt  - Fully-assembled revision prompt.
+   * @param context - Optional RAG knowledge context.
+   */
+  async generateRevisionFromPrompt(
+    prompt: string,
+    context?: KnowledgeContext
+  ): Promise<LLMResponse> {
+    return this.service(ModelRole.REVISER).generateText(prompt, context);
+  }
+
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------

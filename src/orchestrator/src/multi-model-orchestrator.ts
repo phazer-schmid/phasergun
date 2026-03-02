@@ -117,7 +117,7 @@ export class MultiModelOrchestrator {
       // Footnote tracker — wired identically to OrchestratorService
       const footnoteTracker = new FootnoteTracker();
       footnoteTracker.addFromRetrievalResults(procedureChunks, contextChunks);
-      (externalStandards as Array<{ name: string; scope: string }>).forEach(s => {
+      (externalStandards as Array<{ id: string; name: string; scope: string }>).forEach(s => {
         footnoteTracker.addStandardReference(s.name, s.scope);
       });
 
@@ -273,24 +273,16 @@ export class MultiModelOrchestrator {
       if (enableAudit) {
         const auditAssignment = this.modelRouter.getAssignment(ModelRole.AUDITOR);
 
-        // Prefer the externalStandards list from RAG retrieval; fall back to
-        // the two most universal regulatory frameworks for medical devices.
-        const standardsSection =
-          (externalStandards as Array<{ name: string; scope: string }>).length > 0
-            ? (externalStandards as Array<{ name: string; scope: string }>)
-                .map(s => `- ${s.name}${s.scope ? ` (${s.scope})` : ''}`)
-                .join('\n')
-            : '- ISO 14971 (Risk Management for Medical Devices)\n' +
-              '- FDA 21 CFR 820.30 (Design Controls)';
-
-        const auditPrompt =
-          `=== DRAFT DOCUMENT ===\n${draftText}\n\n` +
-          `=== APPLICABLE REGULATORY STANDARDS ===\n${standardsSection}\n\n` +
-          `Return your findings as a numbered list. ` +
-          `If there are no gaps or issues, respond with exactly "No findings."`;
+        const auditPrompt = this.buildAuditPrompt(
+          draftText,
+          externalStandards as Array<{ id: string; name: string; scope: string }>
+        );
 
         console.log(
           `[MultiModelOrchestrator] Step 3 AUDIT — model: ${auditAssignment.modelId}`
+        );
+        console.log(
+          `[MultiModelOrchestrator] Audit prompt: ${auditPrompt.length} chars (was full ragContext)`
         );
 
         const t3 = Date.now();
@@ -315,24 +307,35 @@ export class MultiModelOrchestrator {
       // ------------------------------------------------------------------
       const enableRevision = this.options.enableRevisionStep !== false;
       const threshold = this.options.auditFindingsThreshold ?? 50;
-      const hasFindings = auditText.length >= threshold;
+      const isNoFindings =
+        auditText === 'NO_FINDINGS' || auditText.trimStart().startsWith('NO_FINDINGS');
+      if (isNoFindings) {
+        console.log('[MultiModelOrchestrator] ✓ Audit: no findings — skipping revision step');
+      }
+      const hasFindings = !isNoFindings && auditText.length >= threshold;
 
       let finalContent = draftText;
 
       if (enableRevision && enableAudit && hasFindings) {
         const reviserAssignment = this.modelRouter.getAssignment(ModelRole.REVISER);
 
+        const revisionPrompt = this.buildRevisionPrompt(
+          resolvedPrompt,
+          draftText,
+          auditText,
+          externalStandards as Array<{ id: string; name: string; scope: string }>
+        );
+
         console.log(
           `[MultiModelOrchestrator] Step 4 REVISION — model: ${reviserAssignment.modelId}, ` +
           `audit findings: ${auditText.length} chars`
         );
+        console.log(
+          `[MultiModelOrchestrator] Revision prompt: ${revisionPrompt.length} chars`
+        );
 
         const t4 = Date.now();
-        const revisionResult = await this.modelRouter.generateRevision(
-          draftText,
-          auditText,
-          resolvedPrompt
-        );
+        const revisionResult = await this.modelRouter.generateRevisionFromPrompt(revisionPrompt);
         const revisionDuration = Date.now() - t4;
 
         finalContent = revisionResult.generatedText ?? draftText;
@@ -413,6 +416,66 @@ export class MultiModelOrchestrator {
   // Private helpers — copied verbatim from OrchestratorService
   // (kept here to avoid cross-package coupling; only within orchestrator package)
   // ---------------------------------------------------------------------------
+
+  /**
+   * Build the prompt sent to the AUDITOR model.
+   *
+   * Intentionally lean — contains only the draft and the applicable regulatory
+   * standards. The full RAG context is NOT included here; the auditor only
+   * needs to evaluate the draft against known standards, not re-read all SOPs.
+   *
+   * The sentinel "NO_FINDINGS" (returned verbatim when the auditor finds no
+   * gaps) is checked downstream to skip the revision step without a threshold
+   * comparison.
+   */
+  private buildAuditPrompt(
+    draftContent: string,
+    externalStandards: Array<{ id: string; name: string; scope: string }>
+  ): string {
+    const fallback = [
+      { id: 'iso14971', name: 'ISO 14971',        scope: 'Risk Management for Medical Devices' },
+      { id: 'fda820',   name: 'FDA 21 CFR 820.30', scope: 'Design Controls' },
+    ];
+    const standards = externalStandards.length > 0 ? externalStandards : fallback;
+    const standardsList = standards.map(s => `- ${s.name}: ${s.scope}`).join('\n');
+
+    return (
+      `=== REGULATORY STANDARDS ===\n${standardsList}\n\n` +
+      `=== DRAFT DOCUMENT ===\n${draftContent}\n\n` +
+      `=== TASK ===\n` +
+      `You are a regulatory compliance auditor for medical device submissions. ` +
+      `Review the draft document against each standard listed above. ` +
+      `Return a NUMBERED LIST of findings only — no prose preamble. ` +
+      `Each finding must cite the specific standard and clause it relates to. ` +
+      `If there are no findings, respond with exactly: NO_FINDINGS`
+    );
+  }
+
+  /**
+   * Build the prompt sent to the REVISER model.
+   *
+   * Intentionally lean — contains only the original user task, the draft, and
+   * the audit findings. The full RAG context is NOT included; the reviser's
+   * job is to address identified findings within the existing draft, not to
+   * re-retrieve knowledge.
+   */
+  private buildRevisionPrompt(
+    originalUserPrompt: string,
+    draftContent: string,
+    auditFindings: string,
+    externalStandards: Array<{ id: string; name: string; scope: string }>
+  ): string {
+    return (
+      `=== ORIGINAL TASK ===\n${originalUserPrompt}\n\n` +
+      `=== DRAFT ===\n${draftContent}\n\n` +
+      `=== AUDIT FINDINGS ===\n${auditFindings}\n\n` +
+      `=== TASK ===\n` +
+      `Revise the draft to address all audit findings listed above. ` +
+      `Preserve the document structure and submission voice. ` +
+      `Do not introduce content not supported by the draft or findings. ` +
+      `Write the complete revised document — not a diff or commentary.`
+    );
+  }
 
   /**
    * Parse reference_notation patterns from the prompt.
