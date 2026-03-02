@@ -511,7 +511,18 @@ export class EnhancedRAGService {
       options,
       masterChecklistContent
     );
-    
+
+    // Log summary deduplication stats
+    if (sopSummaries.size > 0) {
+      const retrievedProcedureFiles = new Set(procedureResults.map(r => r.entry.metadata.fileName));
+      const suppressedSopCount = [...sopSummaries.keys()].filter(
+        fileName => retrievedProcedureFiles.has(fileName)
+      ).length;
+      console.log(
+        `[EnhancedRAG] Summary deduplication: suppressed ${suppressedSopCount}/${sopSummaries.size} SOP summaries (already included as chunks)`
+      );
+    }
+
     // 10. Enforce token limits if needed
     const maxTokens = options.maxTokens || 150000;
     ragContext = enforceTokenLimit(ragContext, maxTokens);

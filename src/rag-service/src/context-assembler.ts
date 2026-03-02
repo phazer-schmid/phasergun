@@ -65,7 +65,15 @@ export function assembleContext(
   const sortedContextSummaries = new Map(
     [...contextSummaries.entries()].sort((a, b) => a[0].localeCompare(b[0]))
   );
-  
+
+  // Files that already have full chunks retrieved — their summaries are redundant.
+  const retrievedProcedureFileNames = new Set(
+    sortedProcedureChunks.map(r => r.entry.metadata.fileName)
+  );
+  const retrievedContextFileNames = new Set(
+    sortedContextChunks.map(r => r.entry.metadata.fileName)
+  );
+
   // =========================================================================
   // SECTION 1: ROLE + UNIVERSAL RULES
   // Single source of truth: prompt-builder.ts
@@ -89,19 +97,29 @@ export function assembleContext(
     sections.push('\n');
   }
 
-  if (sortedSopSummaries.size > 0) {
-    sections.push('--- Company Procedures (SOPs) ---\n');
-    sortedSopSummaries.forEach((summary, fileName) => {
+  const filteredSopSummaries = new Map(
+    [...sortedSopSummaries.entries()].filter(
+      ([fileName]) => !retrievedProcedureFileNames.has(fileName)
+    )
+  );
+  if (filteredSopSummaries.size > 0) {
+    sections.push('--- Company Procedures (SOPs — Overview of non-retrieved documents) ---\n');
+    filteredSopSummaries.forEach((summary, fileName) => {
       sections.push(`\n[${fileName}]\n`);
       sections.push(summary);
       sections.push('\n');
     });
     sections.push('\n');
   }
-  
-  if (sortedContextSummaries.size > 0) {
-    sections.push('--- Project Context Summaries ---\n');
-    sortedContextSummaries.forEach((summary, fileName) => {
+
+  const filteredContextSummaries = new Map(
+    [...sortedContextSummaries.entries()].filter(
+      ([fileName]) => !retrievedContextFileNames.has(fileName)
+    )
+  );
+  if (filteredContextSummaries.size > 0) {
+    sections.push('--- Project Context (Overview of non-retrieved documents) ---\n');
+    filteredContextSummaries.forEach((summary, fileName) => {
       sections.push(`\n[${fileName}]\n`);
       sections.push(summary);
       sections.push('\n');
