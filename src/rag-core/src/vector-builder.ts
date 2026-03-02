@@ -90,6 +90,10 @@ export async function buildVectorStore(
   cacheEnabled: boolean
 ): Promise<VectorStore> {
   console.log('[VectorBuilder] Building vector store with deterministic ordering...');
+  // The cache fingerprint is based on file content/mtime only — it does NOT
+  // include chunk parameters (overlapSize, maxChunkSize). Changing those values
+  // will NOT auto-invalidate an existing cache.
+  console.warn('[VectorBuilder] ⚠️ Chunk parameters changed — if cache does not auto-invalidate, clear manually with CACHE_ENABLED=false');
   
   // Get embedding service model info
   const modelInfo = embeddingService.getModelInfo();

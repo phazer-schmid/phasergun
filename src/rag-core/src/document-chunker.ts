@@ -21,8 +21,11 @@ export class DocumentChunker {
   private readonly DEFAULT_OPTIONS: Required<ChunkingOptions> = {
     strategy: 'auto',
     minChunkSize: 2000,
-    maxChunkSize: 4000,
-    overlapSize: 400,
+    maxChunkSize: 3500,
+    // 200 chars (~50 tokens) is sufficient overlap for regulatory SOPs which
+    // use section-aware chunking. The section boundaries provide natural
+    // coherence without requiring large overlaps.
+    overlapSize: 200,
     maxKeywords: 20
   };
 

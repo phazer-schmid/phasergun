@@ -10,7 +10,7 @@
 export function chunkSectionAware(content: string, fileName: string, filePath: string): string[] {
   const chunks: string[] = [];
   const MIN_CHUNK_SIZE = 2000; // ~500 tokens
-  const MAX_CHUNK_SIZE = 4000; // ~1000 tokens
+  const MAX_CHUNK_SIZE = 3500; // ~875 tokens
   
   // Detect section headers: ##, ###, numbered (1., 1.1, etc.)
   // NOTE: /m flag only — do NOT use /g here.  RegExp.prototype.test() with /g
@@ -64,8 +64,11 @@ export function chunkSectionAware(content: string, fileName: string, filePath: s
 export function chunkWithOverlap(content: string, fileName: string, filePath: string): string[] {
   const chunks: string[] = [];
   const TARGET_CHUNK_SIZE = 3000; // ~750 tokens
-  const MAX_CHUNK_SIZE = 4000; // ~1000 tokens
-  const OVERLAP_SIZE = 400; // ~100 tokens
+  const MAX_CHUNK_SIZE = 3500; // ~875 tokens
+  // 200 chars (~50 tokens) is sufficient overlap for regulatory SOPs which
+  // use section-aware chunking. The section boundaries provide natural
+  // coherence without requiring large overlaps.
+  const OVERLAP_SIZE = 200; // ~50 tokens
   
   // Split by paragraphs
   const paragraphs = content.split(/\n\n+/).filter(p => p.trim());
