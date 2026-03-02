@@ -2,8 +2,24 @@ import { Router } from 'express';
 import { OrchestratorService } from '@phasergun/orchestrator';
 import { ComprehensiveFileParser } from '@phasergun/file-parser';
 import { EnhancedRAGService } from '@phasergun/rag-service';
+import { GenerationOutput } from '@phasergun/shared-types';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+
+/**
+ * Minimal structural interface shared by OrchestratorService (single-model)
+ * and MultiModelOrchestrator (multi-model pipeline).  TypeScript verifies that
+ * both classes satisfy this shape at assignment time, even though they live in
+ * different files and are never imported together at the top level.
+ */
+interface IOrchestrator {
+  generateFromPrompt(input: {
+    projectPath: string;
+    primaryContextPath: string;
+    prompt: string;
+    options?: { topKProcedures?: number; topKContext?: number };
+  }): Promise<GenerationOutput>;
+}
 
 const router = Router();
 
@@ -65,50 +81,64 @@ router.post('/generate', async (req, res) => {
     
     // Initialize services
     const enhancedRAGService = new EnhancedRAGService();
-    
-    // Choose LLM service based on environment
+
+    // Choose orchestrator based on LLM_MODE
     const llmMode = process.env.LLM_MODE || 'mock';
-    const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-    const anthropicModel = process.env.ANTHROPIC_MODEL || 'claude-3-haiku-20240307';
-    const mistralApiKey = process.env.MISTRAL_API_KEY;
-    const mistralModel = process.env.MISTRAL_MODEL || 'mistral-small-latest';
-    const groqApiKey = process.env.GROQ_API_KEY;
-    const groqModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
-    const ollamaModel = process.env.OLLAMA_MODEL || 'llama3.1:70b';
-    const ollamaBaseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-    
-    let llmService: any;
-    
-    if (llmMode === 'ollama') {
-      console.log(`[API /generate] Using Ollama with model: ${ollamaModel}`);
-      const { OllamaLLMService } = await import('@phasergun/llm-service');
-      llmService = new OllamaLLMService(ollamaModel, { baseUrl: ollamaBaseUrl });
-      
-    } else if (llmMode === 'mistral' && mistralApiKey) {
-      console.log(`[API /generate] Using Mistral AI (${mistralModel})`);
-      const { MistralLLMService } = await import('@phasergun/llm-service');
-      llmService = new MistralLLMService(mistralApiKey, mistralModel);
-      
-    } else if (llmMode === 'groq' && groqApiKey) {
-      console.log(`[API /generate] Using Groq LPU (${groqModel})`);
-      const { GroqLLMService } = await import('@phasergun/llm-service');
-      llmService = new GroqLLMService(groqApiKey, groqModel);
-      
-    } else if (llmMode === 'anthropic' && anthropicApiKey) {
-      console.log(`[API /generate] Using Anthropic Claude (${anthropicModel})`);
-      const { AnthropicLLMService } = await import('@phasergun/llm-service');
-      llmService = new AnthropicLLMService(anthropicApiKey, anthropicModel);
+    let orchestrator: IOrchestrator;
+
+    if (llmMode === 'multi-model') {
+      // ── New path: ModelRouter + MultiModelOrchestrator ──────────────────
+      console.log('[API /generate] Using multi-model pipeline (INGESTION → DRAFT → AUDIT → REVISION)');
+      const { createModelRouter } = await import('@phasergun/llm-service');
+      const { MultiModelOrchestrator } = await import('@phasergun/orchestrator');
+      const modelRouter = createModelRouter();
+      orchestrator = new MultiModelOrchestrator(enhancedRAGService, modelRouter, {
+        enableIngestionStep: process.env.ENABLE_INGESTION_STEP !== 'false',
+        enableAuditStep:     process.env.ENABLE_AUDIT_STEP     !== 'false',
+        enableRevisionStep:  process.env.ENABLE_REVISION_STEP  !== 'false',
+      });
+
     } else {
-      console.log(`[API /generate] Using MOCK LLM Service`);
-      const { MockLLMService } = await import('@phasergun/llm-service');
-      llmService = new MockLLMService();
+      // ── Existing single-model path (unchanged) ───────────────────────────
+      const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+      const anthropicModel = process.env.ANTHROPIC_MODEL || 'claude-3-haiku-20240307';
+      const mistralApiKey = process.env.MISTRAL_API_KEY;
+      const mistralModel = process.env.MISTRAL_MODEL || 'mistral-small-latest';
+      const groqApiKey = process.env.GROQ_API_KEY;
+      const groqModel = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+      const ollamaModel = process.env.OLLAMA_MODEL || 'llama3.1:70b';
+      const ollamaBaseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+
+      let llmService: any;
+
+      if (llmMode === 'ollama') {
+        console.log(`[API /generate] Using Ollama with model: ${ollamaModel}`);
+        const { OllamaLLMService } = await import('@phasergun/llm-service');
+        llmService = new OllamaLLMService(ollamaModel, { baseUrl: ollamaBaseUrl });
+
+      } else if (llmMode === 'mistral' && mistralApiKey) {
+        console.log(`[API /generate] Using Mistral AI (${mistralModel})`);
+        const { MistralLLMService } = await import('@phasergun/llm-service');
+        llmService = new MistralLLMService(mistralApiKey, mistralModel);
+
+      } else if (llmMode === 'groq' && groqApiKey) {
+        console.log(`[API /generate] Using Groq LPU (${groqModel})`);
+        const { GroqLLMService } = await import('@phasergun/llm-service');
+        llmService = new GroqLLMService(groqApiKey, groqModel);
+
+      } else if (llmMode === 'anthropic' && anthropicApiKey) {
+        console.log(`[API /generate] Using Anthropic Claude (${anthropicModel})`);
+        const { AnthropicLLMService } = await import('@phasergun/llm-service');
+        llmService = new AnthropicLLMService(anthropicApiKey, anthropicModel);
+      } else {
+        console.log(`[API /generate] Using MOCK LLM Service`);
+        const { MockLLMService } = await import('@phasergun/llm-service');
+        llmService = new MockLLMService();
+      }
+
+      // Create single-model orchestrator
+      orchestrator = new OrchestratorService(enhancedRAGService, llmService);
     }
-    
-    // Create orchestrator with simplified dependencies
-    const orchestrator = new OrchestratorService(
-      enhancedRAGService,
-      llmService
-    );
     
     // Generate
     const result = await orchestrator.generateFromPrompt({
@@ -126,6 +156,16 @@ router.post('/generate', async (req, res) => {
     console.log(`[API /generate] Tokens: ${result.usageStats?.tokensUsed || 0}`);
     console.log(`[API /generate] Generated text length: ${result.generatedContent?.length || 0} chars`);
     console.log(`[API /generate] Generated text preview: ${result.generatedContent?.substring(0, 200) || '(empty)'}`);
+    if (llmMode === 'multi-model') {
+      const steps = result.pipelineTrace?.map(t => `${t.step}(${t.modelId})`).join(' → ') || 'N/A';
+      console.log(`[API /generate] Pipeline: ${steps}`);
+      console.log(`[API /generate] Audit findings: ${result.auditFindings ? `${result.auditFindings.length} chars` : 'none'}`);
+      if (result.usageStats?.modelBreakdown) {
+        for (const m of result.usageStats.modelBreakdown) {
+          console.log(`[API /generate]   ${m.role}: ${m.modelId} — ${m.tokensUsed} tokens`);
+        }
+      }
+    }
     console.log(`[API /generate] ========================================\n`);
     
     // Check if generation was successful
