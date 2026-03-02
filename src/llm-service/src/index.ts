@@ -20,6 +20,7 @@ export { MistralLLMService } from './mistral-service';
 export { OllamaLLMService } from './ollama-service';
 export { GroqLLMService } from './groq-service';
 export { OpenAILLMService } from './openai-service';
+export { ModelRouter, createModelRouter } from './model-router';
 
 // Provider configuration layer
 export {
