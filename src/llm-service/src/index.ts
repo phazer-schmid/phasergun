@@ -19,6 +19,17 @@ export { AnthropicLLMService } from './anthropic-service';
 export { MistralLLMService } from './mistral-service';
 export { OllamaLLMService } from './ollama-service';
 export { GroqLLMService } from './groq-service';
+export { OpenAILLMService } from './openai-service';
+
+// Provider configuration layer
+export {
+  ProviderMode,
+  ModelRole,
+  ModelAssignment,
+  ProviderConfig,
+  DEFAULT_DIRECT_CONFIG,
+  buildProviderConfigFromEnv,
+} from './provider-config';
 
 /**
  * Mock Implementation of LLM Service
