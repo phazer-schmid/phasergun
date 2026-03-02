@@ -179,3 +179,78 @@ CACHE_ENABLED=true
 | `[Bootstrap\|name]` Google Drive resolution | Warning logged, generation continues | Needs new bootstrap loader infrastructure |
 | `[Doc\|document\|field]` field extraction | Warning logged, generation continues | Depends on Bootstrap being implemented first |
 | `@{source_id}` per-scope retrieval enforcement | Scopes parsed and logged, but retrieval is not filtered per-scope | Requires redesign of vector search to support per-scope queries |
+
+---
+
+## Multi-Model Mode
+
+### What It Is
+
+When `LLM_MODE=multi-model`, PhaserGun replaces the single-model generation path with a
+four-role pipeline. Each role runs a purpose-fit model; the RAG retrieval layer and all
+reference-notation resolution logic are **unchanged**.
+
+### The 5-Step Pipeline
+
+| Step | Name | Model role | Purpose | Skippable? |
+|---|---|---|---|---|
+| 1 | **Context Ingestion** | `INGESTION` | Compresses `ragContext` when token estimate > 6000 to reduce DRAFTER input cost | Yes — `ENABLE_INGESTION_STEP=false` |
+| 2 | **Draft** | `DRAFTER` | Writes the full regulatory section / narrative | No — always runs |
+| 3 | **Audit** | `AUDITOR` | Reviews draft for ISO 14971 / 820.30 compliance gaps; returns numbered findings | Yes — `ENABLE_AUDIT_STEP=false` |
+| 4 | **Revision** | `REVISER` | Rewrites draft to address audit findings; skipped automatically when findings < 50 chars | Yes — `ENABLE_REVISION_STEP=false` |
+| 5 | **Assemble** | — | Merges revision (or draft) with footnotes, `pipelineTrace`, `auditFindings`, `modelBreakdown` | Always runs |
+
+The API response includes new optional fields when multi-model is active:
+- `pipelineTrace` — array of `{ step, modelId, durationMs, tokensUsed }` for each step that ran
+- `auditFindings` — raw text returned by the AUDITOR (omitted when audit was skipped or found nothing)
+- `usageStats.modelBreakdown` — per-role token and cost breakdown
+
+### Key Files
+
+| File | Role |
+|---|---|
+| `src/llm-service/src/provider-config.ts` | `ProviderMode` / `ModelRole` enums, `ProviderConfig`, `DEFAULT_DIRECT_CONFIG`, `buildProviderConfigFromEnv()` |
+| `src/llm-service/src/openai-service.ts` | `OpenAILLMService` — direct OpenAI + Azure Foundry routing |
+| `src/llm-service/src/model-router.ts` | `ModelRouter` — holds one `LLMService` per role, exposes role-specific generation methods |
+| `src/orchestrator/src/multi-model-orchestrator.ts` | `MultiModelOrchestrator` — 5-step pipeline; sits alongside `OrchestratorService` |
+| `src/api-server/src/routes/generate.ts` | Checks `LLM_MODE`; routes to `MultiModelOrchestrator` or legacy `OrchestratorService` |
+
+### Activating Multi-Model Mode (Direct APIs)
+
+1. Copy `.env.multi-model.template` to `src/api-server/.env`
+2. Fill in `OPENAI_API_KEY` (and optionally `ANTHROPIC_API_KEY` if any role uses a `claude-` model)
+3. Set `LLM_MODE=multi-model`
+4. Restart the API server
+
+Env vars to customise roles:
+
+```bash
+MODEL_INGESTION=gpt-4o-mini    # fast extraction
+MODEL_DRAFTER=gpt-4.1          # primary author
+MODEL_AUDITOR=o3-mini          # compliance reasoning (no temperature)
+MODEL_REVISER=gpt-4.1          # final rewrite
+```
+
+Any role whose `modelId` starts with `claude-` is automatically routed to `AnthropicLLMService`
+when `PROVIDER_MODE=direct`. All other roles use `OpenAILLMService`.
+
+### Switching to Azure AI Foundry (Zero Code Changes)
+
+1. Copy `.env.azure-foundry.template` to `src/api-server/.env`
+2. Set `PROVIDER_MODE=azure_foundry`
+3. Fill in `AZURE_ENDPOINT`, `AZURE_API_KEY`, and `AZURE_DEPLOYMENT_PREFIX`
+4. Ensure your Azure hub has deployments named `{prefix}{modelId}` (e.g. `phasergun-gpt-4o-mini`)
+5. Restart — no code changes needed
+
+The `OpenAILLMService` constructor detects `azure_foundry` mode and sets `baseURL`,
+`defaultQuery` (`api-version`), and `defaultHeaders` (`api-key`) accordingly.
+
+### What Is NOT Changed by Multi-Model Mode
+
+- `EnhancedRAGService` and the full RAG pipeline (`rag-core`, `rag-service`) are identical
+- All bracket-notation reference parsing (`[Procedure|...]`, `[Master Record|...]`, `[Doc|...]`)
+- Master Record and Doc token resolution (same private helpers, same blocking logic)
+- `primary-context.yaml` and `prompt-builder.ts` rules — the DRAFTER receives the same
+  `buildLLMPrompt()` output as the single-model path
+- `GenerationOutput` shape — all new fields (`pipelineTrace`, `auditFindings`, `modelBreakdown`)
+  are **optional**, so existing consumers that ignore them continue to work unchanged
