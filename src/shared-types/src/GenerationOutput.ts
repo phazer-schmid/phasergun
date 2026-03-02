@@ -39,6 +39,10 @@ export interface GenerationOutput {
     durationMs: number;
     /** Total tokens consumed (input + output) for this step. */
     tokensUsed: number;
+    /** Characters sent to this model (the assembled prompt for this step). */
+    promptChars: number;
+    /** Characters received from this model. */
+    responseChars: number;
   }[];
 
   /**

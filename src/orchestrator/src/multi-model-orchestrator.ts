@@ -213,7 +213,7 @@ export class MultiModelOrchestrator {
         console.log(
           `[MultiModelOrchestrator] Step 1 INGESTION: ${assignment.modelId} — ${durationMs}ms, ${tokens} tokens`
         );
-        pipelineTrace.push({ step: 'ingestion', modelId: assignment.modelId, durationMs, tokensUsed: tokens });
+        pipelineTrace.push({ step: 'ingestion', modelId: assignment.modelId, durationMs, tokensUsed: tokens, promptChars: ingestionPrompt.length, responseChars: effectiveRagContext.length });
         modelBreakdown.push({ role: ModelRole.INGESTION, modelId: assignment.modelId, tokensUsed: tokens, cost });
       } else if (enableIngestion) {
         console.log(
@@ -246,7 +246,7 @@ export class MultiModelOrchestrator {
       console.log(
         `[MultiModelOrchestrator] Step 2 DRAFT: ${draftAssignment.modelId} — ${draftDuration}ms, ${draftTokens} tokens`
       );
-      pipelineTrace.push({ step: 'draft', modelId: draftAssignment.modelId, durationMs: draftDuration, tokensUsed: draftTokens });
+      pipelineTrace.push({ step: 'draft', modelId: draftAssignment.modelId, durationMs: draftDuration, tokensUsed: draftTokens, promptChars: fullPrompt.length, responseChars: draftText.length });
       modelBreakdown.push({ role: ModelRole.DRAFTER, modelId: draftAssignment.modelId, tokensUsed: draftTokens, cost: draftCost });
 
       if (!draftText || draftText.trim().length === 0) {
@@ -296,7 +296,7 @@ export class MultiModelOrchestrator {
         console.log(
           `[MultiModelOrchestrator] Step 3 AUDIT: ${auditAssignment.modelId} — ${auditDuration}ms, ${auditTokens} tokens`
         );
-        pipelineTrace.push({ step: 'audit', modelId: auditAssignment.modelId, durationMs: auditDuration, tokensUsed: auditTokens });
+        pipelineTrace.push({ step: 'audit', modelId: auditAssignment.modelId, durationMs: auditDuration, tokensUsed: auditTokens, promptChars: auditPrompt.length, responseChars: auditText.length });
         modelBreakdown.push({ role: ModelRole.AUDITOR, modelId: auditAssignment.modelId, tokensUsed: auditTokens, cost: auditCost });
       } else {
         console.log('[MultiModelOrchestrator] Step 3 AUDIT: disabled');
@@ -345,7 +345,7 @@ export class MultiModelOrchestrator {
         console.log(
           `[MultiModelOrchestrator] Step 4 REVISION: ${reviserAssignment.modelId} — ${revisionDuration}ms, ${revisionTokens} tokens`
         );
-        pipelineTrace.push({ step: 'revision', modelId: reviserAssignment.modelId, durationMs: revisionDuration, tokensUsed: revisionTokens });
+        pipelineTrace.push({ step: 'revision', modelId: reviserAssignment.modelId, durationMs: revisionDuration, tokensUsed: revisionTokens, promptChars: revisionPrompt.length, responseChars: finalContent.length });
         modelBreakdown.push({ role: ModelRole.REVISER, modelId: reviserAssignment.modelId, tokensUsed: revisionTokens, cost: revisionCost });
       } else if (enableRevision && enableAudit && !hasFindings) {
         console.log(
@@ -372,11 +372,23 @@ export class MultiModelOrchestrator {
       console.log(
         `[MultiModelOrchestrator] Step 5 ASSEMBLE — final content: ${finalContent.length} chars`
       );
+      console.log('[MultiModelOrchestrator] === Token Efficiency Report ===');
+      for (const s of pipelineTrace) {
+        const approxInputTokens = Math.round(s.promptChars / 4);
+        console.log(
+          `  ${s.step.padEnd(10)} | ${s.modelId.padEnd(20)} | ` +
+          `input: ~${approxInputTokens.toLocaleString()} tokens (${s.promptChars.toLocaleString()} chars) | ` +
+          `output: ${s.responseChars.toLocaleString()} chars | ` +
+          `${s.durationMs}ms`
+        );
+      }
+      const totalPromptChars = pipelineTrace.reduce((sum, s) => sum + s.promptChars, 0);
       console.log(
-        `[MultiModelOrchestrator] Pipeline: ${pipelineTrace.map(t => t.step).join(' → ')}`
+        `  TOTAL input: ~${Math.round(totalPromptChars / 4).toLocaleString()} tokens ` +
+        `(${totalPromptChars.toLocaleString()} chars across all steps)`
       );
       console.log(
-        `[MultiModelOrchestrator] Total tokens: ${totalTokens}, cost: $${totalCost.toFixed(4)}`
+        `  TOTAL billed: ${totalTokens.toLocaleString()} tokens, cost: $${totalCost.toFixed(4)}`
       );
       console.log('=== MultiModelOrchestrator: Complete ===\n');
 
