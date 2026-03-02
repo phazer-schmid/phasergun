@@ -105,7 +105,7 @@ export class MultiModelOrchestrator {
           {
             procedureChunks: hasProcedureRefs
               ? (input.options?.topKProcedures ?? 5)
-              : (input.options?.topKProcedures ?? 3),
+              : (input.options?.topKProcedures ?? 2),
             contextChunks: hasContextRefs
               ? (input.options?.topKContext ?? 5)
               : (input.options?.topKContext ?? 2),

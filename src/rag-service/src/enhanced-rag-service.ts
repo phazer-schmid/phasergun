@@ -524,7 +524,10 @@ export class EnhancedRAGService {
     }
 
     // 10. Enforce token limits if needed
-    const maxTokens = options.maxTokens || 150000;
+    // 32K is the recommended operating ceiling for structured regulatory
+    // document generation. Pass options.maxTokens to override for large
+    // single-pass operations. The hard window ceiling is 150K.
+    const maxTokens = options.maxTokens || 32000;
     ragContext = enforceTokenLimit(ragContext, maxTokens);
     
     // 11. Build metadata

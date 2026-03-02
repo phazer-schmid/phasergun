@@ -56,9 +56,9 @@ export class OrchestratorService {
           input.prompt,
           {
             // Use parsed references to boost retrieval, but always retrieve baseline chunks
-            procedureChunks: hasProcedureRefs 
+            procedureChunks: hasProcedureRefs
               ? (input.options?.topKProcedures ?? 5)
-              : (input.options?.topKProcedures ?? 3),
+              : (input.options?.topKProcedures ?? 2),
             contextChunks: hasContextRefs
               ? (input.options?.topKContext ?? 5)
               : (input.options?.topKContext ?? 2),
