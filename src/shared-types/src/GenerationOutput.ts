@@ -24,6 +24,29 @@ export interface GenerationOutput {
   
   /** Additional metadata (for sources, footnotes, etc.) */
   metadata?: any;
+
+  /**
+   * Step-by-step trace of the generation pipeline.
+   * Each entry records which model ran, how long it took, and how many tokens
+   * it consumed. Absent for legacy single-pass responses.
+   */
+  pipelineTrace?: {
+    /** Which pipeline step produced this entry. */
+    step: 'ingestion' | 'draft' | 'audit' | 'revision' | 'single-pass';
+    /** Model identifier used for this step. */
+    modelId: string;
+    /** Wall-clock duration of the LLM call in milliseconds. */
+    durationMs: number;
+    /** Total tokens consumed (input + output) for this step. */
+    tokensUsed: number;
+  }[];
+
+  /**
+   * Raw findings text returned by the AUDITOR step.
+   * Preserved so the UI can display audit details separately from the
+   * final revised content. Absent when the audit step was skipped.
+   */
+  auditFindings?: string;
 }
 
 export interface Discrepancy {
@@ -59,4 +82,17 @@ export interface ConfidenceRating {
 export interface UsageStats {
   tokensUsed: number;
   cost: number;
+  /**
+   * Per-role token and cost breakdown when more than one model was used
+   * (e.g., INGESTION → DRAFTER → AUDITOR → REVISER pipeline).
+   * Absent for single-pass generation.
+   */
+  modelBreakdown?: {
+    /** ModelRole enum value, e.g. "ingestion", "drafter", "auditor", "reviser". */
+    role: string;
+    /** Model identifier as used by the provider, e.g. "gpt-4.1" or "o3-mini". */
+    modelId: string;
+    tokensUsed: number;
+    cost: number;
+  }[];
 }
