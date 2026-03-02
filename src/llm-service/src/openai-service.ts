@@ -158,6 +158,27 @@ export class OpenAILLMService implements LLMService {
       const { modelId, maxTokens } = this.assignment;
       const reasoning = this.isReasoningModel(modelId);
 
+      // Split the system message into its STATIC prefix (role + rules, identical
+      // across all calls for the same project) and DYNAMIC suffix (reference
+      // materials that vary per request). OpenAI automatically caches prompt
+      // prefixes longer than 1,024 tokens at ~10% input token cost when the
+      // prefix is identical — no explicit annotation is required.
+      const STATIC_SECTION_END = '=== REFERENCE MATERIALS ===';
+      const refMaterialsIndex = system.indexOf(STATIC_SECTION_END);
+      let staticPrefix: string;
+      let dynamicSuffix: string;
+      if (refMaterialsIndex !== -1) {
+        staticPrefix = system.substring(0, refMaterialsIndex).trim();
+        dynamicSuffix = system.substring(refMaterialsIndex).trim();
+      } else {
+        staticPrefix = system;
+        dynamicSuffix = '';
+      }
+      console.log(
+        `[OpenAIService] Static prefix: ${staticPrefix.length} chars, ` +
+        `dynamic context: ${dynamicSuffix.length} chars`
+      );
+
       const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
 
       if (system.length > 0) {

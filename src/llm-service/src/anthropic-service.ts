@@ -21,7 +21,12 @@ export class AnthropicLLMService implements LLMService {
   private model: string;
 
   constructor(apiKey: string, model: string = 'claude-3-haiku-20240307') {
-    this.client = new Anthropic({ apiKey });
+    this.client = new Anthropic({
+      apiKey,
+      defaultHeaders: {
+        'anthropic-beta': 'prompt-caching-2024-07-31',
+      },
+    });
     this.model = model;
     console.log(`[AnthropicLLMService] Initialized with model: ${model}`);
   }
@@ -51,7 +56,7 @@ export class AnthropicLLMService implements LLMService {
       
       let systemMessage: string;
       let userMessage: string;
-      
+
       if (markerIndex !== -1) {
         systemMessage = enhancedPrompt.substring(0, markerIndex).trim();
         userMessage = enhancedPrompt.substring(markerIndex).trim();
@@ -61,8 +66,34 @@ export class AnthropicLLMService implements LLMService {
         userMessage = enhancedPrompt;
       }
 
+      // Split the system message into STATIC (role + rules, identical across
+      // calls for the same project) and DYNAMIC (reference materials that vary
+      // per request). Anthropic caches everything up to and including the block
+      // marked cache_control: { type: "ephemeral" }, so the static prefix is
+      // billed at ~10% of normal input token cost on cache hits.
+      const STATIC_SECTION_END = '=== REFERENCE MATERIALS ===';
+      const refMaterialsIndex = systemMessage.indexOf(STATIC_SECTION_END);
+      let staticPrefix: string;
+      let dynamicSuffix: string;
+      if (refMaterialsIndex !== -1) {
+        staticPrefix = systemMessage.substring(0, refMaterialsIndex).trim();
+        dynamicSuffix = systemMessage.substring(refMaterialsIndex).trim();
+      } else {
+        staticPrefix = systemMessage;
+        dynamicSuffix = '';
+      }
+
+      type SystemBlock = { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } };
+      const systemBlocks: SystemBlock[] = [];
+      if (staticPrefix.length > 0) {
+        systemBlocks.push({ type: 'text', text: staticPrefix, cache_control: { type: 'ephemeral' } });
+      }
+      if (dynamicSuffix.length > 0) {
+        systemBlocks.push({ type: 'text', text: dynamicSuffix });
+      }
+
       const startTime = Date.now();
-      
+
       const requestParams: any = {
         model: this.model,
         max_tokens: 4000,
@@ -73,20 +104,25 @@ export class AnthropicLLMService implements LLMService {
           content: userMessage
         }]
       };
-      
+
       // Only include system message if we have one
-      if (systemMessage.length > 0) {
-        requestParams.system = systemMessage;
+      if (systemBlocks.length > 0) {
+        requestParams.system = systemBlocks;
       }
 
       const response = await this.client.messages.create(requestParams);
 
       const duration = Date.now() - startTime;
-      
+
       const textContent = response.content
         .filter(block => block.type === 'text')
         .map(block => (block as any).text)
         .join('\n');
+
+      const cacheReadTokens = (response.usage as any)?.cache_read_input_tokens ?? 0;
+      if (cacheReadTokens > 0) {
+        console.log(`[AnthropicService] Cache hit: ${cacheReadTokens} tokens read from cache`);
+      }
 
       console.log(`[AnthropicLLMService] Response received in ${duration}ms`);
       console.log(`[AnthropicLLMService] System message: ${systemMessage.length} chars`);
