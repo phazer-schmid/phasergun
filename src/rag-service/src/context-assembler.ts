@@ -90,9 +90,9 @@ export function assembleContext(
   const externalStandards = extractExternalStandards(primaryContext);
   if (externalStandards.length > 0) {
     sections.push('--- Applicable Regulatory Standards (@external_standards) ---\n');
-    sections.push('All generated content must comply with the following standards. Flag any conflicts with company procedures.\n\n');
+    sections.push('Applicable standards:\n');
     externalStandards.forEach(s => {
-      sections.push(`- **${s.name}** — ${s.scope}\n`);
+      sections.push(`- ${s.name}\n`);
     });
     sections.push('\n');
   }
