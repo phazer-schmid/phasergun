@@ -128,11 +128,26 @@ export class MultiModelOrchestrator {
       console.log('  - Estimated tokens: ' + metadata.totalTokensEstimate);
 
       // ------------------------------------------------------------------
-      // Token resolution: [Master Record|FIELD] and [Doc|Name|FIELD]
+      // Token resolution: [Bootstrap|name], [Master Record|FIELD], [Doc|Name|FIELD]
       // (identical to OrchestratorService)
       // ------------------------------------------------------------------
       let resolvedPrompt = input.prompt;
       const generationErrors: string[] = [];
+
+      // Step 4a: Resolve [Bootstrap|name] tokens — loads each bootstrap document from
+      // {projectPath}/Bootstrap/ (or Context/) and injects its content inline.
+      // Prefix matching handles versioned filenames: [Bootstrap|DDP-Bootstrap-Phase1] → DDP-Bootstrap-Phase1-V4.1.docx
+      const hasBootstrapRefs = /\[Bootstrap\|[^\]]+\]/i.test(resolvedPrompt);
+      if (hasBootstrapRefs) {
+        const bsResult = await this.resolveBootstrapTokens(resolvedPrompt, input.projectPath);
+        resolvedPrompt = bsResult.resolved;
+        for (const missingDoc of bsResult.missingDocs) {
+          generationErrors.push(
+            `Bootstrap document not found: "${missingDoc}"\n` +
+            `  Fix: Add this file to the Bootstrap/ or Context/ folder (version suffixes like -V4.1 are OK).`
+          );
+        }
+      }
 
       if (references.masterRecordFields.length > 0) {
         const mrResult = await this.resolveMasterRecordTokens(resolvedPrompt, input.projectPath);
@@ -141,7 +156,7 @@ export class MultiModelOrchestrator {
           generationErrors.push(
             `Master Record file not found in ${input.projectPath}/Context/\n` +
             `  Referenced fields: ${references.masterRecordFields.join(', ')}\n` +
-            `  Fix: Add "Project-Master-Record.docx" (or any file with "master" and "record" in the name) to the Context folder.`
+            `  Fix: Add "Project-Master-Record.docx" (or any file with "master" and "record" in the name) to the Context folder. Versioned filenames (e.g. Project-Master-Record-v1.2.docx) are supported.`
           );
         }
       }
@@ -631,6 +646,58 @@ export class MultiModelOrchestrator {
     });
 
     return { resolved, fileFound: true, unresolvedFields };
+  }
+
+  /**
+   * Resolve [Bootstrap|name] tokens in the prompt by loading each referenced bootstrap
+   * document from {projectPath}/Bootstrap/ (or Context/ for backward compatibility)
+   * and injecting its full content inline.
+   *
+   * File lookup uses prefix matching so versioned filenames resolve automatically:
+   *   [Bootstrap|DDP-Bootstrap-Phase1] → finds DDP-Bootstrap-Phase1-V4.1.docx
+   */
+  private async resolveBootstrapTokens(
+    prompt: string,
+    projectPath: string
+  ): Promise<{ resolved: string; missingDocs: string[] }> {
+    const contextPath = path.join(projectPath, 'Context');
+    const loader = new DocumentLoader();
+
+    const bootstrapNames = new Set<string>();
+    const scanPattern = /\[Bootstrap\|([^\]]+)\]/gi;
+    let scanMatch;
+    while ((scanMatch = scanPattern.exec(prompt)) !== null) {
+      bootstrapNames.add(scanMatch[1].trim());
+    }
+
+    if (bootstrapNames.size === 0) return { resolved: prompt, missingDocs: [] };
+
+    console.log(`[MultiModelOrchestrator] 📄 Resolving [Bootstrap|...] tokens for: ${Array.from(bootstrapNames).join(', ')}`);
+
+    const docContents = new Map<string, string>();
+    const missingDocs: string[] = [];
+
+    for (const name of bootstrapNames) {
+      const doc = await loader.loadBootstrapDocument(contextPath, name);
+      if (doc) {
+        docContents.set(name.toLowerCase(), doc.content);
+        console.log(`[MultiModelOrchestrator] ✓ Bootstrap document loaded: ${doc.fileName} (for reference: "${name}")`);
+      } else {
+        console.warn(`[MultiModelOrchestrator] ⚠️  [Bootstrap|${name}] — document not found`);
+        missingDocs.push(name);
+      }
+    }
+
+    let resolved = prompt;
+    resolved = resolved.replace(/\[Bootstrap\|([^\]]+)\]/gi, (_match, name) => {
+      const content = docContents.get(name.trim().toLowerCase());
+      if (content) {
+        return `\n\n=== BOOTSTRAP DOCUMENT: ${name.trim()} ===\n${content}\n=== END BOOTSTRAP DOCUMENT ===\n\n`;
+      }
+      return `(Bootstrap document "${name.trim()}" not found)`;
+    });
+
+    return { resolved, missingDocs };
   }
 
   /**

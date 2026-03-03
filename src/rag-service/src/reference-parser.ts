@@ -105,10 +105,13 @@ export function parseKnowledgeSourceScopes(prompt: string): Set<string> {
 
 /**
  * Detect [Bootstrap|{name}] references in the prompt.
- * Logs a warning for each match since Google Drive bootstrap is not yet implemented.
+ * Returns the list of referenced bootstrap document names.
+ *
+ * File lookup uses prefix matching so versioned filenames are resolved automatically:
+ *   [Bootstrap|DDP-Bootstrap-Phase1] → finds DDP-Bootstrap-Phase1-V4.1.docx
  *
  * Maps to: reference_notation.document_bootstrap
- * NOT YET IMPLEMENTED: Google Drive chain resolution requires new infrastructure.
+ * Resolved by the orchestrator via DocumentLoader.loadBootstrapDocument().
  */
 export function parseBootstrapReferences(prompt: string): string[] {
   const bootstrapPattern = /\[Bootstrap\|([^\]]+)\]/gi;
@@ -116,12 +119,7 @@ export function parseBootstrapReferences(prompt: string): string[] {
   let match;
 
   while ((match = bootstrapPattern.exec(prompt)) !== null) {
-    const name = match[1].trim();
-    names.push(name);
-    console.warn(
-      `[ReferenceParser] ⚠️  [Bootstrap|${name}] detected but NOT YET IMPLEMENTED. ` +
-        'Google Drive bootstrap resolution requires new infrastructure. Continuing without it.'
-    );
+    names.push(match[1].trim());
   }
 
   return names;

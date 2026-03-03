@@ -13,6 +13,7 @@ knowledge_sources:
     description: "Living document with key project and product information"
     source: "Customer intake at project start"
     location: "[RAGFolder]/Context/Project-Master-Record.docx"
+    location_note: "Any file in Context/ whose name contains both 'master' and 'record' is accepted. Versioned filenames (e.g. Project-Master-Record-v1.2.docx) are matched automatically."
     retrieval_priority: "always"
     precedence: |
       Answers in the master record document outrank inferred or generated content from all
@@ -95,19 +96,23 @@ knowledge_sources:
     type: "Document-Specific Context"
     description: |
       Bootstrap documents provide document-specific information to help generate a more
-      comprehensive draft. A prompt references a bootstrap document stored in Google Drive;
-      that bootstrap document can in turn list any number of additional supporting documents
-      also stored in Google Drive. PG resolves the full chain at retrieval time.
-    location: "Google Drive"
+      comprehensive draft. A prompt references a bootstrap document by name; PG locates it
+      on disk and injects its full content into the generation context.
+    location: "[RAGFolder]/Bootstrap"
+    location_note: |
+      File lookup uses prefix matching so versioned filenames resolve automatically.
+      [Bootstrap|DDP-Bootstrap-Phase1] will find DDP-Bootstrap-Phase1-V4.1.docx.
+      Files placed in Context/ are also searched for backward compatibility.
     retrieval_priority: "on_demand"
     usage: |
       Only retrieve when a prompt explicitly references a bootstrap document via
-      @reference_notation.document_bootstrap. PG follows the chain: prompt -> bootstrap doc ->
-      any documents listed inside the bootstrap doc. Cite every resolved document in output references.
+      @reference_notation.document_bootstrap. The document's full content is injected
+      inline in the prompt so the LLM can extract Q&A pairs and treat them as
+      high-priority authoritative context. Cite every resolved document in output references.
     notes:
       - "Bootstrap documents are not themselves regulatory content; they supply additional project or document-specific inputs"
-      - "Bootstrap documents may reference other Google Drive documents by name or URL"
-      - "PG must not infer or hallucinate documents not explicitly listed in the bootstrap chain"
+      - "Versioned filenames are matched by prefix — include the base name without version in the prompt reference"
+      - "PG must not infer or hallucinate documents not explicitly listed in the bootstrap reference"
 
 # How prompts reference documents and knowledge sources
 reference_notation:
@@ -168,7 +173,8 @@ reference_notation:
   # ── Document Bootstrap Reference ──────────────────────────────────────────────
   document_bootstrap:
     format: "[Bootstrap|{bootstrap_document_name}]"
-    example: "[Bootstrap|DDP-Bootstrap.docx]"
+    example: "[Bootstrap|DDP-Bootstrap-Phase1]"
+    resolution_note: "Use the base name without version suffix or extension. PG matches files by prefix — DDP-Bootstrap-Phase1 finds DDP-Bootstrap-Phase1-V4.1.docx."
     bootstrap_content_types:
       document_references:
         description: "Links to other Google Drive documents PG should retrieve and use as context"
@@ -183,11 +189,13 @@ reference_notation:
           They take precedence over inferred content from other sources.
           Each Q&A pair is cited as originating from the bootstrap document.
     retrieval: |
-      1. Locate the named bootstrap document in Google Drive (@knowledge_sources.document_bootstraps.location)
-      2. Parse the bootstrap document for both content types:
-         a. Extract any document references and retrieve those documents from Google Drive
-         b. Extract any Q&A pairs and load them as structured, high-priority context
-      3. Make the bootstrap document, all resolved supporting documents, and all Q&A pairs available as context
+      1. Locate the named bootstrap document in [RAGFolder]/Bootstrap/ using prefix matching
+         (e.g. DDP-Bootstrap-Phase1 matches DDP-Bootstrap-Phase1-V4.1.docx).
+         Falls back to Context/ and its subdirectories for backward compatibility.
+      2. Inject the document's full content inline in the prompt so the LLM can:
+         a. Extract any Q&A pairs and treat them as high-priority authoritative context
+         b. Identify any document references listed inside the bootstrap document
+      3. Make the bootstrap document content available as context before generation
     precedence: |
       Q&A pairs from a bootstrap document outrank inferred or generated content from all
       other sources. If a Q&A pair directly answers something the prompt is asking,

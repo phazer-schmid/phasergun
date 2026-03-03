@@ -508,8 +508,13 @@ export class DocumentLoader {
     // Normalize: strip extension for matching
     const refBaseLower = bootstrapDocName.replace(/\.docx$/i, '').toLowerCase();
 
-    // Build search directories: Context root + one level of subdirectories
-    const searchDirs: string[] = [contextPath];
+    // Build search directories: Bootstrap folder at project root, Context root, and one level of subdirectories.
+    // Bootstrap files live in {projectPath}/Bootstrap/ — contextPath is {projectPath}/Context, so we go up one level.
+    const projectPath = path.join(contextPath, '..');
+    const searchDirs: string[] = [
+      path.join(projectPath, 'Bootstrap'), // primary location: {projectPath}/Bootstrap/
+      contextPath,                          // legacy: files placed in Context root
+    ];
     try {
       const entries = await fs.readdir(contextPath, { withFileTypes: true });
       for (const entry of entries) {

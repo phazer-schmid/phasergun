@@ -120,7 +120,7 @@ Prompts use bracket syntax to request specific sources:
 - `[Context|Regulatory Strategy|predicate.docx]` — retrieves a specific on-demand context document
 - `[Master Checklist]` — includes the full Project-Master-Checklist.docx
 - `@sops`, `@global_standards` — knowledge source scope tags (parsed, enforcement not yet implemented)
-- `[Bootstrap|name]` — Google Drive bootstrap chain (NOT YET IMPLEMENTED — logs warning, generation continues)
+- `[Bootstrap|name]` — Loads bootstrap document from `{projectPath}/Bootstrap/` (falls back to `Context/`). File is found by **prefix matching** so versioned filenames work: `[Bootstrap|DDP-Bootstrap-Phase1]` finds `DDP-Bootstrap-Phase1-V4.1.docx`. The document content is injected inline into the prompt.
 - `[Doc|document|field]` — field extraction from bootstrap docs (NOT YET IMPLEMENTED — logs warning)
 
 ### LLM Provider Selection
@@ -199,7 +199,7 @@ cp .env.azure-foundry.template src/api-server/.env
 
 | Feature | Status | Where to implement |
 |---|---|---|
-| `[Bootstrap\|name]` Google Drive resolution | Warning logged, generation continues | Needs new bootstrap loader infrastructure |
+| `[Bootstrap\|name]` full chain resolution | Only local file injection is implemented. Google Drive chain resolution (following links inside the bootstrap doc) is not implemented. | Needs Google Drive API integration |
 | `[Doc\|document\|field]` field extraction | Warning logged, generation continues | Depends on Bootstrap being implemented first |
 | `@{source_id}` per-scope retrieval enforcement | Scopes parsed and logged, but retrieval is not filtered per-scope | Requires redesign of vector search to support per-scope queries |
 
