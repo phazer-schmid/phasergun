@@ -429,7 +429,8 @@ export class OrchestratorService {
     const docContents = new Map<string, string>();
     const missingDocs: string[] = [];
 
-    for (const name of bootstrapNames) {
+    // Load all bootstrap documents in parallel — each is independent
+    await Promise.all(Array.from(bootstrapNames).map(async (name) => {
       const doc = await loader.loadBootstrapDocument(contextPath, name);
       if (doc) {
         docContents.set(name.toLowerCase(), doc.content);
@@ -438,7 +439,7 @@ export class OrchestratorService {
         console.warn(`[Orchestrator] ⚠️  [Bootstrap|${name}] — document not found`);
         missingDocs.push(name);
       }
-    }
+    }));
 
     let resolved = prompt;
     resolved = resolved.replace(/\[Bootstrap\|([^\]]+)\]/gi, (_match, name) => {
@@ -482,11 +483,11 @@ export class OrchestratorService {
 
     console.log(`[Orchestrator] 📄 Resolving [Doc|...] tokens for: ${Array.from(docNames).join(', ')}`);
 
-    // Load each referenced bootstrap document and parse its fields
+    // Load each referenced bootstrap document and parse its fields — all in parallel
     const docFieldMaps = new Map<string, Map<string, string>>();
     const missingDocs: string[] = [];
 
-    for (const docName of docNames) {
+    await Promise.all(Array.from(docNames).map(async (docName) => {
       const doc = await loader.loadBootstrapDocument(contextPath, docName);
       if (doc) {
         const fields = DocumentLoader.parseMasterRecordFields(doc.content);
@@ -497,7 +498,7 @@ export class OrchestratorService {
         console.warn(`[Orchestrator] ⚠️  [Doc|${docName}|...] — bootstrap doc not found`);
         missingDocs.push(docName);
       }
-    }
+    }));
 
     // Substitute every [Doc|DocName|FIELD] token
     const unresolvedFields: Array<{ doc: string; field: string }> = [];

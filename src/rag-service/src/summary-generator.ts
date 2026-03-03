@@ -66,14 +66,14 @@ export class SummaryGenerator {
     if (proceduresFiles.length === 0) return summaryCache;
     
     console.log('[SummaryGenerator] Generating SOP summaries...');
-    
+
     const cachePath = this.getSOPSummariesCachePath(projectPath);
     let cached: any = {};
-    
+
     try {
       const cacheData = await fs.readFile(cachePath, 'utf-8');
       cached = JSON.parse(cacheData);
-      
+
       for (const doc of proceduresFiles) {
         const hash = this.hashContent(doc.content);
         if (cached[doc.fileName] && cached[doc.fileName].hash === hash) {
@@ -84,33 +84,38 @@ export class SummaryGenerator {
     } catch {
       console.log('[SummaryGenerator] No existing summary cache found');
     }
-    
+
+    let newSummariesGenerated = false;
     for (const doc of proceduresFiles) {
       if (!summaryCache.has(doc.fileName)) {
         console.log(`[SummaryGenerator] Summarizing ${doc.fileName}...`);
         const summary = this.extractiveSummary(doc, summaryWordCount);
         summaryCache.set(doc.fileName, summary);
+        newSummariesGenerated = true;
       }
     }
-    
-    const cacheData: any = {};
-    for (const doc of proceduresFiles) {
-      const summary = summaryCache.get(doc.fileName);
-      if (summary) {
-        const hash = this.hashContent(doc.content);
-        const existingEntry = cached[doc.fileName];
-        const generatedAt = (existingEntry && existingEntry.hash === hash) 
-          ? existingEntry.generatedAt : new Date().toISOString();
-        
-        cacheData[doc.fileName] = { hash, summary, generatedAt };
+
+    // Only write the cache file if something new was computed — avoids a disk write every request
+    if (newSummariesGenerated) {
+      const cacheData: any = {};
+      for (const doc of proceduresFiles) {
+        const summary = summaryCache.get(doc.fileName);
+        if (summary) {
+          const hash = this.hashContent(doc.content);
+          const existingEntry = cached[doc.fileName];
+          const generatedAt = (existingEntry && existingEntry.hash === hash)
+            ? existingEntry.generatedAt : new Date().toISOString();
+
+          cacheData[doc.fileName] = { hash, summary, generatedAt };
+        }
       }
-    }
-    
-    try {
-      await fs.mkdir(path.dirname(cachePath), { recursive: true });
-      await fs.writeFile(cachePath, JSON.stringify(cacheData, null, 2));
-    } catch (error) {
-      console.warn('[SummaryGenerator] Failed to save SOP summaries cache (non-fatal)');
+
+      try {
+        await fs.mkdir(path.dirname(cachePath), { recursive: true });
+        await fs.writeFile(cachePath, JSON.stringify(cacheData, null, 2));
+      } catch (error) {
+        console.warn('[SummaryGenerator] Failed to save SOP summaries cache (non-fatal)');
+      }
     }
     
     console.log('[SummaryGenerator] ✓ SOP summaries complete');
@@ -126,14 +131,14 @@ export class SummaryGenerator {
     if (contextFiles.length === 0) return summaryCache;
     
     console.log('[SummaryGenerator] Generating Context file summaries...');
-    
+
     const cachePath = this.getContextSummariesCachePath(projectPath);
     let cached: any = {};
-    
+
     try {
       const cacheData = await fs.readFile(cachePath, 'utf-8');
       cached = JSON.parse(cacheData);
-      
+
       for (const { doc } of contextFiles) {
         const hash = this.hashContent(doc.content);
         if (cached[doc.fileName] && cached[doc.fileName].hash === hash) {
@@ -144,33 +149,38 @@ export class SummaryGenerator {
     } catch {
       console.log('[SummaryGenerator] No existing context summary cache found');
     }
-    
+
+    let newSummariesGenerated = false;
     for (const { doc } of contextFiles) {
       if (!summaryCache.has(doc.fileName)) {
         console.log(`[SummaryGenerator] Summarizing ${doc.fileName}...`);
         const summary = this.extractiveSummary(doc, summaryWordCount);
         summaryCache.set(doc.fileName, summary);
+        newSummariesGenerated = true;
       }
     }
-    
-    const cacheData: any = {};
-    for (const { doc } of contextFiles) {
-      const summary = summaryCache.get(doc.fileName);
-      if (summary) {
-        const hash = this.hashContent(doc.content);
-        const existingEntry = cached[doc.fileName];
-        const generatedAt = (existingEntry && existingEntry.hash === hash) 
-          ? existingEntry.generatedAt : new Date().toISOString();
-        
-        cacheData[doc.fileName] = { hash, summary, generatedAt };
+
+    // Only write the cache file if something new was computed — avoids a disk write every request
+    if (newSummariesGenerated) {
+      const cacheData: any = {};
+      for (const { doc } of contextFiles) {
+        const summary = summaryCache.get(doc.fileName);
+        if (summary) {
+          const hash = this.hashContent(doc.content);
+          const existingEntry = cached[doc.fileName];
+          const generatedAt = (existingEntry && existingEntry.hash === hash)
+            ? existingEntry.generatedAt : new Date().toISOString();
+
+          cacheData[doc.fileName] = { hash, summary, generatedAt };
+        }
       }
-    }
-    
-    try {
-      await fs.mkdir(path.dirname(cachePath), { recursive: true });
-      await fs.writeFile(cachePath, JSON.stringify(cacheData, null, 2));
-    } catch (error) {
-      console.warn('[SummaryGenerator] Failed to save Context summaries cache (non-fatal)');
+
+      try {
+        await fs.mkdir(path.dirname(cachePath), { recursive: true });
+        await fs.writeFile(cachePath, JSON.stringify(cacheData, null, 2));
+      } catch (error) {
+        console.warn('[SummaryGenerator] Failed to save Context summaries cache (non-fatal)');
+      }
     }
     
     console.log('[SummaryGenerator] ✓ Context file summaries complete');

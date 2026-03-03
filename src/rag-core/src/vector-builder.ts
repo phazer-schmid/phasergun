@@ -118,35 +118,41 @@ export async function buildVectorStore(
   
   console.log('[VectorBuilder] Processing files in sorted order for determinism...');
   
-  // Process procedures sequentially (not in parallel) to maintain order
-  const procedureVectors: VectorEntry[] = [];
-  for (const { doc, procedureSubcategory, procedureCategoryId } of sortedProcedures) {
-    const vectors = await chunkAndEmbedDocument(
-      doc,
-      'procedure',
-      projectPath,
-      embeddingService,
-      chunkingStrategy,
-      undefined,
-      procedureSubcategory,
-      procedureCategoryId
-    );
-    procedureVectors.push(...vectors);
-  }
-  
-  // Process context files sequentially (not in parallel) to maintain order
-  const contextVectors: VectorEntry[] = [];
-  for (const { doc, contextCategory } of sortedContext) {
-    const vectors = await chunkAndEmbedDocument(
-      doc,
-      'context',
-      projectPath,
-      embeddingService,
-      chunkingStrategy,
-      contextCategory
-    );
-    contextVectors.push(...vectors);
-  }
+  // Process documents in parallel — each document's file I/O, chunking, and embedding-cache
+  // lookups are independent. ONNX inference is single-threaded (set above) so actual
+  // embedding calls serialize inside the runtime; the concurrency benefit comes from
+  // overlapping disk reads and cache hits across documents.
+  // DETERMINISM: results are collected in the same sorted order as sortedProcedures /
+  // sortedContext (Promise.all preserves index order), so vector entry ordering is stable.
+  const procedureVectorArrays = await Promise.all(
+    sortedProcedures.map(({ doc, procedureSubcategory, procedureCategoryId }) =>
+      chunkAndEmbedDocument(
+        doc,
+        'procedure',
+        projectPath,
+        embeddingService,
+        chunkingStrategy,
+        undefined,
+        procedureSubcategory,
+        procedureCategoryId
+      )
+    )
+  );
+  const procedureVectors: VectorEntry[] = procedureVectorArrays.flat();
+
+  const contextVectorArrays = await Promise.all(
+    sortedContext.map(({ doc, contextCategory }) =>
+      chunkAndEmbedDocument(
+        doc,
+        'context',
+        projectPath,
+        embeddingService,
+        chunkingStrategy,
+        contextCategory
+      )
+    )
+  );
+  const contextVectors: VectorEntry[] = contextVectorArrays.flat();
   
   // Add to vector store in deterministic order: procedures first, then context
   const allVectors = [...procedureVectors, ...contextVectors];

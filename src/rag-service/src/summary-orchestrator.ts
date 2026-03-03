@@ -11,9 +11,11 @@ import { SummaryGenerator } from './summary-generator';
 import { DocumentLoader, CategorizedProcedureFile } from './document-loader';
 
 /**
- * GLOBAL mutex for summary generation - prevents duplicate LLM calls
+ * Separate mutexes per summary type — SOP and context summaries are independent
+ * so they can run concurrently without blocking each other.
  */
-const globalSummaryMutex = new Mutex();
+const globalSOPSummaryMutex = new Mutex();
+const globalContextSummaryMutex = new Mutex();
 
 /**
  * Generate SOP summaries with mutex protection.
@@ -32,9 +34,9 @@ export async function generateSOPSummaries(
 ): Promise<Map<string, string>> {
   let sopSummaries = new Map<string, string>();
 
-  // Acquire GLOBAL summary mutex to prevent duplicate summary generation
-  const releaseSummary = await globalSummaryMutex.acquire();
-  console.log('[SummaryOrchestrator] 🔒 Summary mutex acquired - generating SOP summaries...');
+  // Acquire SOP-specific mutex to prevent duplicate generation across concurrent requests
+  const releaseSummary = await globalSOPSummaryMutex.acquire();
+  console.log('[SummaryOrchestrator] 🔒 SOP mutex acquired - generating SOP summaries...');
 
   try {
     // Get categorized procedure files
@@ -74,7 +76,7 @@ export async function generateSOPSummaries(
     console.warn('[SummaryOrchestrator] Failed to generate SOP summaries, continuing without them:', error);
   } finally {
     releaseSummary();
-    console.log('[SummaryOrchestrator] 🔓 Summary mutex released');
+    console.log('[SummaryOrchestrator] 🔓 SOP mutex released');
   }
 
   return sopSummaries;
@@ -94,9 +96,9 @@ export async function generateContextSummaries(
 ): Promise<Map<string, string>> {
   let contextSummaries = new Map<string, string>();
   
-  // Acquire GLOBAL summary mutex to prevent duplicate summary generation
-  const releaseSummary = await globalSummaryMutex.acquire();
-  console.log('[SummaryOrchestrator] 🔒 Summary mutex acquired - generating context summaries...');
+  // Acquire context-specific mutex to prevent duplicate generation across concurrent requests
+  const releaseSummary = await globalContextSummaryMutex.acquire();
+  console.log('[SummaryOrchestrator] 🔒 Context mutex acquired - generating context summaries...');
   
   try {
     // Get context files
@@ -133,8 +135,8 @@ export async function generateContextSummaries(
     console.warn('[SummaryOrchestrator] Failed to generate Context summaries, continuing without them:', error);
   } finally {
     releaseSummary();
-    console.log('[SummaryOrchestrator] 🔓 Summary mutex released');
+    console.log('[SummaryOrchestrator] 🔓 Context mutex released');
   }
-  
+
   return contextSummaries;
 }

@@ -409,41 +409,56 @@ export class EnhancedRAGService {
       console.log(`[EnhancedRAG]    ℹ️  Knowledge source scopes detected: @${Array.from(knowledgeScopes).join(', @')} (logging only — full scope enforcement not yet implemented)`);
     }
     
-    // 2. Load knowledge with lock protection (prevents concurrent rebuild collisions)
-    const knowledge = await this.ensureCacheBuilt(projectPath, primaryContextPath);
-    
-    // 3 & 4. Generate summaries if requested (delegated to summary orchestrator)
-    let sopSummaries = new Map<string, string>();
-    let contextSummaries = new Map<string, string>();
-    
+    // 2, 3, 4 & 5 run in parallel — they are independent of each other:
+    //   - ensureCacheBuilt: loads/builds the vector store (I/O bound)
+    //   - SOP + context summaries: read summary caches from disk (separate mutex per type)
+    //   - Prompt embedding: runs ONNX inference (CPU bound)
+    // We need the results of all four before proceeding to vector search.
+
+    // Lazy-load SummaryGenerator before the parallel section (await import is not re-entrant safe)
     if (options.includeSummaries ?? true) {
-      // Lazy-load SummaryGenerator
       if (!this.summaryGenerator) {
         const { SummaryGenerator } = await import('./summary-generator');
         this.summaryGenerator = new SummaryGenerator();
       }
-      
-      sopSummaries = await generateSOPSummariesOrch(
-        projectPath,
-        options.summaryWordCount || 250,
-        this.documentLoader,
-        this.summaryGenerator,
-        excludedProcedureSubcategories
-      );
-      
-      contextSummaries = await generateContextSummariesOrch(
-        projectPath,
-        options.summaryWordCount || 250,
-        excludeGeneral,
-        excludeRegStrategy,
-        this.documentLoader,
-        this.summaryGenerator
-      );
     }
-    
-    // 5. Embed the prompt
-    const embeddingService = await this.getEmbeddingService(projectPath);
-    const promptEmbedding = await embeddingService.embedText(prompt);
+
+    const [knowledge, [sopSummaries, contextSummaries], promptEmbedding] = await Promise.all([
+      // 2. Load vector store (mutex-protected internally)
+      this.ensureCacheBuilt(projectPath, primaryContextPath),
+
+      // 3 & 4. Generate SOP and context summaries in parallel (separate mutexes)
+      (async (): Promise<[Map<string, string>, Map<string, string>]> => {
+        if (!(options.includeSummaries ?? true)) {
+          return [new Map(), new Map()];
+        }
+        const [sop, ctx] = await Promise.all([
+          generateSOPSummariesOrch(
+            projectPath,
+            options.summaryWordCount || 250,
+            this.documentLoader,
+            this.summaryGenerator!,
+            excludedProcedureSubcategories
+          ),
+          generateContextSummariesOrch(
+            projectPath,
+            options.summaryWordCount || 250,
+            excludeGeneral,
+            excludeRegStrategy,
+            this.documentLoader,
+            this.summaryGenerator!
+          ),
+        ]);
+        return [sop, ctx];
+      })(),
+
+      // 5. Embed the prompt
+      (async () => {
+        const embeddingService = await this.getEmbeddingService(projectPath);
+        return embeddingService.embedText(prompt);
+      })(),
+    ]);
+
     const promptEmbeddingArray = VectorStore.float32ArrayToNumbers(promptEmbedding);
     
     // 6. Search procedures with on-demand subcategory filtering
