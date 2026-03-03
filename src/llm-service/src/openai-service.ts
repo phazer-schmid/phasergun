@@ -136,6 +136,24 @@ export class OpenAILLMService implements LLMService {
   }
 
   /**
+   * Returns per-million-token USD rates for a given model ID.
+   * Prices as of early 2026 — update if OpenAI revises rates.
+   * Unknown models return 0 so cost shows $0 rather than crashing.
+   */
+  private getModelPricing(modelId: string): { inputPerM: number; outputPerM: number } {
+    if (modelId.startsWith('o3-mini'))      return { inputPerM: 1.10,  outputPerM: 4.40  };
+    if (modelId.startsWith('o3'))           return { inputPerM: 10.00, outputPerM: 40.00 };
+    if (modelId.startsWith('o1-mini'))      return { inputPerM: 3.00,  outputPerM: 12.00 };
+    if (modelId.startsWith('o1'))           return { inputPerM: 15.00, outputPerM: 60.00 };
+    if (modelId.startsWith('gpt-4o-mini'))  return { inputPerM: 0.15,  outputPerM: 0.60  };
+    if (modelId.startsWith('gpt-4.1-mini')) return { inputPerM: 0.40,  outputPerM: 1.60  };
+    if (modelId.startsWith('gpt-4.1-nano')) return { inputPerM: 0.10,  outputPerM: 0.40  };
+    if (modelId.startsWith('gpt-4.1'))      return { inputPerM: 2.00,  outputPerM: 8.00  };
+    if (modelId.startsWith('gpt-4o'))       return { inputPerM: 2.50,  outputPerM: 10.00 };
+    return { inputPerM: 0, outputPerM: 0 };
+  }
+
+  /**
    * Returns true for model families that do not accept a `temperature`
    * parameter (OpenAI o1 and o3 reasoning models).
    */
@@ -186,10 +204,13 @@ export class OpenAILLMService implements LLMService {
       }
       messages.push({ role: 'user', content: user });
 
-      const requestParams: OpenAI.Chat.ChatCompletionCreateParamsNonStreaming = {
+      // Reasoning models (o1/o3) use max_completion_tokens; standard models use max_tokens.
+      const requestParams: any = {
         model: modelId,
-        max_tokens: maxTokens,
         messages,
+        ...(reasoning
+          ? { max_completion_tokens: maxTokens }
+          : { max_tokens: maxTokens }),
       };
 
       // Do NOT include temperature for o1/o3 reasoning models.
@@ -210,20 +231,20 @@ export class OpenAILLMService implements LLMService {
       const outputTokens = response.usage?.completion_tokens ?? 0;
       const tokensUsed   = inputTokens + outputTokens;
 
+      const { inputPerM, outputPerM } = this.getModelPricing(modelId);
+      const cost =
+        (inputTokens  / 1_000_000) * inputPerM +
+        (outputTokens / 1_000_000) * outputPerM;
+
       console.log(`[OpenAILLMService:${this.role}] Response in ${duration}ms`);
       console.log(`[OpenAILLMService:${this.role}] System: ${system.length} chars`);
       console.log(`[OpenAILLMService:${this.role}] User: ${user.length} chars`);
       console.log(`[OpenAILLMService:${this.role}] Tokens — in: ${inputTokens}, out: ${outputTokens}`);
+      console.log(`[OpenAILLMService:${this.role}] Cost: $${cost.toFixed(4)} (${modelId} pricing)`);
 
       return {
         generatedText,
-        usageStats: {
-          tokensUsed,
-          // Cost calculation deferred — pricing varies by model and tier.
-          // Callers can compute cost from tokensUsed + known rate once pricing
-          // is wired through ProviderConfig.
-          cost: 0,
-        },
+        usageStats: { tokensUsed, cost },
       };
     } catch (error: any) {
       const isRateLimit =
