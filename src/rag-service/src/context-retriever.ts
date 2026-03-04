@@ -1,4 +1,4 @@
-import { VectorStore, SearchResult, EmbeddingService } from '@phasergun/rag-core';
+import { VectorStore, SearchResult, EmbeddingService } from '@phaser/rag-core';
 
 export interface RetrievalOptions {
   topK?: number;

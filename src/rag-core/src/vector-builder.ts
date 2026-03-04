@@ -3,7 +3,7 @@
  * Handles vector store construction and document embedding
  */
 
-import { ParsedDocument } from '@phasergun/shared-types';
+import { ParsedDocument } from '@phaser/shared-types';
 import { EmbeddingService } from './embedding-service';
 import { VectorStore, VectorEntry } from './vector-store';
 

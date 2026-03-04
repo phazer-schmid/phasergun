@@ -9,7 +9,7 @@
  * and any output-specific overrides. Everything else is handled here.
  */
 
-import { SearchResult } from '@phasergun/rag-core';
+import { SearchResult } from '@phaser/rag-core';
 import { buildSystemSection } from './prompt-builder';
 
 /**

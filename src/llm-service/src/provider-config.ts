@@ -94,7 +94,7 @@ export interface ProviderConfig {
   /**
    * Optional deployment name prefix for Azure.
    * When set, model IDs are prefixed before resolving the Azure deployment name.
-   * Example: prefix "phasergun-" + modelId "gpt-4o-mini" → deployment "phasergun-gpt-4o-mini".
+   * Example: prefix "phaser-" + modelId "gpt-4o-mini" → deployment "phaser-gpt-4o-mini".
    */
   azureDeploymentPrefix?: string;
 

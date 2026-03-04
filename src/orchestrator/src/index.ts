@@ -1,7 +1,7 @@
-import { GenerationOutput, SourceAttribution, Discrepancy, ConfidenceRating } from '@phasergun/shared-types';
-import { EnhancedRAGService, FootnoteTracker, SourceReference, buildLLMPrompt, parseProcedureReferences, parseKnowledgeSourceScopes } from '@phasergun/rag-service';
-import { DocumentLoader } from '@phasergun/rag-service';
-import { LLMService } from '@phasergun/llm-service';
+import { GenerationOutput, SourceAttribution, Discrepancy, ConfidenceRating } from '@phaser/shared-types';
+import { EnhancedRAGService, FootnoteTracker, SourceReference, buildLLMPrompt, parseProcedureReferences, parseKnowledgeSourceScopes } from '@phaser/rag-service';
+import { DocumentLoader } from '@phaser/rag-service';
+import { LLMService } from '@phaser/llm-service';
 import * as path from 'path';
 
 /**
@@ -132,7 +132,7 @@ export class OrchestratorService {
       }
 
       // Step 4d: Block generation if any critical document references could not be satisfied.
-      // PhaserGun never hallucinate missing information — it returns a clear error instead.
+      // Phaser never hallucinate missing information — it returns a clear error instead.
       if (generationErrors.length > 0) {
         const errorList = generationErrors.map((e, i) => `${i + 1}. ${e}`).join('\n\n');
         console.error(`\n[Orchestrator] ❌ GENERATION BLOCKED — ${generationErrors.length} missing required document(s):\n${errorList}\n`);
@@ -142,7 +142,7 @@ export class OrchestratorService {
           timestamp: new Date().toISOString(),
           generatedContent:
             `## ⚠️ Generation Blocked — Missing Required Documents\n\n` +
-            `PhaserGun cannot generate this document because the following referenced files were not found:\n\n` +
+            `Phaser cannot generate this document because the following referenced files were not found:\n\n` +
             generationErrors.map((e, i) => `**${i + 1}.** ${e}`).join('\n\n') +
             `\n\nPlease add the missing files and try again.`,
         };
@@ -355,7 +355,7 @@ export class OrchestratorService {
     const contextPath = path.join(projectPath, 'Context');
     const loader = new DocumentLoader();
 
-    let masterRecord: import('@phasergun/shared-types').ParsedDocument | null = null;
+    let masterRecord: import('@phaser/shared-types').ParsedDocument | null = null;
     try {
       masterRecord = await loader.loadMasterRecord(contextPath);
     } catch (err) {

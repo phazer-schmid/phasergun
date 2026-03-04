@@ -170,7 +170,7 @@ async function startServer() {
     }
 
     app.listen(PORT, () => {
-      console.log(`\n=== PhaserGun Generation API Server ===`);
+      console.log(`\n=== Phaser Generation API Server ===`);
       console.log(`Server running on http://localhost:${PORT}`);
       console.log(``);
       console.log(`API Endpoints:`);

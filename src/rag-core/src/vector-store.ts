@@ -459,7 +459,7 @@ export class VectorStore {
     // Use system temp directory for cache instead of project directory
     const tempBase = os.tmpdir();
     const cacheBaseName = crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8);
-    return path.join(tempBase, 'phasergun-cache', 'vector-store', cacheBaseName, 'vector-store.json');
+    return path.join(tempBase, 'phaser-cache', 'vector-store', cacheBaseName, 'vector-store.json');
   }
 
   /**

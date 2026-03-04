@@ -1,8 +1,8 @@
-# PhaserGun RAG Service Documentation
+# Phaser RAG Service Documentation
 
 ## Overview
 
-The RAG (Retrieval-Augmented Generation) service is the intelligence layer of PhaserGun. It combines semantic search, local embeddings, and structured knowledge retrieval to provide relevant context for LLM generation.
+The RAG (Retrieval-Augmented Generation) service is the intelligence layer of Phaser. It combines semantic search, local embeddings, and structured knowledge retrieval to provide relevant context for LLM generation.
 
 ### Key Features
 - **Three-Layer Knowledge Model**: Static rules + Dynamic procedures + Dynamic context
@@ -16,13 +16,13 @@ The RAG (Retrieval-Augmented Generation) service is the intelligence layer of Ph
 
 ## Three-Layer Knowledge Model
 
-PhaserGun organizes knowledge into three distinct layers, each serving a specific purpose:
+Phaser organizes knowledge into three distinct layers, each serving a specific purpose:
 
 ### Layer 1: Primary Context (Static Rules)
 
 **File**: `src/rag-service/knowledge-base/context/primary-context.yaml`
 
-**Purpose**: Defines PhaserGun's role, behavioral rules, regulatory framework, and operational constraints.
+**Purpose**: Defines Phaser's role, behavioral rules, regulatory framework, and operational constraints.
 
 **Content**:
 - Product definition and purpose
@@ -36,12 +36,12 @@ PhaserGun organizes knowledge into three distinct layers, each serving a specifi
 - **Static**: Rarely changes
 - **Mandatory**: Always included in LLM context
 - **Regulatory**: Contains FDA/ISO compliance requirements
-- **Behavioral**: Defines how PhaserGun should generate content
+- **Behavioral**: Defines how Phaser should generate content
 
 **Example Structure**:
 ```yaml
 product:
-  name: "PhaserGun (PG)"
+  name: "Phaser (PG)"
   type: "Regulatory Documentation Engine"
   purpose: "Generate regulatory documents for 510(k) submissions using industry standards, company operating procedures and project context"
 
@@ -263,7 +263,7 @@ const embeddings = await embeddingService.embedBatch(
 - Deterministic insertion order (alphabetical by file, then chunk index)
 
 **Persistence**:
-- Saved to `$TMPDIR/phasergun-cache/vector-store/{project_hash}/vector-store.json`
+- Saved to `$TMPDIR/phaser-cache/vector-store/{project_hash}/vector-store.json`
 - Loaded on cache hit (~100-200ms)
 - Includes fingerprint for validation
 
@@ -577,7 +577,7 @@ The RAG service assembles context in a structured three-tier format optimized fo
 ```
 === YOUR ROLE AND CRITICAL INSTRUCTIONS ===
 
-You are PhaserGun AI, an AI regulatory documentation expert.
+You are Phaser AI, an AI regulatory documentation expert.
 
 PRIMARY FUNCTION: Generate regulatory documents for 510(k) submissions
 

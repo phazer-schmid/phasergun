@@ -1,6 +1,6 @@
-# PhaserGun Primary Context - Core Essence
+# Phaser Primary Context - Core Essence
 product:
-  name: "PhaserGun (PG)"
+  name: "Phaser (PG)"
   type: "Regulatory Documentation Engine"
   purpose: "Generate regulatory documents for 510(k) submissions using industry standards, company operating procedures and project context"
 
@@ -354,7 +354,7 @@ cache_system:
     effect_when_disabled: "All documents processed fresh on every request; no disk reads or writes for cache artifacts"
 
   location:
-    base: "$TMPDIR/phasergun-cache"
+    base: "$TMPDIR/phaser-cache"
     project_isolation: "MD5 hash of project path, truncated to 8 characters"
     structure:
       vector_store: "{base}/vector-store/{project_hash}/vector-store.json"
@@ -420,6 +420,6 @@ cache_system:
     purpose: "Ensures identical vector store content and ordering across cache rebuilds, independent of filesystem enumeration order"
 
   manual_reset:
-    all_projects: "rm -rf $TMPDIR/phasergun-cache"
-    single_project: "rm -rf $TMPDIR/phasergun-cache/*/{project_hash}"
+    all_projects: "rm -rf $TMPDIR/phaser-cache"
+    single_project: "rm -rf $TMPDIR/phaser-cache/*/{project_hash}"
     effect: "Next request detects missing cache and triggers full rebuild automatically"

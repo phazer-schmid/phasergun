@@ -1,4 +1,4 @@
-import { LLMResponse, KnowledgeContext } from '@phasergun/shared-types';
+import { LLMResponse, KnowledgeContext } from '@phaser/shared-types';
 
 /**
  * LLM Service Interface
@@ -51,7 +51,7 @@ export class MockLLMService implements LLMService {
       generatedText: `GENERATED DOCUMENT CONTENT
 
 INTRODUCTION:
-This is mock-generated content created by the PhaserGun RAG-enhanced generation system. The system has successfully processed your generation request through the complete pipeline: document parsing, intelligent chunking, semantic retrieval, and context-aware text generation.
+This is mock-generated content created by the Phaser RAG-enhanced generation system. The system has successfully processed your generation request through the complete pipeline: document parsing, intelligent chunking, semantic retrieval, and context-aware text generation.
 
 CONTENT GENERATION APPROACH:
 The system retrieved relevant information from your knowledge base including procedural documents and contextual materials. This content was generated following the guidance and requirements specified in your source documents, with appropriate citations and references maintained throughout.

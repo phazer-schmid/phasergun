@@ -1,4 +1,4 @@
-import { ParsedDocument } from '@phasergun/shared-types';
+import { ParsedDocument } from '@phaser/shared-types';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -195,13 +195,13 @@ export class SummaryGenerator {
     const os = require('os');
     const tempBase = os.tmpdir();
     const cacheBaseName = crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8);
-    return path.join(tempBase, 'phasergun-cache', 'sop-summaries', cacheBaseName, 'sop-summaries.json');
+    return path.join(tempBase, 'phaser-cache', 'sop-summaries', cacheBaseName, 'sop-summaries.json');
   }
 
   private getContextSummariesCachePath(projectPath: string): string {
     const os = require('os');
     const tempBase = os.tmpdir();
     const cacheBaseName = crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8);
-    return path.join(tempBase, 'phasergun-cache', 'context-summaries', cacheBaseName, 'context-summaries.json');
+    return path.join(tempBase, 'phaser-cache', 'context-summaries', cacheBaseName, 'context-summaries.json');
   }
 }

@@ -1,8 +1,8 @@
-# PhaserGun API Documentation
+# Phaser API Documentation
 
 ## Overview
 
-The PhaserGun API is a RESTful HTTP API built with Express.js that provides document generation, file management, and health monitoring endpoints. The API coordinates between the RAG service, LLM providers, and the Vue frontend.
+The Phaser API is a RESTful HTTP API built with Express.js that provides document generation, file management, and health monitoring endpoints. The API coordinates between the RAG service, LLM providers, and the Vue frontend.
 
 **Base URL**: `http://localhost:3001` (development) or `https://yourdomain.com` (production)
 
@@ -480,7 +480,7 @@ LLM_MODE=mock
 
 ## Rate Limiting and Quotas
 
-The PhaserGun API itself does not impose rate limits, but be aware of:
+The Phaser API itself does not impose rate limits, but be aware of:
 
 1. **LLM Provider Limits**: Each LLM provider has its own rate limits and quotas
    - Anthropic: Varies by tier (check your account)
@@ -500,7 +500,7 @@ The PhaserGun API itself does not impose rate limits, but be aware of:
 
 ## Authentication
 
-Currently, the PhaserGun API does not implement authentication. It is designed for:
+Currently, the Phaser API does not implement authentication. It is designed for:
 - **Local development** (localhost only)
 - **Private networks** (behind firewall/VPN)
 - **Single-user deployments** (trusted environment)

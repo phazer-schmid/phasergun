@@ -7,7 +7,7 @@
         <div class="app-logo">
           <div class="logo-icon">PG</div>
           <div class="logo-content">
-            <span class="logo-text">PhaserGun</span>
+            <span class="logo-text">Phaser</span>
             <span class="logo-subtitle">Quality Regulatory Generation</span>
           </div>
         </div>
@@ -79,7 +79,7 @@
 
       <!-- Sidebar Footer -->
       <div class="sidebar-footer">
-        <div class="footer-text">© 2026 PhaserGun</div>
+        <div class="footer-text">© 2026 Phaser</div>
         <div class="footer-version">v2.0.0</div>
       </div>
     </aside>
@@ -235,7 +235,7 @@ import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useProjectService } from '../composables/useProjectService';
 import { Project } from '../models/project.model';
-import { GenerationOutput } from '@phasergun/shared-types';
+import { GenerationOutput } from '@phaser/shared-types';
 import { getApiEndpoint } from '../config/api';
 import { marked } from 'marked';
 

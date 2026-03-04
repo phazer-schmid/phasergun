@@ -1,6 +1,6 @@
 import { Project } from '../models/project.model';
 
-const STORAGE_KEY = 'phasergun_projects';
+const STORAGE_KEY = 'phaser_projects';
 
 export function useProjectService() {
   /**

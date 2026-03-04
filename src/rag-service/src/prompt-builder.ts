@@ -87,7 +87,7 @@ export const RULE_NO_ECHO_PROMPT =
  * @param primaryContext - Parsed primary-context.yaml object
  */
 export function buildSystemSection(primaryContext: any): string {
-  const role = primaryContext?.product?.name || 'PhaserGun AI';
+  const role = primaryContext?.product?.name || 'Phaser AI';
   const purpose = primaryContext?.product?.purpose || 'Generate regulatory documents';
 
   return [

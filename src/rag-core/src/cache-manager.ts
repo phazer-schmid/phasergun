@@ -22,25 +22,25 @@ export class CacheManager {
   getVectorStorePath(projectPath: string): string {
     const tempBase = os.tmpdir();
     const cacheBaseName = crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8);
-    return path.join(tempBase, 'phasergun-cache', 'vector-store', cacheBaseName, 'vector-store.json');
+    return path.join(tempBase, 'phaser-cache', 'vector-store', cacheBaseName, 'vector-store.json');
   }
 
   getSOPSummariesCachePath(projectPath: string): string {
     const tempBase = os.tmpdir();
     const cacheBaseName = crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8);
-    return path.join(tempBase, 'phasergun-cache', 'sop-summaries', cacheBaseName, 'sop-summaries.json');
+    return path.join(tempBase, 'phaser-cache', 'sop-summaries', cacheBaseName, 'sop-summaries.json');
   }
 
   getContextSummariesCachePath(projectPath: string): string {
     const tempBase = os.tmpdir();
     const cacheBaseName = crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8);
-    return path.join(tempBase, 'phasergun-cache', 'context-summaries', cacheBaseName, 'context-summaries.json');
+    return path.join(tempBase, 'phaser-cache', 'context-summaries', cacheBaseName, 'context-summaries.json');
   }
 
   getCacheMetadataPath(projectPath: string): string {
     const tempBase = os.tmpdir();
     const cacheBaseName = crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8);
-    return path.join(tempBase, 'phasergun-cache', 'metadata', cacheBaseName, 'cache-metadata.json');
+    return path.join(tempBase, 'phaser-cache', 'metadata', cacheBaseName, 'cache-metadata.json');
   }
 
   async getAllFiles(dirPath: string, excludeDirs: string[] = []): Promise<string[]> {

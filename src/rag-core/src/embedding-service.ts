@@ -62,7 +62,7 @@ export class EmbeddingService {
       ? crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8)
       : 'default';
     
-    this.cacheDir = path.join(tempBase, 'phasergun-cache', 'embeddings', cacheBaseName);
+    this.cacheDir = path.join(tempBase, 'phaser-cache', 'embeddings', cacheBaseName);
     
     console.log(`[EmbeddingService] Cache directory will be: ${this.cacheDir}`);
   }

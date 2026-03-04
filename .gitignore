@@ -45,8 +45,8 @@ credentials.json
 *_secret*
 
 # Embedding cache (transformers.js models and cached embeddings)
-.phasergun-cache/
-**/.phasergun-cache/
+.phaser-cache/
+**/.phaser-cache/
 
 # Misc
 .DS_Store

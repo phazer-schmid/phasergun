@@ -1,8 +1,8 @@
-import { ParsedDocument } from '@phasergun/shared-types';
+import { ParsedDocument } from '@phaser/shared-types';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Mutex } from 'async-mutex';
-import { EmbeddingService, VectorStore, SearchResult, LockManager, getLockManager, CacheManager, KnowledgeCache, buildVectorStore as buildVectorStoreUtil, chunkSectionAware, chunkWithOverlap } from '@phasergun/rag-core';
+import { EmbeddingService, VectorStore, SearchResult, LockManager, getLockManager, CacheManager, KnowledgeCache, buildVectorStore as buildVectorStoreUtil, chunkSectionAware, chunkWithOverlap } from '@phaser/rag-core';
 import { DocumentLoader, CategorizedProcedureFile } from './document-loader';
 import {
   parseExplicitContextReferences,
@@ -27,7 +27,7 @@ const globalBuildMutex = new Mutex();
 /**
  * Enhanced RAG Service for Content Generation
  * Retrieves context from multiple knowledge sources to inform LLM generation:
- * 1. Static: primary-context.yaml (PhaserGun role, regulatory framework)
+ * 1. Static: primary-context.yaml (Phaser role, regulatory framework)
  * 2. Dynamic: Files in /Procedures folder (SOPs, company guidelines)
  * 3. Dynamic: Files in /Context folder (project-specific information)
  */
@@ -586,7 +586,7 @@ export class EnhancedRAGService {
     
     // TIER 1: Role & Instructions
     sections.push('=== YOUR ROLE AND CRITICAL INSTRUCTIONS ===\n\n');
-    sections.push('You are PhaserGun AI, an AI regulatory documentation expert.\n\n');
+    sections.push('You are Phaser AI, an AI regulatory documentation expert.\n\n');
     sections.push('CRITICAL: Write directly as requested. Do NOT analyze or summarize reference materials.\n');
     sections.push('Follow the exact format, tone, and length specified in user requests.\n\n');
     sections.push('---\n\n');

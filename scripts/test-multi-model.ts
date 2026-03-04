@@ -23,7 +23,7 @@
  *   export PROVIDER_MODE=azure_foundry
  *   export AZURE_ENDPOINT=https://YOUR-HUB-NAME.openai.azure.com
  *   export AZURE_API_KEY=...
- *   export AZURE_DEPLOYMENT_PREFIX=phasergun-
+ *   export AZURE_DEPLOYMENT_PREFIX=phaser-
  *   npm run test:multi-model
  *
  * Skip the audit step:
@@ -51,7 +51,7 @@ try {
   // dotenv optional — env vars may already be set in the shell
 }
 
-import { buildProviderConfigFromEnv, createModelRouter, ModelRole, ProviderMode } from '@phasergun/llm-service';
+import { buildProviderConfigFromEnv, createModelRouter, ModelRole, ProviderMode } from '@phaser/llm-service';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -80,7 +80,7 @@ function usageSummary(tokens: number, cost: number): string {
 
 async function main(): Promise<void> {
   console.log('\n═══════════════════════════════════════════════════════');
-  console.log('  PhaserGun Multi-Model Pipeline — Smoke Test');
+  console.log('  Phaser Multi-Model Pipeline — Smoke Test');
   console.log('═══════════════════════════════════════════════════════\n');
 
   // ── 1. Resolve and log provider config ──────────────────────────────────

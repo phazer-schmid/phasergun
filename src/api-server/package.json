@@ -1,5 +1,5 @@
 {
-  "name": "@phasergun/api-server",
+  "name": "@phaser/api-server",
   "version": "0.1.0",
   "main": "dist/index.js",
   "scripts": {
@@ -8,13 +8,13 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@phasergun/chunker": "file:../chunker",
-    "@phasergun/file-parser": "file:../file-parser",
-    "@phasergun/llm-service": "file:../llm-service",
-    "@phasergun/orchestrator": "file:../orchestrator",
-    "@phasergun/rag-core": "file:../rag-core",
-    "@phasergun/rag-service": "file:../rag-service",
-    "@phasergun/shared-types": "file:../shared-types",
+    "@phaser/chunker": "file:../chunker",
+    "@phaser/file-parser": "file:../file-parser",
+    "@phaser/llm-service": "file:../llm-service",
+    "@phaser/orchestrator": "file:../orchestrator",
+    "@phaser/rag-core": "file:../rag-core",
+    "@phaser/rag-service": "file:../rag-service",
+    "@phaser/shared-types": "file:../shared-types",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",

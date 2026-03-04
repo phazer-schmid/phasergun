@@ -1,4 +1,4 @@
-import { ParsedDocument } from '@phasergun/shared-types';
+import { ParsedDocument } from '@phaser/shared-types';
 
 export interface DocumentChunk {
   content: string;

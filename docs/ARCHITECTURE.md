@@ -1,8 +1,8 @@
-# PhaserGun System Architecture
+# Phaser System Architecture
 
 ## Overview
 
-**PhaserGun** is a Regulatory Documentation Engine designed for FDA 510(k) submissions. It combines Retrieval-Augmented Generation (RAG) with multi-provider LLM support to generate compliant medical device documentation from company procedures, project context, and regulatory knowledge.
+**Phaser** is a Regulatory Documentation Engine designed for FDA 510(k) submissions. It combines Retrieval-Augmented Generation (RAG) with multi-provider LLM support to generate compliant medical device documentation from company procedures, project context, and regulatory knowledge.
 
 ### Key Capabilities
 - **Intelligent Context Retrieval**: Semantic search across SOPs and project documentation
@@ -15,7 +15,7 @@
 
 ## Monorepo Structure
 
-PhaserGun uses an npm workspaces monorepo with packages under `src/` and `vue-ui/`:
+Phaser uses an npm workspaces monorepo with packages under `src/` and `vue-ui/`:
 
 ### Backend Packages (`src/`)
 
@@ -230,7 +230,7 @@ PhaserGun uses an npm workspaces monorepo with packages under `src/` and `vue-ui
 
 ## Knowledge Sources
 
-PhaserGun retrieves context from multiple knowledge sources:
+Phaser retrieves context from multiple knowledge sources:
 
 ### 1. **Master Record** (Primary Reference)
 - **Location**: `[ProjectPath]/Context/Project-Master-Record.docx`
@@ -277,7 +277,7 @@ PhaserGun retrieves context from multiple knowledge sources:
 
 ## Reference Notation
 
-PhaserGun uses bracket syntax in prompts to explicitly request specific sources:
+Phaser uses bracket syntax in prompts to explicitly request specific sources:
 
 | Pattern | Format | Example | Behavior |
 |---------|--------|---------|----------|
@@ -285,7 +285,7 @@ PhaserGun uses bracket syntax in prompts to explicitly request specific sources:
 | **Master Record** | `[Master Record\|{field}]` | `[Master Record\|DEVICE_NAME]` | Extracts specific field from master record |
 | **Context** | `[Context\|{folder}\|{filename}]` | `[Context\|Regulatory Strategy\|predicate.docx]` | Retrieves specific document from context folder |
 
-**Output**: PhaserGun cites the source file name and section used in footnotes.
+**Output**: Phaser cites the source file name and section used in footnotes.
 
 ---
 
@@ -326,7 +326,7 @@ PhaserGun uses bracket syntax in prompts to explicitly request specific sources:
                        ▼
         ┌──────────────────────────────────┐
         │  File System (Cache + Projects)  │
-        │  • $TMPDIR/phasergun-cache/      │
+        │  • $TMPDIR/phaser-cache/      │
         │  • [ProjectPath]/Procedures/     │
         │  • [ProjectPath]/Context/        │
         └──────────────────────────────────┘
@@ -553,12 +553,12 @@ PROVIDER_MODE=azure_foundry
 AZURE_ENDPOINT=https://YOUR-HUB-NAME.openai.azure.com
 AZURE_API_KEY=...
 AZURE_API_VERSION=2024-12-01-preview
-AZURE_DEPLOYMENT_PREFIX=phasergun-   # maps gpt-4.1 → phasergun-gpt-4.1
+AZURE_DEPLOYMENT_PREFIX=phaser-   # maps gpt-4.1 → phaser-gpt-4.1
 LLM_MODE=multi-model
 ```
 
 Azure deployment names must follow the pattern `{AZURE_DEPLOYMENT_PREFIX}{modelId}`,
-e.g. `phasergun-gpt-4.1`, `phasergun-o3-mini`.
+e.g. `phaser-gpt-4.1`, `phaser-o3-mini`.
 
 ### RAG Service Stability
 

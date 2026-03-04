@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Is
 
-**PhaserGun** is a Regulatory Documentation Engine for FDA 510(k) submissions. It uses RAG (Retrieval-Augmented Generation) to generate compliant medical device documentation from company procedures, project context files, and regulatory knowledge. The system is not a general-purpose chatbot — it is purpose-built to produce traceable, citation-linked regulatory documents.
+**Phaser** is a Regulatory Documentation Engine for FDA 510(k) submissions. It uses RAG (Retrieval-Augmented Generation) to generate compliant medical device documentation from company procedures, project context files, and regulatory knowledge. The system is not a general-purpose chatbot — it is purpose-built to produce traceable, citation-linked regulatory documents.
 
 ## Commands
 
@@ -45,17 +45,17 @@ npm run test:rag
 
 ### Monorepo Structure
 
-All packages live under `src/` as npm workspaces scoped to `@phasergun/*`:
+All packages live under `src/` as npm workspaces scoped to `@phaser/*`:
 
 | Package | Scope | Purpose |
 |---|---|---|
-| `src/shared-types` | `@phasergun/shared-types` | TypeScript types shared across all packages |
-| `src/rag-core` | `@phasergun/rag-core` | Core RAG infrastructure: embeddings (`@xenova/all-MiniLM-L6-v2`), vector store (in-memory + JSON persistence), chunking, cache management, file locking |
-| `src/rag-service` | `@phasergun/rag-service` | High-level RAG orchestration: document loading, context assembly, footnote tracking. Wraps `rag-core` |
-| `src/llm-service` | `@phasergun/llm-service` | Multi-provider LLM interface (Anthropic, Mistral, Groq, Ollama, Mock) |
-| `src/orchestrator` | `@phasergun/orchestrator` | Coordinates full generation workflow: parse references → retrieve RAG context → build prompt → call LLM → append footnotes → return `GenerationOutput` |
-| `src/api-server` | `@phasergun/api-server` | Express REST API (`:3001`) — entry point for generation requests |
-| `src/file-parser` | `@phasergun/file-parser` | Document parsing for PDF, DOCX, TXT, MD, images (OCR via Tesseract.js) |
+| `src/shared-types` | `@phaser/shared-types` | TypeScript types shared across all packages |
+| `src/rag-core` | `@phaser/rag-core` | Core RAG infrastructure: embeddings (`@xenova/all-MiniLM-L6-v2`), vector store (in-memory + JSON persistence), chunking, cache management, file locking |
+| `src/rag-service` | `@phaser/rag-service` | High-level RAG orchestration: document loading, context assembly, footnote tracking. Wraps `rag-core` |
+| `src/llm-service` | `@phaser/llm-service` | Multi-provider LLM interface (Anthropic, Mistral, Groq, Ollama, Mock) |
+| `src/orchestrator` | `@phaser/orchestrator` | Coordinates full generation workflow: parse references → retrieve RAG context → build prompt → call LLM → append footnotes → return `GenerationOutput` |
+| `src/api-server` | `@phaser/api-server` | Express REST API (`:3001`) — entry point for generation requests |
+| `src/file-parser` | `@phaser/file-parser` | Document parsing for PDF, DOCX, TXT, MD, images (OCR via Tesseract.js) |
 | `vue-ui` | — | Vue 3 + Vite + Tailwind CSS frontend |
 
 ### Package Dependency Chain
@@ -66,7 +66,7 @@ api-server → orchestrator → rag-service → rag-core → shared-types
                          → file-parser
 ```
 
-`rag-core` is the lowest-level backend package. When primitives like embedding, vector store, chunking, or cache management need changes, edit `src/rag-core/src/`. The `rag-service` then uses these primitives via `@phasergun/rag-core`.
+`rag-core` is the lowest-level backend package. When primitives like embedding, vector store, chunking, or cache management need changes, edit `src/rag-core/src/`. The `rag-service` then uses these primitives via `@phaser/rag-core`.
 
 ### Generation Workflow (End-to-End)
 
@@ -104,11 +104,11 @@ Every "project" the user creates has this expected structure on disk:
     Project-Master-Checklist.docx  # Referenced via [Master Checklist]
 ```
 
-**Note on cache upgrade:** If you add `SOPs/`, `QPs/`, or `QaPs/` subfolders to an existing project, clear the vector cache (`CACHE_ENABLED=false` for one request, or delete `$TMPDIR/phasergun-cache/`) so that subcategory metadata is re-embedded.
+**Note on cache upgrade:** If you add `SOPs/`, `QPs/`, or `QaPs/` subfolders to an existing project, clear the vector cache (`CACHE_ENABLED=false` for one request, or delete `$TMPDIR/phaser-cache/`) so that subcategory metadata is re-embedded.
 
 ### Cache System
 
-Vector embeddings are cached to `$TMPDIR/phasergun-cache/` keyed by a SHA-256 fingerprint of all file paths, sizes, and mtimes. Cache is invalidated automatically when source files change. The `CACHE_ENABLED=false` env var disables caching (forces fresh processing on every request).
+Vector embeddings are cached to `$TMPDIR/phaser-cache/` keyed by a SHA-256 fingerprint of all file paths, sizes, and mtimes. Cache is invalidated automatically when source files change. The `CACHE_ENABLED=false` env var disables caching (forces fresh processing on every request).
 
 ### Reference Notation in Prompts
 
@@ -163,7 +163,7 @@ cp .env.azure-foundry.template src/api-server/.env
 
 ## Key Architectural Decisions
 
-- **`rag-core` vs `rag-service`**: `rag-core` holds pure infrastructure (no project-specific logic). `rag-service` holds PhaserGun-specific document loading patterns and context assembly. When refactoring, keep project-agnostic primitives in `rag-core`.
+- **`rag-core` vs `rag-service`**: `rag-core` holds pure infrastructure (no project-specific logic). `rag-service` holds Phaser-specific document loading patterns and context assembly. When refactoring, keep project-agnostic primitives in `rag-core`.
 - **Concurrency**: Cache builds use a global in-process `Mutex` (async-mutex) combined with cross-process file locks (proper-lockfile) to prevent cache corruption under concurrent requests.
 - **Local embeddings**: `@xenova/transformers` runs `all-MiniLM-L6-v2` locally (384-dim). No external embedding API calls.
 - **On-demand filtering**: `Context/General/`, `Context/Regulatory Strategy/`, `Procedures/QPs/`, and `Procedures/QaPs/` are only retrieved when explicitly referenced in prompts. Enforced in `enhanced-rag-service.ts:retrieveRelevantContext()`.
@@ -209,7 +209,7 @@ cp .env.azure-foundry.template src/api-server/.env
 
 ### What It Is
 
-When `LLM_MODE=multi-model`, PhaserGun replaces the single-model generation path with a
+When `LLM_MODE=multi-model`, Phaser replaces the single-model generation path with a
 four-role pipeline. Each role runs a purpose-fit model; the RAG retrieval layer and all
 reference-notation resolution logic are **unchanged**.
 
@@ -262,7 +262,7 @@ when `PROVIDER_MODE=direct`. All other roles use `OpenAILLMService`.
 1. Copy `.env.azure-foundry.template` to `src/api-server/.env`
 2. Set `PROVIDER_MODE=azure_foundry`
 3. Fill in `AZURE_ENDPOINT`, `AZURE_API_KEY`, and `AZURE_DEPLOYMENT_PREFIX`
-4. Ensure your Azure hub has deployments named `{prefix}{modelId}` (e.g. `phasergun-gpt-4o-mini`)
+4. Ensure your Azure hub has deployments named `{prefix}{modelId}` (e.g. `phaser-gpt-4o-mini`)
 5. Restart — no code changes needed
 
 The `OpenAILLMService` constructor detects `azure_foundry` mode and sets `baseURL`,

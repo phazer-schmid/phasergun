@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { LLMResponse, KnowledgeContext } from '@phasergun/shared-types';
+import { LLMResponse, KnowledgeContext } from '@phaser/shared-types';
 import { LLMService } from './index';
 import { ProviderConfig, ProviderMode, ModelRole, ModelAssignment } from './provider-config';
 

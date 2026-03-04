@@ -33,5 +33,5 @@ export {
 // Context assembly
 export { assembleContext, extractExternalStandards } from './context-assembler';
 
-// Re-export rag-core primitives for consumers that depend on @phasergun/rag-service
-export { VectorStore, VectorEntry, SearchResult, EmbeddingService, LockManager, getLockManager } from '@phasergun/rag-core';
+// Re-export rag-core primitives for consumers that depend on @phaser/rag-service
+export { VectorStore, VectorEntry, SearchResult, EmbeddingService, LockManager, getLockManager } from '@phaser/rag-core';

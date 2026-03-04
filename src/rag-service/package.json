@@ -1,5 +1,5 @@
 {
-  "name": "@phasergun/rag-service",
+  "name": "@phaser/rag-service",
   "version": "1.0.0",
   "description": "Complete DHF validation with 148 checks + RAG",
   "main": "dist/index.js",
@@ -19,9 +19,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.0",
-    "@phasergun/rag-core": "file:../rag-core",
-    "@phasergun/shared-types": "file:../shared-types",
-    "@phasergun/file-parser": "file:../file-parser",
+    "@phaser/rag-core": "file:../rag-core",
+    "@phaser/shared-types": "file:../shared-types",
+    "@phaser/file-parser": "file:../file-parser",
     "async-mutex": "^0.5.0",
     "dotenv": "^16.3.1",
     "pg": "^8.11.3",

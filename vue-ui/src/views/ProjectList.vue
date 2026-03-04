@@ -3,7 +3,7 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <!-- Header -->
       <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900 mb-2">PhaserGun Projects</h1>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Phaser Projects</h1>
         <p class="text-gray-600">Manage your quality regulatory document generation projects</p>
       </div>
 

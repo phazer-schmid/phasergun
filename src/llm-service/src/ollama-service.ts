@@ -1,4 +1,4 @@
-import { LLMResponse, KnowledgeContext } from '@phasergun/shared-types';
+import { LLMResponse, KnowledgeContext } from '@phaser/shared-types';
 
 interface OllamaConfig {
   baseUrl?: string;

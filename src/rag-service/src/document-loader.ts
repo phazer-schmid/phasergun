@@ -1,5 +1,5 @@
-import { ParsedDocument } from '@phasergun/shared-types';
-import { ComprehensiveFileParser } from '@phasergun/file-parser';
+import { ParsedDocument } from '@phaser/shared-types';
+import { ComprehensiveFileParser } from '@phaser/file-parser';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as yaml from 'js-yaml';

@@ -49,7 +49,7 @@ export class LockManager {
   private getLockFilePath(projectPath: string): string {
     const tempBase = os.tmpdir();
     const cacheBaseName = crypto.createHash('md5').update(projectPath).digest('hex').substring(0, 8);
-    const lockDir = path.join(tempBase, 'phasergun-cache', 'locks', cacheBaseName);
+    const lockDir = path.join(tempBase, 'phaser-cache', 'locks', cacheBaseName);
     return path.join(lockDir, 'cache-build.lock');
   }
 

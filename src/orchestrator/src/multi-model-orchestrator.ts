@@ -4,7 +4,7 @@ import {
   Discrepancy,
   ConfidenceRating,
   ParsedDocument,
-} from '@phasergun/shared-types';
+} from '@phaser/shared-types';
 import {
   EnhancedRAGService,
   FootnoteTracker,
@@ -12,8 +12,8 @@ import {
   parseProcedureReferences,
   parseKnowledgeSourceScopes,
   DocumentLoader,
-} from '@phasergun/rag-service';
-import { ModelRouter, ModelRole } from '@phasergun/llm-service';
+} from '@phaser/rag-service';
+import { ModelRouter, ModelRole } from '@phaser/llm-service';
 import * as path from 'path';
 
 // ---------------------------------------------------------------------------
@@ -184,7 +184,7 @@ export class MultiModelOrchestrator {
           timestamp: new Date().toISOString(),
           generatedContent:
             `## ⚠️ Generation Blocked — Missing Required Documents\n\n` +
-            `PhaserGun cannot generate this document because the following referenced files were not found:\n\n` +
+            `Phaser cannot generate this document because the following referenced files were not found:\n\n` +
             generationErrors.map((e, i) => `**${i + 1}.** ${e}`).join('\n\n') +
             `\n\nPlease add the missing files and try again.`,
         };

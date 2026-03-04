@@ -1,8 +1,8 @@
-# PhaserGun Cache System
+# Phaser Cache System
 
 ## Overview
 
-The PhaserGun cache system persists indexed knowledge (vector embeddings, summaries, and metadata) across requests and process restarts. This dramatically improves performance by avoiding expensive document re-parsing and re-embedding operations.
+The Phaser cache system persists indexed knowledge (vector embeddings, summaries, and metadata) across requests and process restarts. This dramatically improves performance by avoiding expensive document re-parsing and re-embedding operations.
 
 ### Key Benefits
 - **Fast Retrieval**: Load cached vectors in ~100-200ms vs. minutes for full rebuild
@@ -41,29 +41,29 @@ Cache files are stored in the system temp directory to avoid permission issues w
 
 ### Base Path
 ```
-$TMPDIR/phasergun-cache/
+$TMPDIR/phaser-cache/
 ```
 
-On macOS/Linux: `/tmp/phasergun-cache/`  
-On Windows: `%TEMP%\phasergun-cache\`
+On macOS/Linux: `/tmp/phaser-cache/`  
+On Windows: `%TEMP%\phaser-cache\`
 
 ### Project Isolation
 
 Each project gets its own cache directory identified by an MD5 hash of the project path (truncated to 8 characters):
 
 ```
-$TMPDIR/phasergun-cache/{project_hash}/
+$TMPDIR/phaser-cache/{project_hash}/
 ```
 
 Example:
 ```
-/tmp/phasergun-cache/a3f8c2d9/
+/tmp/phaser-cache/a3f8c2d9/
 ```
 
 ### File Structure
 
 ```
-$TMPDIR/phasergun-cache/
+$TMPDIR/phaser-cache/
 ├── vector-store/
 │   └── {project_hash}/
 │       └── vector-store.json         # Vector embeddings + metadata
@@ -248,7 +248,7 @@ The `Context/Prompt/` subfolder is **intentionally excluded** from the cache:
 
 ## Concurrency Protection
 
-PhaserGun uses a two-layer concurrency protection strategy to prevent race conditions during cache builds:
+Phaser uses a two-layer concurrency protection strategy to prevent race conditions during cache builds:
 
 ### Layer 1: In-Process Mutex (Global async-mutex)
 
@@ -274,7 +274,7 @@ try {
 ### Layer 2: Cross-Process Lock (proper-lockfile)
 
 ```typescript
-// File-based lock at $TMPDIR/phasergun-cache/locks/{project_hash}/cache-build.lock
+// File-based lock at $TMPDIR/phaser-cache/locks/{project_hash}/cache-build.lock
 const lock = await lockfile.lock(lockPath, {
   stale: 60000,        // 60 seconds
   retries: 10,
@@ -314,7 +314,7 @@ Request 1 (Process A)  Request 2 (Process A)  Request 3 (Process B)
 
 ## Determinism: Alphabetical File Sorting
 
-To ensure cache rebuilds produce identical results across different runs, PhaserGun enforces deterministic ordering:
+To ensure cache rebuilds produce identical results across different runs, Phaser enforces deterministic ordering:
 
 ### Why Determinism Matters
 
@@ -439,7 +439,7 @@ Cache validation metadata.
   "fingerprint": "sha256:mno345...",
   "primaryContext": {
     "product": {
-      "name": "PhaserGun",
+      "name": "Phaser",
       "type": "Regulatory Documentation Engine"
     },
     "knowledge_sources": { /* ... */ }
@@ -457,15 +457,15 @@ Cache validation metadata.
 
 ```bash
 # macOS/Linux
-rm -rf $TMPDIR/phasergun-cache
+rm -rf $TMPDIR/phaser-cache
 
 # OR specify full path
-rm -rf /tmp/phasergun-cache
+rm -rf /tmp/phaser-cache
 ```
 
 ```powershell
 # Windows
-Remove-Item -Recurse -Force $env:TEMP\phasergun-cache
+Remove-Item -Recurse -Force $env:TEMP\phaser-cache
 ```
 
 ### Reset Single Project
@@ -476,7 +476,7 @@ PROJECT_PATH="/path/to/project"
 PROJECT_HASH=$(echo -n "$PROJECT_PATH" | md5sum | cut -c1-8)
 
 # Remove that project's cache
-rm -rf $TMPDIR/phasergun-cache/*/$PROJECT_HASH
+rm -rf $TMPDIR/phaser-cache/*/$PROJECT_HASH
 ```
 
 ### Effect of Manual Reset
@@ -535,10 +535,10 @@ rm -rf $TMPDIR/phasergun-cache/*/$PROJECT_HASH
 echo $CACHE_ENABLED  # Should be true or unset
 
 # Check cache directory permissions
-ls -la $TMPDIR/phasergun-cache
+ls -la $TMPDIR/phaser-cache
 
 # Check file modification times
-find /path/to/project -type f -newer /tmp/phasergun-cache/metadata/*/cache-metadata.json
+find /path/to/project -type f -newer /tmp/phaser-cache/metadata/*/cache-metadata.json
 ```
 
 ### Cache Stale (Old Content Being Served)
@@ -552,7 +552,7 @@ find /path/to/project -type f -newer /tmp/phasergun-cache/metadata/*/cache-metad
 **Solutions:**
 ```bash
 # Force cache rebuild
-rm -rf $TMPDIR/phasergun-cache
+rm -rf $TMPDIR/phaser-cache
 
 # Verify files have recent mtimes
 ls -lt /path/to/project/Procedures
@@ -583,7 +583,7 @@ touch $TMPDIR/test && rm $TMPDIR/test
 **Solution:**
 ```bash
 # Remove stale lock files
-rm -rf $TMPDIR/phasergun-cache/locks
+rm -rf $TMPDIR/phaser-cache/locks
 ```
 
 ---
@@ -591,7 +591,7 @@ rm -rf $TMPDIR/phasergun-cache/locks
 ## Best Practices
 
 1. **Enable Caching in Production**: Set `CACHE_ENABLED=true` for best performance
-2. **Monitor Cache Size**: Check `$TMPDIR/phasergun-cache` size periodically
+2. **Monitor Cache Size**: Check `$TMPDIR/phaser-cache` size periodically
 3. **Clear Cache After Major Changes**: Rebuild cache when changing chunking/embedding logic
 4. **Use Proper File Sync**: Ensure rclone or sync tools preserve modification times
 5. **Check Logs**: Monitor cache hit/miss rates in server logs

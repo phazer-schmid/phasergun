@@ -256,7 +256,7 @@ Reference: [Context|Regulatory Strategy|Predicate-Device.docx]
 
 1. **Clear cache** to force rebuild with new logic:
    ```bash
-   rm -rf $TMPDIR/phasergun-cache
+   rm -rf $TMPDIR/phaser-cache
    ```
 
 2. **Test with your original prompt** ("Rohun - DDP Scope - DAVID - V1.0.docx")

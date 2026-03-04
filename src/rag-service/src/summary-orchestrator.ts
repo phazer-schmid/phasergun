@@ -3,7 +3,7 @@
  * Coordinates SOP and Context file summary generation with mutex protection
  */
 
-import { ParsedDocument } from '@phasergun/shared-types';
+import { ParsedDocument } from '@phaser/shared-types';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Mutex } from 'async-mutex';

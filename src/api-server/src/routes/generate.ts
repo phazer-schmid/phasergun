@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { OrchestratorService } from '@phasergun/orchestrator';
-import { ComprehensiveFileParser } from '@phasergun/file-parser';
-import { EnhancedRAGService } from '@phasergun/rag-service';
-import { GenerationOutput } from '@phasergun/shared-types';
+import { OrchestratorService } from '@phaser/orchestrator';
+import { ComprehensiveFileParser } from '@phaser/file-parser';
+import { EnhancedRAGService } from '@phaser/rag-service';
+import { GenerationOutput } from '@phaser/shared-types';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 
@@ -89,8 +89,8 @@ router.post('/generate', async (req, res) => {
     if (llmMode === 'multi-model') {
       // ── New path: ModelRouter + MultiModelOrchestrator ──────────────────
       console.log('[API /generate] Using multi-model pipeline (INGESTION → DRAFT → AUDIT → REVISION)');
-      const { createModelRouter } = await import('@phasergun/llm-service');
-      const { MultiModelOrchestrator } = await import('@phasergun/orchestrator');
+      const { createModelRouter } = await import('@phaser/llm-service');
+      const { MultiModelOrchestrator } = await import('@phaser/orchestrator');
       const modelRouter = createModelRouter();
       orchestrator = new MultiModelOrchestrator(enhancedRAGService, modelRouter, {
         enableIngestionStep: process.env.ENABLE_INGESTION_STEP !== 'false',
@@ -113,26 +113,26 @@ router.post('/generate', async (req, res) => {
 
       if (llmMode === 'ollama') {
         console.log(`[API /generate] Using Ollama with model: ${ollamaModel}`);
-        const { OllamaLLMService } = await import('@phasergun/llm-service');
+        const { OllamaLLMService } = await import('@phaser/llm-service');
         llmService = new OllamaLLMService(ollamaModel, { baseUrl: ollamaBaseUrl });
 
       } else if (llmMode === 'mistral' && mistralApiKey) {
         console.log(`[API /generate] Using Mistral AI (${mistralModel})`);
-        const { MistralLLMService } = await import('@phasergun/llm-service');
+        const { MistralLLMService } = await import('@phaser/llm-service');
         llmService = new MistralLLMService(mistralApiKey, mistralModel);
 
       } else if (llmMode === 'groq' && groqApiKey) {
         console.log(`[API /generate] Using Groq LPU (${groqModel})`);
-        const { GroqLLMService } = await import('@phasergun/llm-service');
+        const { GroqLLMService } = await import('@phaser/llm-service');
         llmService = new GroqLLMService(groqApiKey, groqModel);
 
       } else if (llmMode === 'anthropic' && anthropicApiKey) {
         console.log(`[API /generate] Using Anthropic Claude (${anthropicModel})`);
-        const { AnthropicLLMService } = await import('@phasergun/llm-service');
+        const { AnthropicLLMService } = await import('@phaser/llm-service');
         llmService = new AnthropicLLMService(anthropicApiKey, anthropicModel);
       } else {
         console.log(`[API /generate] Using MOCK LLM Service`);
-        const { MockLLMService } = await import('@phasergun/llm-service');
+        const { MockLLMService } = await import('@phaser/llm-service');
         llmService = new MockLLMService();
       }
 

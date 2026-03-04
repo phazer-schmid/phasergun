@@ -1,8 +1,8 @@
-# PhaserGun Deployment Guide
+# Phaser Deployment Guide
 
 ## Overview
 
-This guide covers deploying PhaserGun in production environments, including building, configuring nginx, setting up pm2 process management, SSL certificates, and project file synchronization with rclone.
+This guide covers deploying Phaser in production environments, including building, configuring nginx, setting up pm2 process management, SSL certificates, and project file synchronization with rclone.
 
 ---
 
@@ -43,8 +43,8 @@ npm install -g pm2
 
 ```bash
 cd /var/www  # Or your preferred location
-git clone https://github.com/yourorg/phasergun.git
-cd phasergun
+git clone https://github.com/yourorg/phaser.git
+cd phaser
 ```
 
 ### 2. Install Dependencies
@@ -142,7 +142,7 @@ ANTHROPIC_MODEL=claude-sonnet-4-20250514
 # OLLAMA_BASE_URL=http://localhost:11434
 
 # Primary Context Path (optional)
-PRIMARY_CONTEXT_PATH=/var/www/phasergun/src/rag-service/knowledge-base/context/primary-context.yaml
+PRIMARY_CONTEXT_PATH=/var/www/phaser/src/rag-service/knowledge-base/context/primary-context.yaml
 
 # Cache Configuration
 CACHE_ENABLED=true
@@ -166,14 +166,14 @@ cp vue-ui/.env.template vue-ui/.env.local
 
 ### Production Setup (Static Assets + API Proxy)
 
-**File**: `/etc/nginx/sites-available/phasergun`
+**File**: `/etc/nginx/sites-available/phaser`
 
 ```bash
 # Copy template
-sudo cp nginx.conf.template /etc/nginx/sites-available/phasergun
+sudo cp nginx.conf.template /etc/nginx/sites-available/phaser
 
 # Edit configuration
-sudo nano /etc/nginx/sites-available/phasergun
+sudo nano /etc/nginx/sites-available/phaser
 ```
 
 **Configuration** (update paths and domain):
@@ -182,7 +182,7 @@ sudo nano /etc/nginx/sites-available/phasergun
 # HTTP - Redirect to HTTPS
 server {
     listen 80;
-    server_name phasergun.app www.phasergun.app;
+    server_name phaser.app www.phaser.app;
     
     return 301 https://$server_name$request_uri;
 }
@@ -190,11 +190,11 @@ server {
 # HTTPS - Main Server
 server {
     listen 443 ssl http2;
-    server_name phasergun.app www.phasergun.app;
+    server_name phaser.app www.phaser.app;
 
     # SSL Certificate (configured after certbot)
-    ssl_certificate /etc/letsencrypt/live/phasergun.app/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/phasergun.app/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/phaser.app/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/phaser.app/privkey.pem;
     
     # SSL Configuration
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -202,7 +202,7 @@ server {
     ssl_prefer_server_ciphers on;
 
     # Vue UI - Serve static build files
-    root /var/www/phasergun/vue-ui/dist;
+    root /var/www/phaser/vue-ui/dist;
     index index.html;
 
     # Vue Router support (SPA)
@@ -246,8 +246,8 @@ server {
     }
 
     # Logs
-    access_log /var/log/nginx/phasergun-access.log;
-    error_log /var/log/nginx/phasergun-error.log;
+    access_log /var/log/nginx/phaser-access.log;
+    error_log /var/log/nginx/phaser-error.log;
 }
 ```
 
@@ -255,7 +255,7 @@ server {
 
 ```bash
 # Create symbolic link
-sudo ln -sf /etc/nginx/sites-available/phasergun /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/phaser /etc/nginx/sites-enabled/
 
 # Test configuration
 sudo nginx -t
@@ -275,12 +275,12 @@ sudo systemctl reload nginx
 sudo apt install certbot python3-certbot-nginx
 
 # Obtain certificate
-sudo certbot certonly --nginx -d phasergun.app -d www.phasergun.app
+sudo certbot certonly --nginx -d phaser.app -d www.phaser.app
 
 # Follow prompts:
 # - Enter email address
 # - Agree to terms
-# - Certificate will be saved to /etc/letsencrypt/live/phasergun.app/
+# - Certificate will be saved to /etc/letsencrypt/live/phaser.app/
 
 # Reload nginx with new certificate
 sudo systemctl reload nginx
@@ -309,7 +309,7 @@ sudo systemctl status certbot.timer
 module.exports = {
   apps: [
     {
-      name: 'phasergun-api',
+      name: 'phaser-api',
       cwd: './src/api-server',
       script: 'dist/index.js',
       instances: 1,
@@ -345,26 +345,26 @@ pm2 start ecosystem.config.js
 pm2 status
 
 # View logs
-pm2 logs phasergun-api
+pm2 logs phaser-api
 
 # Follow logs in real-time
-pm2 logs phasergun-api --lines 100
+pm2 logs phaser-api --lines 100
 ```
 
 ### pm2 Management Commands
 
 ```bash
 # Restart
-pm2 restart phasergun-api
+pm2 restart phaser-api
 
 # Stop
-pm2 stop phasergun-api
+pm2 stop phaser-api
 
 # Delete from pm2
-pm2 delete phasergun-api
+pm2 delete phaser-api
 
 # View detailed info
-pm2 show phasergun-api
+pm2 show phaser-api
 
 # Monitor resources
 pm2 monit
@@ -433,13 +433,13 @@ curl https://rclone.org/install.sh | sudo bash
 rclone config
 
 # Sync projects
-rclone sync remote:path/to/projects /var/www/phasergun/projects --progress
+rclone sync remote:path/to/projects /var/www/phaser/projects --progress
 
 # Set up cron job for automatic sync
 crontab -e
 
 # Add line (sync every hour):
-0 * * * * rclone sync remote:path/to/projects /var/www/phasergun/projects --log-file=/var/log/rclone.log
+0 * * * * rclone sync remote:path/to/projects /var/www/phaser/projects --log-file=/var/log/rclone.log
 ```
 
 ---
@@ -462,19 +462,19 @@ crontab -e
 ssh root@your-droplet-ip
 
 # 2. Create non-root user
-adduser phasergun
-usermod -aG sudo phasergun
+adduser phaser
+usermod -aG sudo phaser
 
 # 3. Set up SSH key authentication
-mkdir -p /home/phasergun/.ssh
-cp /root/.ssh/authorized_keys /home/phasergun/.ssh/
-chown -R phasergun:phasergun /home/phasergun/.ssh
-chmod 700 /home/phasergun/.ssh
-chmod 600 /home/phasergun/.ssh/authorized_keys
+mkdir -p /home/phaser/.ssh
+cp /root/.ssh/authorized_keys /home/phaser/.ssh/
+chown -R phaser:phaser /home/phaser/.ssh
+chmod 700 /home/phaser/.ssh
+chmod 600 /home/phaser/.ssh/authorized_keys
 
 # 4. Exit and reconnect as new user
 exit
-ssh phasergun@your-droplet-ip
+ssh phaser@your-droplet-ip
 
 # 5. Update system
 sudo apt update && sudo apt upgrade -y
@@ -494,7 +494,7 @@ sudo ufw allow OpenSSH
 sudo ufw allow 'Nginx Full'
 sudo ufw enable
 
-# 10. Clone and build PhaserGun (see Build Process section above)
+# 10. Clone and build Phaser (see Build Process section above)
 ```
 
 ### Domain Configuration
@@ -506,7 +506,7 @@ sudo ufw enable
 # A record: www -> droplet-ip
 
 # 2. Wait for DNS propagation (5-60 minutes)
-# Check with: dig phasergun.app
+# Check with: dig phaser.app
 
 # 3. Configure nginx and SSL (see sections above)
 ```
@@ -554,7 +554,7 @@ sudo ufw status verbose
 pm2 logs
 
 # View specific app logs
-pm2 logs phasergun-api
+pm2 logs phaser-api
 
 # View last 200 lines
 pm2 logs --lines 200
@@ -568,10 +568,10 @@ tail -f logs/api-error.log
 
 ```bash
 # Access log
-sudo tail -f /var/log/nginx/phasergun-access.log
+sudo tail -f /var/log/nginx/phaser-access.log
 
 # Error log
-sudo tail -f /var/log/nginx/phasergun-error.log
+sudo tail -f /var/log/nginx/phaser-error.log
 
 # Rotate logs
 sudo logrotate /etc/logrotate.d/nginx
@@ -590,7 +590,7 @@ htop
 df -h
 
 # Check cache size
-du -sh /tmp/phasergun-cache
+du -sh /tmp/phaser-cache
 ```
 
 ---
@@ -604,7 +604,7 @@ du -sh /tmp/phasergun-cache
    - `vue-ui/.env.local`
 
 2. **nginx Configuration**:
-   - `/etc/nginx/sites-available/phasergun`
+   - `/etc/nginx/sites-available/phaser`
 
 3. **SSL Certificates**:
    - `/etc/letsencrypt/`
@@ -622,14 +622,14 @@ du -sh /tmp/phasergun-cache
 #!/bin/bash
 # backup.sh
 
-BACKUP_DIR="/backup/phasergun-$(date +%Y%m%d)"
+BACKUP_DIR="/backup/phaser-$(date +%Y%m%d)"
 mkdir -p $BACKUP_DIR
 
 # Backup env files
 cp src/api-server/.env $BACKUP_DIR/
 
 # Backup nginx config
-sudo cp /etc/nginx/sites-available/phasergun $BACKUP_DIR/
+sudo cp /etc/nginx/sites-available/phaser $BACKUP_DIR/
 
 # Backup SSL certs
 sudo cp -r /etc/letsencrypt $BACKUP_DIR/
@@ -638,9 +638,9 @@ sudo cp -r /etc/letsencrypt $BACKUP_DIR/
 cp ecosystem.config.js $BACKUP_DIR/
 
 # Create archive
-tar -czf phasergun-backup-$(date +%Y%m%d).tar.gz $BACKUP_DIR/
+tar -czf phaser-backup-$(date +%Y%m%d).tar.gz $BACKUP_DIR/
 
-echo "Backup complete: phasergun-backup-$(date +%Y%m%d).tar.gz"
+echo "Backup complete: phaser-backup-$(date +%Y%m%d).tar.gz"
 ```
 
 ---
@@ -657,10 +657,10 @@ echo "Backup complete: phasergun-backup-$(date +%Y%m%d).tar.gz"
 grep CACHE_ENABLED src/api-server/.env
 
 # Check temp directory permissions
-ls -la /tmp/phasergun-cache
+ls -la /tmp/phaser-cache
 
 # Clear and rebuild cache
-rm -rf /tmp/phasergun-cache
+rm -rf /tmp/phaser-cache
 # Next request will rebuild automatically
 
 # Check if files are changing unexpectedly
@@ -674,16 +674,16 @@ find /path/to/project -type f -mmin -60  # Files modified in last hour
 **Solutions**:
 ```bash
 # Check temp directory ownership
-ls -la /tmp/phasergun-cache
+ls -la /tmp/phaser-cache
 
 # Fix ownership
-sudo chown -R $USER:$USER /tmp/phasergun-cache
+sudo chown -R $USER:$USER /tmp/phaser-cache
 
 # Check project file permissions
 ls -la /path/to/projects
 
 # Fix project permissions
-sudo chown -R phasergun:phasergun /path/to/projects
+sudo chown -R phaser:phaser /path/to/projects
 ```
 
 ### Missing Environment Variables
@@ -699,7 +699,7 @@ ls -la src/api-server/.env
 cat src/api-server/.env | grep API_KEY
 
 # Restart pm2 to reload env
-pm2 restart phasergun-api
+pm2 restart phaser-api
 ```
 
 ### nginx Issues
@@ -713,13 +713,13 @@ pm2 status
 curl http://localhost:3001/api/health
 
 # Check nginx error log
-sudo tail -f /var/log/nginx/phasergun-error.log
+sudo tail -f /var/log/nginx/phaser-error.log
 
 # Test nginx config
 sudo nginx -t
 
 # Restart services
-pm2 restart phasergun-api
+pm2 restart phaser-api
 sudo systemctl restart nginx
 ```
 
@@ -786,13 +786,13 @@ npx tsc --noEmit
 
 ---
 
-## Updating PhaserGun
+## Updating Phaser
 
 ### Zero-Downtime Deployment
 
 ```bash
 # 1. Pull latest code
-cd /var/www/phasergun
+cd /var/www/phaser
 git pull origin main
 
 # 2. Install dependencies
@@ -807,10 +807,10 @@ npm run build
 cd ..
 
 # 5. Reload pm2 (graceful restart)
-pm2 reload phasergun-api
+pm2 reload phaser-api
 
 # 6. Clear cache if needed
-rm -rf /tmp/phasergun-cache
+rm -rf /tmp/phaser-cache
 
 # Done! No downtime required.
 ```
@@ -828,7 +828,7 @@ npm run build-packages
 cd vue-ui && npm run build && cd ..
 
 # Restart
-pm2 restart phasergun-api
+pm2 restart phaser-api
 ```
 
 ---
@@ -870,7 +870,7 @@ listen 443 ssl http2;
 
 ```bash
 # Check cache statistics
-du -sh /tmp/phasergun-cache/*
+du -sh /tmp/phaser-cache/*
 
 # Monitor cache hits in logs
 grep "Cache valid" logs/api-out.log | wc -l

@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { LLMResponse, KnowledgeContext } from '@phasergun/shared-types';
+import { LLMResponse, KnowledgeContext } from '@phaser/shared-types';
 import { LLMService } from './index';
 
 /**

@@ -1,4 +1,4 @@
-import { ParsedDocument } from '@phasergun/shared-types';
+import { ParsedDocument } from '@phaser/shared-types';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -209,7 +209,7 @@ export class ComprehensiveFileParser implements FileParser {
           `║  ❌  UNSUPPORTED FILE — CANNOT PARSE (no extension, unknown bytes)\n` +
           `║  File: ${filePath}\n` +
           `║  Action: Add the correct file extension (e.g., .docx, .pdf) and\n` +
-          `║          re-run so PhaserGun can process this document.\n` +
+          `║          re-run so Phaser can process this document.\n` +
           `╚════════════════════════════════════════════════════════════════╝`
         );
         return null;
@@ -227,7 +227,7 @@ export class ComprehensiveFileParser implements FileParser {
         `║  File: ${filePath}\n` +
         `║  Extension: "${ext}"\n` +
         `║  Supported: ${this.supportedExtensions.join(', ')}\n` +
-        `║  If this file contains document content you need PhaserGun to\n` +
+        `║  If this file contains document content you need Phaser to\n` +
         `║  process, convert it to PDF or DOCX and re-run.\n` +
         `╚════════════════════════════════════════════════════════════════╝`
       );
