@@ -167,6 +167,29 @@ async function startServer() {
     } else if (llmMode === 'ollama') {
       llmProvider = 'Ollama (Local)';
       llmModel = process.env.OLLAMA_MODEL || 'llama3.1:70b';
+    } else if (llmMode === 'multi-model') {
+      const providerMode = process.env.PROVIDER_MODE || 'direct';
+      const drafter = process.env.MODEL_DRAFTER || 'gpt-4.1';
+      const auditor = process.env.MODEL_AUDITOR || 'o3-mini';
+      const ingestion = process.env.MODEL_INGESTION || 'gpt-4o-mini';
+      const reviser = process.env.MODEL_REVISER || 'gpt-4.1';
+      const ingestionEnabled = process.env.ENABLE_INGESTION_STEP !== 'false';
+      const auditEnabled = process.env.ENABLE_AUDIT_STEP !== 'false';
+      const revisionEnabled = process.env.ENABLE_REVISION_STEP !== 'false';
+      const steps = [
+        ingestionEnabled ? `ingestion:${ingestion}` : null,
+        `draft:${drafter}`,
+        auditEnabled ? `audit:${auditor}` : null,
+        revisionEnabled ? `revise:${reviser}` : null,
+      ].filter(Boolean).join(' → ');
+      if (providerMode === 'azure_foundry') {
+        const endpoint = process.env.AZURE_ENDPOINT || '(endpoint not set)';
+        const prefix = process.env.AZURE_DEPLOYMENT_PREFIX || '';
+        llmProvider = `Multi-Model Pipeline via Azure AI Foundry (${endpoint}, prefix: "${prefix}")`;
+      } else {
+        llmProvider = 'Multi-Model Pipeline (direct APIs)';
+      }
+      llmModel = steps;
     }
 
     app.listen(PORT, () => {
