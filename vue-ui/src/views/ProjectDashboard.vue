@@ -4,12 +4,9 @@
     <aside class="dashboard-sidebar">
       <!-- Logo/Branding -->
       <div class="sidebar-header">
-        <div class="app-logo">
-          <div class="logo-icon">PG</div>
-          <div class="logo-content">
-            <span class="logo-text">Phaser</span>
-            <span class="logo-subtitle">Quality Regulatory Generation</span>
-          </div>
+        <div class="app-logo-card">
+          <img :src="'/phaser-logo.png'" alt="Phaser" class="logo-image" />
+          <span class="logo-subtitle">Quality Regulatory Generation</span>
         </div>
       </div>
 
@@ -595,42 +592,31 @@ function formatCategoryName(category: string): string {
   margin-bottom: var(--spacing-2xl);
 }
 
-.app-logo {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-}
-
-.logo-icon {
-  width: 44px;
-  height: 44px;
-  background-color: var(--primary-purple);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: var(--font-weight-bold);
-  font-size: var(--font-size-xl);
-  border-radius: var(--radius-md);
-  flex-shrink: 0;
-}
-
-.logo-content {
+.app-logo-card {
+  background: white;
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: flex-start;
+  gap: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
-.logo-text {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
-  color: var(--text-dark);
-  line-height: 1.2;
+.logo-image {
+  width: 180px;
+  height: auto;
+  display: block;
 }
 
 .logo-subtitle {
-  font-size: var(--font-size-sm);
-  color: var(--text-gray);
+  font-family: 'Georgia', 'Palatino Linotype', 'Book Antiqua', serif;
+  font-size: 0.8rem;
+  font-style: italic;
+  font-weight: 400;
+  color: #5a5a7a;
+  letter-spacing: 0.04em;
   line-height: 1.2;
 }
 
