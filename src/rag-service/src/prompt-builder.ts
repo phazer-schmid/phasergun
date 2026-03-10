@@ -28,6 +28,19 @@ export const RULE_NO_HALLUCINATION =
   '- STRICT: Do NOT invent, fabricate, or assume values for project-specific facts (e.g., names, dates, device identifiers, submission numbers, test results, specific regulatory decisions). If a value is shown as "(FIELD_NAME: not configured in Master Record)" or "(FIELD_NAME: not set)" or similar, reproduce that placeholder exactly — do NOT replace it with a made-up value, example data, or generic text. Only real project-specific data from the provided sources may be written into those fields.\n';
 
 /**
+ * Hard guard: if a [Procedure|...] reference resolves to an SOP that is NOT present
+ * in the retrieved reference materials, do NOT invent or infer its content.
+ * Instead, emit the UNRESOLVED placeholder and stop generating for that section.
+ *
+ * This prevents the model from fabricating SOP language (e.g., Quality Plan purpose
+ * statements) when the required SOP file was not loaded into context.
+ *
+ * Maps to: operational_rules.source_tracking — "never invent procedural content"
+ */
+export const RULE_NO_FABRICATE_SOP_CONTENT =
+  '- STRICT SOP GUARD: When a [Procedure|...] reference resolves to an SOP number and title, you MUST verify that the actual text of that SOP appears in the retrieved reference materials above. If the SOP text is NOT present (only its name appears, or it is absent entirely), do NOT generate, infer, paraphrase, or fabricate any content attributed to it. Instead, output exactly: [UNRESOLVED: <SOP number and title> — document not found in retrieved context. Content cannot be generated.] Never substitute invented regulatory language for missing SOP content.\n';
+
+/**
  * Role responsibilities may be derived from SOP/procedure context when the Master Record
  * does not contain explicit responsibility text. This prevents Claude from collapsing
  * a responsibilities column simply because the field is not in the Master Record.
@@ -95,6 +108,7 @@ export function buildSystemSection(primaryContext: any): string {
     'GENERATION RULES (apply to all tasks):\n',
     RULE_WRITE_AS_AUTHOR,
     RULE_NO_HALLUCINATION,
+    RULE_NO_FABRICATE_SOP_CONTENT,
     RULE_DERIVE_RESPONSIBILITIES_FROM_SOPS,
     RULE_RESOLVE_BRACKET_NOTATION,
     RULE_USE_PROCEDURAL_LANGUAGE,
